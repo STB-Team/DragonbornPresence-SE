@@ -21,11 +21,6 @@ SKSEPluginLoad(const SKSE::LoadInterface* skse) {
     SKSE::log::info("DragonbornPresence 2.0.0");
 
     DragonbornPresence::SetLocale();
-
-    if (auto* papyrus = SKSE::GetPapyrusInterface()) {
-        papyrus->Register(DragonbornPresence::RegisterFuncs);
-    }
-
     DragonbornPresence::RegisterGameEventHandlers();
     return true;
 }

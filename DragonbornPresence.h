@@ -6,6 +6,5 @@ namespace DragonbornPresence {
 
 void SetLocale();
 void RegisterGameEventHandlers();
-bool RegisterFuncs(RE::BSScript::IVirtualMachine* vm);
 
 }
