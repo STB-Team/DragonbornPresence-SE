@@ -1,9 +1,12 @@
 #include "DragonbornPresence.h"
 #include "AdditionalFunctions.h"
 #include "discord.h"
+#include <atomic>
+#include <chrono>
 #include <ctime>
 #include <fstream>
 #include <string>
+#include <thread>
 
 namespace DragonbornPresence {
 
@@ -20,6 +23,7 @@ discord::Core* g_core              = nullptr;
 int64_t        g_startTime         = 0;
 std::string    g_localeMainMenu    = "Main menu";
 std::string    g_localeEditingChar = "Editing character";
+std::string    g_lastPosition;
 
 static std::string SafeStr(const char* s) {
     if (!s || *s == '\0') return "";
@@ -31,27 +35,24 @@ static std::string BuildPosition(RE::PlayerCharacter* player) {
     auto* loc  = player->GetCurrentLocation();
     auto* cell = player->GetParentCell();
 
+    std::string locName;
+    for (auto* l = loc; l && locName.empty(); l = l->parentLoc)
+        locName = SafeStr(l->GetName());
+
     std::string wsName   = ws   ? SafeStr(ws->GetName())   : "";
-    std::string locName  = loc  ? SafeStr(loc->GetName())  : "";
     std::string cellName = cell ? SafeStr(cell->GetName()) : "";
 
-    if (!wsName.empty()) {
-        return (!locName.empty() && locName != wsName)
-            ? wsName + ": " + locName
-            : wsName;
-    }
-    if (!locName.empty()) {
-        return (!cellName.empty() && cellName != locName)
-            ? locName + ": " + cellName
-            : locName;
-    }
+if (!wsName.empty())
+        return (!locName.empty() && locName != wsName) ? wsName + ": " + locName : wsName;
+    if (!locName.empty()) return locName;
     return cellName;
 }
 
 static std::string BuildPlayerInfo(RE::PlayerCharacter* player) {
-    auto* base = player->GetActorBase();
     auto* race = player->GetRace();
-    std::string name     = base ? SafeStr(base->GetName()) : "";
+    // GetName() on the actor returns the display name (updated after char edit);
+    // GetActorBase()->GetName() can lag behind by several frames.
+    std::string name     = SafeStr(player->GetName());
     std::string raceName = race ? SafeStr(race->GetName()) : "";
     return name + " - " + raceName + " (" + std::to_string(player->GetLevel()) + ")";
 }
@@ -72,20 +73,36 @@ void SendPresence(const char* state, const char* details) {
         else
             SKSE::log::info("Presence updated.");
     });
-    g_core->RunCallbacks();
 }
 
-void RefreshPosition() {
+void RefreshPosition(const char* trigger = nullptr) {
     auto* player = RE::PlayerCharacter::GetSingleton();
     if (!player) return;
 
     std::string position   = BuildPosition(player);
     std::string playerInfo = BuildPlayerInfo(player);
-    SKSE::log::info("Position: {}", position);
-    SendPresence(position.c_str(), playerInfo.c_str());
+
+    const bool fallback = position.empty() && !g_lastPosition.empty();
+    if (!position.empty()) g_lastPosition = position;
+
+    const std::string& display = fallback ? g_lastPosition : position;
+    SKSE::log::info("[{}] player='{}' location='{}'{}",
+        trigger ? trigger : "refresh", playerInfo, display,
+        fallback ? " [fallback]" : "");
+    SendPresence(display.c_str(), playerInfo.c_str());
+}
+
+void DeferredRefresh(int ticks) {
+    SKSE::GetTaskInterface()->AddTask([ticks]() {
+        if (ticks > 1)
+            DeferredRefresh(ticks - 1);
+        else if (g_state == State::Playing)
+            RefreshPosition("post-charcreate");
+    });
 }
 
 void TransitionTo(State next) {
+    State prev = g_state;
     g_state = next;
     switch (g_state) {
     case State::MainMenu:
@@ -98,7 +115,13 @@ void TransitionTo(State next) {
         break;
     case State::Playing:
         SKSE::log::info("State -> Playing");
-        RefreshPosition();
+        if (prev == State::EditingCharacter) {
+            // Skyrim commits new name/race to actor base after the menu-close
+            // event fires — defer 10 ticks (~167ms at 60fps) to let it finish.
+            DeferredRefresh(10);
+        } else {
+            RefreshPosition("state-change");
+        }
         break;
     case State::Loading:
         SKSE::log::info("State -> Loading");
@@ -118,10 +141,17 @@ public:
         const auto& menu    = ev->menuName;
 
         if (menu == "Main Menu") {
+            SKSE::log::info("Menu: '{}' {}", menu.c_str(), opening ? "open" : "close");
             if (opening) TransitionTo(State::MainMenu);
         } else if (menu == "Loading Menu") {
-            TransitionTo(opening ? State::Loading : State::Playing);
+            SKSE::log::info("Menu: '{}' {}", menu.c_str(), opening ? "open" : "close");
+            if (opening) {
+                TransitionTo(State::Loading);
+            } else if (g_state == State::Loading) {
+                TransitionTo(State::Playing);
+            }
         } else if (menu == "RaceSex Menu") {
+            SKSE::log::info("Menu: '{}' {}", menu.c_str(), opening ? "open" : "close");
             TransitionTo(opening ? State::EditingCharacter : State::Playing);
         }
         return RE::BSEventNotifyControl::kContinue;
@@ -137,7 +167,7 @@ public:
         if (!ev) return RE::BSEventNotifyControl::kContinue;
         if (g_state == State::Playing &&
             ev->actor.get() == RE::PlayerCharacter::GetSingleton())
-            RefreshPosition();
+            RefreshPosition("location-change");
         return RE::BSEventNotifyControl::kContinue;
     }
 };
@@ -151,7 +181,7 @@ public:
         if (!ev) return RE::BSEventNotifyControl::kContinue;
         auto* player = RE::PlayerCharacter::GetSingleton();
         if (g_state == State::Playing && player && player->GetParentCell() == ev->cell)
-            RefreshPosition();
+            RefreshPosition("cell-loaded");
         return RE::BSEventNotifyControl::kContinue;
     }
 };
@@ -159,6 +189,20 @@ public:
 MenuEventSink      g_menuSink;
 LocationChangeSink g_locationSink;
 CellLoadSink       g_cellSink;
+
+std::atomic<bool> g_callbackThreadRunning{false};
+
+static void StartCallbackThread() {
+    if (g_callbackThreadRunning.exchange(true)) return;
+    std::thread([]() {
+        while (g_callbackThreadRunning) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            SKSE::GetTaskInterface()->AddTask([]() {
+                if (g_core) g_core->RunCallbacks();
+            });
+        }
+    }).detach();
+}
 
 void InitDiscord() {
     g_startTime = static_cast<int64_t>(std::time(nullptr));
@@ -172,6 +216,7 @@ void InitDiscord() {
         SKSE::log::warn("Discord: {}", msg);
     });
     SKSE::log::info("Discord Game SDK initialized.");
+    StartCallbackThread();
 }
 
 } // anonymous namespace
@@ -194,6 +239,9 @@ void SetLocale() {
 void RegisterGameEventHandlers() {
     SKSE::log::info("Registering game event handlers...");
     InitDiscord();
+    // Plugin loads before Main Menu appears, but the open-event may still
+    // race. Start in MainMenu state so Discord shows something right away.
+    TransitionTo(State::MainMenu);
 
     auto* ui = RE::UI::GetSingleton();
     if (ui) {
@@ -209,6 +257,14 @@ void RegisterGameEventHandlers() {
     } else {
         SKSE::log::error("Failed to get RE::ScriptEventSourceHolder singleton.");
     }
+}
+
+void OnGameLoaded() {
+    // kPostLoadGame / kNewGame fires on the main thread after the engine
+    // has fully committed all save data — call RefreshPosition directly.
+    SKSE::log::info("Game loaded — forcing presence refresh");
+    g_state = State::Playing;
+    RefreshPosition("game-loaded");
 }
 
 } // namespace DragonbornPresence
