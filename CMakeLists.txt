@@ -25,7 +25,6 @@ add_commonlibsse_plugin(DragonbornPresence
 
 target_include_directories(DragonbornPresence PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}"
-    "${CMAKE_CURRENT_SOURCE_DIR}/tinyfsm/include"
     "${CMAKE_CURRENT_SOURCE_DIR}/discord_rpc/include"
 )
 

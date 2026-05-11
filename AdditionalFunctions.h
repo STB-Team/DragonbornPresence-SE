@@ -1,7 +1,6 @@
 #pragma once
-#include <RE/Skyrim.h>
+#include <string>
+#include <string_view>
 
-RE::PlayerCharacter* GetPlayer();
-const char* Cp1251ToUtf8(const char* str);
-bool is_valid_utf8(const char* string);
-const char* Format(const char* fmt, ...);
+std::string Cp1251ToUtf8(const char* str);
+bool IsValidUtf8(std::string_view str);
