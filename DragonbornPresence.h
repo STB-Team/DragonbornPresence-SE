@@ -1,46 +1,31 @@
 #pragma once
-#include "skse64/GameEvents.h"
-#include "skse64/PapyrusNativeFunctions.h"
+#include <RE/Skyrim.h>
+#include <SKSE/SKSE.h>
 #include "discord_rpc.h"
 
 
 namespace dragonborn_presence_namespace {
 
-  void SetLocale();
+    void SetLocale();
 
-#pragma region Discord Callbacks
-  void HandleDiscordReady(const DiscordUser * connected_user);
+    void HandleDiscordReady(const DiscordUser* connected_user);
+    void HandleDiscordError(int error_code, const char* message);
+    void HandleDiscordDisconnected(int error_code, const char* message);
 
-  void HandleDiscordError(const int error_code, const char * message);
+    void InitDiscord();
+    void UpdatePresence(const char* current_state, const char* current_details);
 
-  void HandleDiscordDisconnected(const int error_code, const char * message);
-#pragma endregion
+    class DiscordMenuEventHandler : public RE::BSTEventSink<RE::MenuOpenCloseEvent> {
+    public:
+        RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent* a_event,
+                                             RE::BSTEventSource<RE::MenuOpenCloseEvent>* a_eventSource) override;
+    };
 
-#pragma region Discord Functions
-  void InitDiscord();
-  void UpdatePresence(const char * current_state, const char * current_details);
-#pragma endregion
+    extern DiscordMenuEventHandler g_discordMenuEventHandler;
+    void RegisterGameEventHandlers();
 
-#pragma region Handler classes
-  class DiscordMenuEventHandler : public BSTEventSink<MenuOpenCloseEvent> {
-  public:
-    EventResult ReceiveEvent(MenuOpenCloseEvent * evn,
-                             EventDispatcher<MenuOpenCloseEvent> * dispatcher);
-  };
-#pragma endregion
-
-#pragma region Event Handlers
-  extern DiscordMenuEventHandler g_discordMenuEventHandler;
-
-  void RegisterGameEventHandlers();
-#pragma endregion
-
-#pragma region Papyrus functions
-  void UpdatePresenceData(StaticFunctionTag * base, BSFixedString new_position,
-                          BSFixedString new_player_info);
-
-  void SetGameLoaded(StaticFunctionTag * base);
-
-  bool RegisterFuncs(VMClassRegistry * registry);
-#pragma endregion
+    void UpdatePresenceData(RE::StaticFunctionTag*, RE::BSFixedString new_position,
+                            RE::BSFixedString new_player_info);
+    void SetGameLoaded(RE::StaticFunctionTag*);
+    bool RegisterFuncs(RE::BSScript::IVirtualMachine* vm);
 }
