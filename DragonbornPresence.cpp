@@ -261,7 +261,15 @@ static void StartCallbackThread() {
 
 void InitDiscord() {
     g_startTime = static_cast<int64_t>(std::time(nullptr));
-    auto result = discord::Core::Create(kAppId, DiscordCreateFlags_Default, &g_core);
+    discord::Result result;
+    try {
+        result = discord::Core::Create(kAppId, DiscordCreateFlags_Default, &g_core);
+    } catch (...) {
+        // discord_game_sdk.dll not found — delay-load threw; run without presence.
+        SKSE::log::warn("Discord: discord_game_sdk.dll not found — presence disabled.");
+        g_core = nullptr;
+        return;
+    }
     if (result != discord::Result::Ok) {
         SKSE::log::error("Discord: failed to initialize (result={})", static_cast<int>(result));
         g_core = nullptr;
