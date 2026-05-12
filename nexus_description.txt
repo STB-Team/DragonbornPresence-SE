@@ -1,0 +1,84 @@
+[center][img]https://i.imgur.com/e2etYi1.png[/img]
+
+[font=Tahoma][size=5][b]DRAGONBORN PRESENCE[/b][/size]
+[size=3]DISCORD RICH PRESENCE SKSE PLUGIN[/size][/font][/center]
+
+[font=Tahoma]Show your friends what you're up to in Skyrim — right in Discord. Dragonborn Presence displays your current location, character name, race, level, and session timer as Discord Rich Presence, updating in real time as you explore the world.[/font]
+
+[font=Tahoma][url=https://www.nexusmods.com/skyrim/mods/97371]Legendary Edition version[/url]   [url=https://discord.gg/Tnk395B]My Discord Server (Russian)[/url]   [url=https://github.com/Fozar/DragonbornPresence-SE]Source Code[/url][/font]
+
+[font=Tahoma][size=4][b]— What it shows —[/b][/size][/font]
+
+[font=Tahoma][list]
+[*][b]Location[/b] — worldspace and named location, e.g. [i]Skyrim: Riverwood[/i] or [i]Nightcaller Temple[/i]. Updates immediately when you cross a location boundary or enter a new cell.
+[*][b]Character[/b] — name, race, and level, e.g. [i]Dovahkiin - Nord (42)[/i]. Updates correctly after character creation and name changes.
+[*][b]Session timer[/b] — shows how long you've been playing this session.
+[*][b]Menu states[/b] — displays [i]Main menu[/i] while on the title screen and [i]Editing character[/i] during character creation.
+[/list][/font]
+
+[font=Tahoma][size=4][b]— How to install —[/b][/size][/font]
+
+[font=Tahoma][b]Manual:[/b]
+[list]
+[*]Drop [font=Courier New]discord_game_sdk.dll[/font] into your Skyrim SE root folder (next to [font=Courier New]SkyrimSE.exe[/font]).
+[*]Drop [font=Courier New]DragonbornPresence.dll[/font] into [font=Courier New]Data\SKSE\Plugins\[/font].
+[/list]
+[b]Mod manager:[/b] Install normally. Manually place [font=Courier New]discord_game_sdk.dll[/font] in the game root — mod managers cannot put files there automatically.
+
+No .esp. No plugins to enable. Just drop and play.[/font]
+
+[font=Tahoma][size=4][b]— Localization —[/b][/size][/font]
+
+[font=Tahoma]The plugin displays two hardcoded strings — the main menu label and the character editing label. Both can be overridden by creating a locale file.
+
+Create [font=Courier New]Data\SKSE\Plugins\DragonbornPresenceLocale.txt[/font] with the following content:[/font]
+
+[font=Courier New]; Line 1 — shown in Discord while on the main menu (default: Main menu)
+Main menu
+; Line 2 — shown while editing the character (default: Editing character)
+Editing character[/font]
+
+[font=Tahoma]Replace the text with your preferred wording or language. Lines starting with [font=Courier New];[/font] are comments and are ignored. The file is optional — if it is absent, the English defaults are used.[/font]
+
+[font=Tahoma][size=4][b]— Compatibility —[/b][/size][/font]
+
+[font=Tahoma]Compatible with everything. The plugin is pure C++ with no scripts, no .esp, and no patches required.[/font]
+
+[font=Tahoma][size=4][b]— Requirements —[/b][/size][/font]
+
+[font=Tahoma][list]
+[*]SKSE64 (any runtime — SE, AE, or newer)
+[*][url=https://www.nexusmods.com/skyrimspecialedition/mods/32444]Address Library for SKSE Plugins[/url]
+[*]Discord Desktop
+[/list][/font]
+
+[font=Tahoma][size=4][b]— Credits —[/b][/size][/font]
+
+[font=Tahoma][list]
+[*]SKSE Team
+[*]CommonLibSSE-NG
+[*]Discord Game SDK
+[/list][/font]
+
+[font=Tahoma][size=2]Source code on [url=https://github.com/Fozar/DragonbornPresence-SE]GitHub[/url][/size][/font]
+
+[line]
+
+[font=Tahoma][size=4][b]— Version 2.0 —[/b][/size][/font]
+
+[font=Tahoma]Version 2.0 is a full rewrite. If you used version 1.x, here's what changed:[/font]
+
+[font=Tahoma][b]No more .esp[/b]
+The old version shipped a Papyrus script and a plugin file to track the player's location. Version 2.0 uses native C++ SKSE event hooks ([font=Courier New]TESActorLocationChangeEvent[/font], [font=Courier New]TESCellFullyLoadedEvent[/font]) — the .esp is gone entirely. Fewer files, no load order concerns, no script overhead.
+
+[b]Any runtime[/b]
+Version 1.x only worked on a specific Skyrim runtime (1.5.97). Version 2.0 uses the address library and runs on any version of Skyrim SE or AE without changes.
+
+[b]Discord Game SDK instead of discord-rpc[/b]
+Replaced the archived [font=Courier New]discord-rpc[/font] library with the current Discord Game SDK. More reliable connection, proper async callbacks, no stale presence.
+
+[b]Better location display[/b]
+The old version could show an empty location in areas without a named location record. Version 2.0 traverses the full location hierarchy to find the nearest named parent (e.g. a room inside a dungeon will show the dungeon name), and falls back to the last known location when crossing boundaries.
+
+[b]Correct character name after creation[/b]
+The old version sometimes showed the default name ("Prisoner") for a few seconds after character creation. Version 2.0 reads the actor's display name directly and defers the presence update until Skyrim has committed the new name.[/font]
