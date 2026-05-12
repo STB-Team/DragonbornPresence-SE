@@ -49,6 +49,25 @@ if (!wsName.empty())
     return cellName;
 }
 
+static std::string BuildActiveQuest(RE::PlayerCharacter* player) {
+    if (REL::Module::IsVR()) return "";  // objectives not mapped for VR
+
+    // objectives sits at 0x580 from PlayerCharacter* in SE/older AE,
+    // shifted +8 to 0x588 for AE 1.6.629+ (PLAYER_RUNTIME_DATA base moves from 0x3D8 → 0x3E0)
+    auto& objectives = REL::RelocateMemberIfNewer<RE::BSTArray<RE::BGSInstancedQuestObjective>>(
+        SKSE::RUNTIME_SSE_1_6_629, player, 0x580, 0x588);
+
+    RE::TESQuest* best = nullptr;
+    for (const auto& instObj : objectives) {
+        if (instObj.InstanceState != RE::QUEST_OBJECTIVE_STATE::kDisplayed) continue;
+        auto* quest = instObj.Objective ? instObj.Objective->ownerQuest : nullptr;
+        if (!quest) continue;
+        if (!best || quest->data.priority > best->data.priority)
+            best = quest;
+    }
+    return best ? SafeStr(best->GetFullName()) : "";
+}
+
 static std::string BuildPlayerInfo(RE::PlayerCharacter* player) {
     auto* race = player->GetRace();
     // GetName() on the actor returns the display name (updated after char edit);
@@ -82,15 +101,19 @@ void RefreshPosition(const char* trigger = nullptr) {
 
     std::string position   = BuildPosition(player);
     std::string playerInfo = BuildPlayerInfo(player);
+    std::string quest      = BuildActiveQuest(player);
 
     const bool fallback = position.empty() && !g_lastPosition.empty();
     if (!position.empty()) g_lastPosition = position;
 
     const std::string& display = fallback ? g_lastPosition : position;
-    SKSE::log::info("[{}] player='{}' location='{}'{}",
-        trigger ? trigger : "refresh", playerInfo, display,
+    std::string state = display;
+    if (!quest.empty()) state += " \xC2\xB7 " + quest;  // · (U+00B7)
+
+    SKSE::log::info("[{}] player='{}' location='{}' quest='{}'{}",
+        trigger ? trigger : "refresh", playerInfo, display, quest,
         fallback ? " [fallback]" : "");
-    SendPresence(display.c_str(), playerInfo.c_str());
+    SendPresence(state.c_str(), playerInfo.c_str());
 }
 
 void DeferredRefresh(int ticks) {
@@ -154,6 +177,9 @@ public:
         } else if (menu == "RaceSex Menu") {
             SKSE::log::info("Menu: '{}' {}", menu.c_str(), opening ? "open" : "close");
             TransitionTo(opening ? State::EditingCharacter : State::Playing);
+        } else if (menu == "Journal Menu") {
+            if (!opening && g_state == State::Playing)
+                RefreshPosition("journal-close");
         }
         return RE::BSEventNotifyControl::kContinue;
     }
@@ -187,9 +213,37 @@ public:
     }
 };
 
+class QuestStageSink : public RE::BSTEventSink<RE::TESQuestStageEvent> {
+public:
+    RE::BSEventNotifyControl ProcessEvent(
+        const RE::TESQuestStageEvent* ev,
+        RE::BSTEventSource<RE::TESQuestStageEvent>*) override
+    {
+        if (!ev) return RE::BSEventNotifyControl::kContinue;
+        if (g_state == State::Playing)
+            SKSE::GetTaskInterface()->AddTask([]() { RefreshPosition("quest-stage"); });
+        return RE::BSEventNotifyControl::kContinue;
+    }
+};
+
+class QuestStartStopSink : public RE::BSTEventSink<RE::TESQuestStartStopEvent> {
+public:
+    RE::BSEventNotifyControl ProcessEvent(
+        const RE::TESQuestStartStopEvent* ev,
+        RE::BSTEventSource<RE::TESQuestStartStopEvent>*) override
+    {
+        if (!ev) return RE::BSEventNotifyControl::kContinue;
+        if (g_state == State::Playing)
+            SKSE::GetTaskInterface()->AddTask([]() { RefreshPosition("quest-startstop"); });
+        return RE::BSEventNotifyControl::kContinue;
+    }
+};
+
 MenuEventSink      g_menuSink;
 LocationChangeSink g_locationSink;
 CellLoadSink       g_cellSink;
+QuestStageSink     g_questStageSink;
+QuestStartStopSink g_questStartStopSink;
 
 std::atomic<bool> g_callbackThreadRunning{false};
 
@@ -253,6 +307,8 @@ void RegisterGameEventHandlers() {
     if (src) {
         src->AddEventSink<RE::TESActorLocationChangeEvent>(&g_locationSink);
         src->AddEventSink<RE::TESCellFullyLoadedEvent>(&g_cellSink);
+        src->AddEventSink<RE::TESQuestStageEvent>(&g_questStageSink);
+        src->AddEventSink<RE::TESQuestStartStopEvent>(&g_questStartStopSink);
     } else {
         SKSE::log::error("Failed to get RE::ScriptEventSourceHolder singleton.");
     }
