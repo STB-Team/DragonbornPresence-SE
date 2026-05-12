@@ -5,7 +5,7 @@
 
 [font=Tahoma]Show your friends what you're up to in Skyrim — right in Discord. Dragonborn Presence displays your current location, character name, race, level, and session timer as Discord Rich Presence, updating in real time as you explore the world.[/font]
 
-[font=Tahoma][url=https://www.nexusmods.com/skyrim/mods/97371]Legendary Edition version[/url]   [url=https://discord.gg/Tnk395B]My Discord Server (Russian)[/url]   [url=https://github.com/Fozar/DragonbornPresence-SE]Source Code[/url][/font]
+[font=Tahoma][url=https://www.nexusmods.com/skyrim/mods/97371]Legendary Edition version[/url]   [url=https://github.com/Fozar/DragonbornPresence-SE]Source Code[/url][/font]
 
 [font=Tahoma][size=4][b]— What it shows —[/b][/size][/font]
 
@@ -29,16 +29,16 @@ No .esp. No plugins to enable. Just drop and play.[/font]
 
 [font=Tahoma][size=4][b]— Localization —[/b][/size][/font]
 
-[font=Tahoma]The plugin displays two hardcoded strings — the main menu label and the character editing label. Both can be overridden by creating a locale file.
+[font=Tahoma]The plugin displays two hardcoded strings — the main menu label and the character editing label. Both can be overridden by editing the locale file included in the archive.
 
-Create [font=Courier New]Data\SKSE\Plugins\DragonbornPresenceLocale.txt[/font] with the following content:[/font]
+Open [font=Courier New]Data\SKSE\Plugins\DragonbornPresenceLocale.json[/font] and change the values:[/font]
 
-[font=Courier New]; Line 1 — shown in Discord while on the main menu (default: Main menu)
-Main menu
-; Line 2 — shown while editing the character (default: Editing character)
-Editing character[/font]
+[font=Courier New]{
+    "main_menu": "Main menu",
+    "editing_character": "Editing character"
+}[/font]
 
-[font=Tahoma]Replace the text with your preferred wording or language. Lines starting with [font=Courier New];[/font] are comments and are ignored. The file is optional — if it is absent, the English defaults are used.[/font]
+[font=Tahoma]Replace the values with your preferred wording or translation. The file is optional — if it is absent, the English defaults are used.[/font]
 
 [font=Tahoma][size=4][b]— Compatibility —[/b][/size][/font]
 

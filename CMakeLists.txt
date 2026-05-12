@@ -42,6 +42,15 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(rapidcsv)
 set(RAPIDCSV_INCLUDE_DIRS "${rapidcsv_SOURCE_DIR}/src" CACHE PATH "" FORCE)
 
+# nlohmann/json — header-only JSON parser for locale file
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.11.3
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(nlohmann_json)
+
 # CommonLibSSE-NG — find_package(fmt/spdlog) intercepted above, tests disabled
 set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
@@ -104,16 +113,16 @@ target_precompile_headers(DragonbornPresence PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/pch.h"
 )
 
-target_link_libraries(DragonbornPresence PRIVATE discord_cpp delayimp)
+target_link_libraries(DragonbornPresence PRIVATE discord_cpp delayimp nlohmann_json::nlohmann_json)
 target_link_options(DragonbornPresence PRIVATE /DELAYLOAD:discord_game_sdk.dll)
 
 set(_pkg_plugins "${CMAKE_CURRENT_BINARY_DIR}/_package/Data/SKSE/Plugins")
 file(MAKE_DIRECTORY "${_pkg_plugins}")
-file(WRITE "${_pkg_plugins}/DragonbornPresenceLocale.txt"
-"; Line 1 — label shown in Discord while on the main menu\n\
-Main menu\n\
-; Line 2 — label shown while editing the character\n\
-Editing character\n\
+file(WRITE "${_pkg_plugins}/DragonbornPresenceLocale.json"
+"{\n\
+    \"main_menu\": \"Main menu\",\n\
+    \"editing_character\": \"Editing character\"\n\
+}\n\
 ")
 
 add_custom_command(TARGET DragonbornPresence POST_BUILD
@@ -130,7 +139,7 @@ add_custom_command(TARGET DragonbornPresence POST_BUILD
         "${CMAKE_CURRENT_BINARY_DIR}/DragonbornPresence.zip" --format=zip
         -- "discord_game_sdk.dll"
            "Data/SKSE/Plugins/DragonbornPresence.dll"
-           "Data/SKSE/Plugins/DragonbornPresenceLocale.txt"
+           "Data/SKSE/Plugins/DragonbornPresenceLocale.json"
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_package"
     COMMENT "Packaging DragonbornPresence.zip"
 )

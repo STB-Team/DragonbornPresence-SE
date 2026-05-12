@@ -7,6 +7,7 @@
 #include <fstream>
 #include <string>
 #include <thread>
+#include <nlohmann/json.hpp>
 
 namespace DragonbornPresence {
 
@@ -222,17 +223,15 @@ void InitDiscord() {
 } // anonymous namespace
 
 void SetLocale() {
-    std::ifstream file(R"(Data\SKSE\Plugins\DragonbornPresenceLocale.txt)");
+    std::ifstream file(R"(Data\SKSE\Plugins\DragonbornPresenceLocale.json)");
     if (!file) return;
 
-    int index = 0;
-    std::string line;
-    while (std::getline(file, line)) {
-        if (!line.empty() && line.back() == '\r') line.pop_back();
-        if (line.empty() || line.front() == ';') continue;
-        if (index == 0)      g_localeMainMenu    = line;
-        else if (index == 1) g_localeEditingChar = line;
-        ++index;
+    try {
+        auto j = nlohmann::json::parse(file);
+        if (j.contains("main_menu"))         g_localeMainMenu    = j["main_menu"].get<std::string>();
+        if (j.contains("editing_character")) g_localeEditingChar = j["editing_character"].get<std::string>();
+    } catch (const nlohmann::json::exception& e) {
+        SKSE::log::error("Failed to parse locale JSON: {}", e.what());
     }
 }
 
