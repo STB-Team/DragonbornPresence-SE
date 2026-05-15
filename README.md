@@ -2,7 +2,7 @@
 
 An SKSE plugin for **Skyrim Special Edition** that displays your current in-game state as Discord Rich Presence.
 
-While you play, Discord shows your character's name, race, level, current location, and active quest — and updates automatically as you move through the world.
+While you play, Discord shows your character's name, race, level, current location, active quest, and current combat — and updates automatically as you move through the world.
 
 ---
 
@@ -11,6 +11,7 @@ While you play, Discord shows your character's name, race, level, current locati
 - Current location displayed in Discord (worldspace + named location)
 - Character info: name, race, and level
 - Active quest name shown alongside the location
+- Combat state — shows `Battling <enemy name>` while in combat, replacing the quest suffix
 - Session timer showing how long you've been playing
 - State-aware presence: Main Menu, Character Creation, Loading, and In-Game are all handled separately
 - Localization support — English labels can be replaced via a JSON file
@@ -55,7 +56,8 @@ The file format:
 ```json
 {
     "main_menu": "Main menu",
-    "editing_character": "Editing character"
+    "editing_character": "Editing character",
+    "combat_fighting": "Battling"
 }
 ```
 
@@ -104,8 +106,9 @@ Pure C++ DLL — no `.esp`, no Papyrus scripts.
 - **`LocationChangeSink`** — listens to `TESActorLocationChangeEvent`; calls `RefreshPosition()` when the player changes named location.
 - **`CellLoadSink`** — listens to `TESCellFullyLoadedEvent`; calls `RefreshPosition()` when the player's cell finishes loading.
 - **`QuestStageSink`** / **`QuestStartStopSink`** — listen to quest stage and start/stop events; refresh presence via an SKSE task so the update runs on the game thread.
+- **`CombatSink`** — listens to `TESCombatEvent` filtered to the player. On `kCombat` stores `"Battling <target name>"` in `g_combatTarget` and triggers a refresh; on `kNone` clears it. While `g_combatTarget` is set it replaces the quest suffix in the presence state line.
 - **`BuildPosition()`** — traverses the `parentLoc` chain to find the first named ancestor. Returns `"Worldspace: Location"` for exterior, `"Location"` for interior, cell name as last resort. Caches the last non-empty result to handle null pointers during location boundary crossing.
-- **`BuildActiveQuest()`** — scans displayed quest objectives and returns the name of the highest-priority active quest. Appended to the location string with a `·` separator.
+- **`BuildActiveQuest()`** — scans displayed quest objectives and returns the name of the highest-priority active quest. Appended to the location string with a `·` separator when not in combat.
 - **`BuildPlayerInfo()`** — returns `"Name - Race (Level)"`.
 - **`SendPresence()`** — sends a `discord::Activity` to the Discord Game SDK.
 - **`StartCallbackThread()`** — background thread that posts one `SKSE::GetTaskInterface()->AddTask` per 100 ms to call `g_core->RunCallbacks()` on the game thread. Keeps Discord IPC processing off the hot path without per-frame overhead.

@@ -3,7 +3,7 @@
 [font=Tahoma][size=5][b]DRAGONBORN PRESENCE[/b][/size]
 [size=3]DISCORD RICH PRESENCE SKSE PLUGIN[/size][/font][/center]
 
-[font=Tahoma]Show your friends what you're up to in Skyrim — right in Discord. Dragonborn Presence displays your current location, character name, race, level, and session timer as Discord Rich Presence, updating in real time as you explore the world.[/font]
+[font=Tahoma]Show your friends what you're up to in Skyrim — right in Discord. Dragonborn Presence displays your current location, character name, race, level, active quest, and combat state as Discord Rich Presence, updating in real time as you explore and fight your way through the world.[/font]
 
 [font=Tahoma][url=https://www.nexusmods.com/skyrim/mods/97371]Legendary Edition version[/url]   [url=https://github.com/Fozar/DragonbornPresence-SE]Source Code[/url][/font]
 
@@ -13,6 +13,7 @@
 [*][b]Location[/b] — worldspace and named location, e.g. [i]Skyrim: Riverwood[/i] or [i]Nightcaller Temple[/i]. Updates immediately when you cross a location boundary or enter a new cell.
 [*][b]Character[/b] — name, race, and level, e.g. [i]Dovahkiin - Nord (42)[/i]. Updates correctly after character creation and name changes.
 [*][b]Active quest[/b] — name of your current tracked quest, shown alongside the location, e.g. [i]Skyrim: Whiterun · Bleak Falls Barrow[/i].
+[*][b]Combat[/b] — while fighting, the quest is replaced with the enemy's name, e.g. [i]Skyrim: Helgen · Battling Alduin[/i]. Reverts to the quest when combat ends.
 [*][b]Session timer[/b] — shows how long you've been playing this session.
 [*][b]Menu states[/b] — displays [i]Main menu[/i] while on the title screen and [i]Editing character[/i] during character creation.
 [/list][/font]
@@ -30,13 +31,14 @@ No .esp. No plugins to enable. Just drop and play.[/font]
 
 [font=Tahoma][size=4][b]— Localization —[/b][/size][/font]
 
-[font=Tahoma]The plugin displays two hardcoded strings — the main menu label and the character editing label. Both can be overridden by editing the locale file included in the archive.
+[font=Tahoma]The plugin displays several hardcoded strings — the main menu label, the character editing label, and the combat prefix. All can be overridden by editing the locale file included in the archive.
 
 Open [font=Courier New]Data\SKSE\Plugins\DragonbornPresenceLocale.json[/font] and change the values:[/font]
 
 [font=Courier New]{
     "main_menu": "Main menu",
-    "editing_character": "Editing character"
+    "editing_character": "Editing character",
+    "combat_fighting": "Battling"
 }[/font]
 
 [font=Tahoma]Replace the values with your preferred wording or translation. The file is optional — if it is absent, the English defaults are used.[/font]

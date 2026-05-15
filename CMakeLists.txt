@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(DragonbornPresence VERSION 2.0.0 LANGUAGES CXX)
+project(DragonbornPresence VERSION 2.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -100,7 +100,7 @@ add_commonlibsse_plugin(DragonbornPresence
         AdditionalFunctions.cpp
         discord_loader.cpp
     NAME "DragonbornPresence"
-    VERSION "2.0.0"
+    VERSION "2.1.0"
     USE_ADDRESS_LIBRARY
 )
 
@@ -121,7 +121,8 @@ file(MAKE_DIRECTORY "${_pkg_plugins}")
 file(WRITE "${_pkg_plugins}/DragonbornPresenceLocale.json"
 "{\n\
     \"main_menu\": \"Main menu\",\n\
-    \"editing_character\": \"Editing character\"\n\
+    \"editing_character\": \"Editing character\",\n\
+    \"combat_fighting\": \"Battling\"\n\
 }\n\
 ")
 

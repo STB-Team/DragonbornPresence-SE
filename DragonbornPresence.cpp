@@ -22,9 +22,11 @@ enum class State { Loading, MainMenu, EditingCharacter, Playing };
 State          g_state             = State::Loading;
 discord::Core* g_core              = nullptr;
 int64_t        g_startTime         = 0;
-std::string    g_localeMainMenu    = "Main menu";
-std::string    g_localeEditingChar = "Editing character";
+std::string    g_localeMainMenu      = "Main menu";
+std::string    g_localeEditingChar   = "Editing character";
+std::string    g_localeCombatFighting = "Battling";
 std::string    g_lastPosition;
+std::string    g_combatTarget;
 
 static std::string SafeStr(const char* s) {
     if (!s || *s == '\0') return "";
@@ -101,17 +103,18 @@ void RefreshPosition(const char* trigger = nullptr) {
 
     std::string position   = BuildPosition(player);
     std::string playerInfo = BuildPlayerInfo(player);
-    std::string quest      = BuildActiveQuest(player);
 
     const bool fallback = position.empty() && !g_lastPosition.empty();
     if (!position.empty()) g_lastPosition = position;
 
     const std::string& display = fallback ? g_lastPosition : position;
     std::string state = display;
-    if (!quest.empty()) state += " \xC2\xB7 " + quest;  // · (U+00B7)
 
-    SKSE::log::info("[{}] player='{}' location='{}' quest='{}'{}",
-        trigger ? trigger : "refresh", playerInfo, display, quest,
+    std::string suffix = !g_combatTarget.empty() ? g_combatTarget : BuildActiveQuest(player);
+    if (!suffix.empty()) state += " \xC2\xB7 " + suffix;  // · (U+00B7)
+
+    SKSE::log::info("[{}] player='{}' location='{}' suffix='{}'{}",
+        trigger ? trigger : "refresh", playerInfo, display, suffix,
         fallback ? " [fallback]" : "");
     SendPresence(state.c_str(), playerInfo.c_str());
 }
@@ -239,11 +242,46 @@ public:
     }
 };
 
+class CombatSink : public RE::BSTEventSink<RE::TESCombatEvent> {
+public:
+    RE::BSEventNotifyControl ProcessEvent(
+        const RE::TESCombatEvent* ev,
+        RE::BSTEventSource<RE::TESCombatEvent>*) override
+    {
+        if (!ev) return RE::BSEventNotifyControl::kContinue;
+        if (g_state != State::Playing) return RE::BSEventNotifyControl::kContinue;
+
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        if (!player || ev->actor.get() != player)
+            return RE::BSEventNotifyControl::kContinue;
+
+        switch (ev->newState.get()) {
+        case RE::ACTOR_COMBAT_STATE::kCombat:
+            if (ev->targetActor) {
+                std::string name = SafeStr(ev->targetActor.get()->GetName());
+                g_combatTarget = name.empty() ? g_localeCombatFighting
+                                              : g_localeCombatFighting + " " + name;
+            }
+            break;
+        case RE::ACTOR_COMBAT_STATE::kNone:
+            g_combatTarget.clear();
+            break;
+        default:
+            return RE::BSEventNotifyControl::kContinue;
+        }
+
+        SKSE::log::info("Combat: '{}'", g_combatTarget);
+        SKSE::GetTaskInterface()->AddTask([]() { RefreshPosition("combat"); });
+        return RE::BSEventNotifyControl::kContinue;
+    }
+};
+
 MenuEventSink      g_menuSink;
 LocationChangeSink g_locationSink;
 CellLoadSink       g_cellSink;
 QuestStageSink     g_questStageSink;
 QuestStartStopSink g_questStartStopSink;
+CombatSink         g_combatSink;
 
 std::atomic<bool> g_callbackThreadRunning{false};
 
@@ -290,8 +328,9 @@ void SetLocale() {
 
     try {
         auto j = nlohmann::json::parse(file);
-        if (j.contains("main_menu"))         g_localeMainMenu    = j["main_menu"].get<std::string>();
-        if (j.contains("editing_character")) g_localeEditingChar = j["editing_character"].get<std::string>();
+        if (j.contains("main_menu"))          g_localeMainMenu       = j["main_menu"].get<std::string>();
+        if (j.contains("editing_character")) g_localeEditingChar    = j["editing_character"].get<std::string>();
+        if (j.contains("combat_fighting"))   g_localeCombatFighting = j["combat_fighting"].get<std::string>();
     } catch (const nlohmann::json::exception& e) {
         SKSE::log::error("Failed to parse locale JSON: {}", e.what());
     }
@@ -317,6 +356,7 @@ void RegisterGameEventHandlers() {
         src->AddEventSink<RE::TESCellFullyLoadedEvent>(&g_cellSink);
         src->AddEventSink<RE::TESQuestStageEvent>(&g_questStageSink);
         src->AddEventSink<RE::TESQuestStartStopEvent>(&g_questStartStopSink);
+        src->AddEventSink<RE::TESCombatEvent>(&g_combatSink);
     } else {
         SKSE::log::error("Failed to get RE::ScriptEventSourceHolder singleton.");
     }
