@@ -152,6 +152,7 @@ void TransitionTo(State next) {
         break;
     case State::Loading:
         SKSE::log::info("State -> Loading");
+        g_combatTarget.clear();
         break;
     }
 }
@@ -251,27 +252,41 @@ public:
         if (!ev) return RE::BSEventNotifyControl::kContinue;
         if (g_state != State::Playing) return RE::BSEventNotifyControl::kContinue;
 
-        auto* player = RE::PlayerCharacter::GetSingleton();
-        if (!player || ev->actor.get() != player)
+        // TESCombatEvent fires for the NPC side too (actor=NPC, targetActor=player),
+        // so check IsPlayerRef() on both sides rather than comparing pointers.
+        bool actorIsPlayer  = ev->actor       && ev->actor->IsPlayerRef();
+        bool targetIsPlayer = ev->targetActor && ev->targetActor->IsPlayerRef();
+        bool involvesPlayer = actorIsPlayer || targetIsPlayer;
+        // kNone events not involving the player may signal that the player also exited
+        // combat — only trigger if we're currently showing combat to avoid spam.
+        bool mayEndCombat = ev->newState.get() == RE::ACTOR_COMBAT_STATE::kNone
+                            && !g_combatTarget.empty();
+        SKSE::log::info("TESCombatEvent: state={} actorIsPlayer={} targetIsPlayer={}",
+            static_cast<int>(ev->newState.get()), actorIsPlayer, targetIsPlayer);
+        if (!involvesPlayer && !mayEndCombat)
             return RE::BSEventNotifyControl::kContinue;
 
-        switch (ev->newState.get()) {
-        case RE::ACTOR_COMBAT_STATE::kCombat:
-            if (ev->targetActor) {
-                std::string name = SafeStr(ev->targetActor.get()->GetName());
-                g_combatTarget = name.empty() ? g_localeCombatFighting
-                                              : g_localeCombatFighting + " " + name;
+        // Read game-object state on the game thread via AddTask.
+        SKSE::GetTaskInterface()->AddTask([]() {
+            auto* player = RE::PlayerCharacter::GetSingleton();
+            if (!player || g_state != State::Playing) return;
+
+            if (player->IsInCombat()) {
+                if (auto target = player->GetActorRuntimeData().currentCombatTarget.get()) {
+                    std::string name = SafeStr(target->GetName());
+                    g_combatTarget = name.empty() ? g_localeCombatFighting
+                                                  : g_localeCombatFighting + " " + name;
+                } else if (g_combatTarget.empty()) {
+                    g_combatTarget = g_localeCombatFighting;
+                }
+                // currentCombatTarget temporarily null — keep existing name
+            } else {
+                g_combatTarget.clear();
             }
-            break;
-        case RE::ACTOR_COMBAT_STATE::kNone:
-            g_combatTarget.clear();
-            break;
-        default:
-            return RE::BSEventNotifyControl::kContinue;
-        }
 
-        SKSE::log::info("Combat: '{}'", g_combatTarget);
-        SKSE::GetTaskInterface()->AddTask([]() { RefreshPosition("combat"); });
+            SKSE::log::info("Combat: '{}'", g_combatTarget);
+            RefreshPosition("combat");
+        });
         return RE::BSEventNotifyControl::kContinue;
     }
 };

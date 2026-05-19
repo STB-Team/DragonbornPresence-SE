@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(DragonbornPresence VERSION 2.1.0 LANGUAGES CXX)
+project(DragonbornPresence VERSION 2.1.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -100,7 +100,7 @@ add_commonlibsse_plugin(DragonbornPresence
         AdditionalFunctions.cpp
         discord_loader.cpp
     NAME "DragonbornPresence"
-    VERSION "2.1.0"
+    VERSION "${PROJECT_VERSION}"
     USE_ADDRESS_LIBRARY
 )
 

@@ -25,7 +25,9 @@ namespace {
 SKSEPluginLoad(const SKSE::LoadInterface* skse) {
     SKSE::Init(skse);
     InitializeLogging();
-    SKSE::log::info("DragonbornPresence 2.0.0 — plugin loaded");
+    const auto* plugin = SKSE::PluginDeclaration::GetSingleton();
+    const auto& ver    = plugin->GetVersion();
+    SKSE::log::info("DragonbornPresence {}.{}.{} — plugin loaded", ver.major(), ver.minor(), ver.patch());
 
     DragonbornPresence::SetLocale();
 
