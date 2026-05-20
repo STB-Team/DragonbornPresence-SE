@@ -116,7 +116,7 @@ target_precompile_headers(DragonbornPresence PRIVATE
 target_link_libraries(DragonbornPresence PRIVATE discord_cpp delayimp nlohmann_json::nlohmann_json)
 target_link_options(DragonbornPresence PRIVATE /DELAYLOAD:discord_game_sdk.dll)
 
-set(_pkg_plugins "${CMAKE_CURRENT_BINARY_DIR}/_package/Data/SKSE/Plugins")
+set(_pkg_plugins "${CMAKE_CURRENT_BINARY_DIR}/_package/SKSE/Plugins")
 file(MAKE_DIRECTORY "${_pkg_plugins}")
 file(WRITE "${_pkg_plugins}/DragonbornPresenceLocale.json"
 "{\n\
@@ -135,12 +135,12 @@ add_custom_command(TARGET DragonbornPresence POST_BUILD
         "${_pkg_plugins}/DragonbornPresence.dll"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${_discord_sdk_dir}/lib/x86_64/discord_game_sdk.dll"
-        "${CMAKE_CURRENT_BINARY_DIR}/_package/discord_game_sdk.dll"
+        "${_pkg_plugins}/discord_game_sdk.dll"
     COMMAND ${CMAKE_COMMAND} -E tar cf
         "${CMAKE_CURRENT_BINARY_DIR}/DragonbornPresence.zip" --format=zip
-        -- "discord_game_sdk.dll"
-           "Data/SKSE/Plugins/DragonbornPresence.dll"
-           "Data/SKSE/Plugins/DragonbornPresenceLocale.json"
+        -- "SKSE/Plugins/DragonbornPresence.dll"
+           "SKSE/Plugins/DragonbornPresenceLocale.json"
+           "SKSE/Plugins/discord_game_sdk.dll"
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_package"
     COMMENT "Packaging DragonbornPresence.zip"
 )

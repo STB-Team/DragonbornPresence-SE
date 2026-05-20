@@ -20,12 +20,9 @@
 
 [font=Tahoma][size=4][b]— How to install —[/b][/size][/font]
 
-[font=Tahoma][b]Manual:[/b]
-[list]
-[*]Drop [font=Courier New]discord_game_sdk.dll[/font] into your Skyrim SE root folder (next to [font=Courier New]SkyrimSE.exe[/font]).
-[*]Drop [font=Courier New]DragonbornPresence.dll[/font] into [font=Courier New]Data\SKSE\Plugins\[/font].
-[/list]
-[b]Mod manager:[/b] Install normally. Manually place [font=Courier New]discord_game_sdk.dll[/font] in the game root — mod managers cannot put files there automatically.
+[font=Tahoma][b]Mod manager:[/b] Install normally — all files go into [font=Courier New]Data\SKSE\Plugins\[/font].
+
+[b]Manual:[/b] Extract the archive and copy the [font=Courier New]Data\[/font] folder into your Skyrim directory.
 
 No .esp. No plugins to enable. Just drop and play.[/font]
 

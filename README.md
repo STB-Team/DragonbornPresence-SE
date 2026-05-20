@@ -31,14 +31,13 @@ While you play, Discord shows your character's name, race, level, current locati
 1. Install SKSE64 for your Skyrim SE/AE runtime.
 2. Extract the archive. It contains:
    ```
-   discord_game_sdk.dll              → Skyrim Special Edition\
-   Data\SKSE\Plugins\
+   SKSE\Plugins\
        DragonbornPresence.dll
        DragonbornPresenceLocale.json
+       discord_game_sdk.dll
    ```
-3. Copy `discord_game_sdk.dll` to the **game root** (same folder as `SkyrimSE.exe`).
-4. Copy the `Data\` folder into your Skyrim `Data\` directory.
-5. Launch the game through SKSE.
+3. Copy the `SKSE\` folder into your Skyrim `Data\` directory (or install via mod manager).
+4. Launch the game through SKSE.
 
 Discord must be running before or alongside the game. If it is not running the plugin loads normally — presence is simply disabled.
 
