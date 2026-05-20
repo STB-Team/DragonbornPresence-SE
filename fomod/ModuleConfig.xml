@@ -1,0 +1,127 @@
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="http://qconsulting.ca/fo3/ModConfig5.0.xsd">
+    <moduleName>DragonbornPresence SE</moduleName>
+    <requiredInstallFiles>
+        <folder source="SKSE" destination="SKSE" />
+    </requiredInstallFiles>
+    <installSteps order="Explicit">
+        <installStep name="Language">
+            <optionalFileGroups order="Explicit">
+                <group name="Select Language" type="SelectExactlyOne">
+                    <plugins order="Explicit">
+                        <plugin name="English">
+                            <description>English</description>
+                            <files>
+                                <file source="locales/en/DragonbornPresenceLocale.json"
+                                      destination="SKSE/Plugins/DragonbornPresenceLocale.json" />
+                            </files>
+                            <typeDescriptor>
+                                <type name="Recommended" />
+                            </typeDescriptor>
+                        </plugin>
+                        <plugin name="Russian / Русский">
+                            <description>Russian</description>
+                            <files>
+                                <file source="locales/ru/DragonbornPresenceLocale.json"
+                                      destination="SKSE/Plugins/DragonbornPresenceLocale.json" />
+                            </files>
+                            <typeDescriptor>
+                                <type name="Optional" />
+                            </typeDescriptor>
+                        </plugin>
+                        <plugin name="German / Deutsch">
+                            <description>German</description>
+                            <files>
+                                <file source="locales/de/DragonbornPresenceLocale.json"
+                                      destination="SKSE/Plugins/DragonbornPresenceLocale.json" />
+                            </files>
+                            <typeDescriptor>
+                                <type name="Optional" />
+                            </typeDescriptor>
+                        </plugin>
+                        <plugin name="French / Français">
+                            <description>French</description>
+                            <files>
+                                <file source="locales/fr/DragonbornPresenceLocale.json"
+                                      destination="SKSE/Plugins/DragonbornPresenceLocale.json" />
+                            </files>
+                            <typeDescriptor>
+                                <type name="Optional" />
+                            </typeDescriptor>
+                        </plugin>
+                        <plugin name="Spanish / Español">
+                            <description>Spanish</description>
+                            <files>
+                                <file source="locales/es/DragonbornPresenceLocale.json"
+                                      destination="SKSE/Plugins/DragonbornPresenceLocale.json" />
+                            </files>
+                            <typeDescriptor>
+                                <type name="Optional" />
+                            </typeDescriptor>
+                        </plugin>
+                        <plugin name="Italian / Italiano">
+                            <description>Italian</description>
+                            <files>
+                                <file source="locales/it/DragonbornPresenceLocale.json"
+                                      destination="SKSE/Plugins/DragonbornPresenceLocale.json" />
+                            </files>
+                            <typeDescriptor>
+                                <type name="Optional" />
+                            </typeDescriptor>
+                        </plugin>
+                        <plugin name="Polish / Polski">
+                            <description>Polish</description>
+                            <files>
+                                <file source="locales/pl/DragonbornPresenceLocale.json"
+                                      destination="SKSE/Plugins/DragonbornPresenceLocale.json" />
+                            </files>
+                            <typeDescriptor>
+                                <type name="Optional" />
+                            </typeDescriptor>
+                        </plugin>
+                        <plugin name="Chinese (Simplified) / 中文">
+                            <description>Chinese (Simplified)</description>
+                            <files>
+                                <file source="locales/zh/DragonbornPresenceLocale.json"
+                                      destination="SKSE/Plugins/DragonbornPresenceLocale.json" />
+                            </files>
+                            <typeDescriptor>
+                                <type name="Optional" />
+                            </typeDescriptor>
+                        </plugin>
+                        <plugin name="Japanese / 日本語">
+                            <description>Japanese</description>
+                            <files>
+                                <file source="locales/ja/DragonbornPresenceLocale.json"
+                                      destination="SKSE/Plugins/DragonbornPresenceLocale.json" />
+                            </files>
+                            <typeDescriptor>
+                                <type name="Optional" />
+                            </typeDescriptor>
+                        </plugin>
+                        <plugin name="Korean / 한국어">
+                            <description>Korean</description>
+                            <files>
+                                <file source="locales/ko/DragonbornPresenceLocale.json"
+                                      destination="SKSE/Plugins/DragonbornPresenceLocale.json" />
+                            </files>
+                            <typeDescriptor>
+                                <type name="Optional" />
+                            </typeDescriptor>
+                        </plugin>
+                        <plugin name="Portuguese (BR) / Português">
+                            <description>Portuguese (Brazilian)</description>
+                            <files>
+                                <file source="locales/pt/DragonbornPresenceLocale.json"
+                                      destination="SKSE/Plugins/DragonbornPresenceLocale.json" />
+                            </files>
+                            <typeDescriptor>
+                                <type name="Optional" />
+                            </typeDescriptor>
+                        </plugin>
+                    </plugins>
+                </group>
+            </optionalFileGroups>
+        </installStep>
+    </installSteps>
+</config>

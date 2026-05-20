@@ -11,7 +11,7 @@ While you play, Discord shows your character's name, race, level, current locati
 - Current location displayed in Discord (worldspace + named location)
 - Character info: name, race, and level
 - Active quest name shown alongside the location
-- Combat state — shows `Battling <enemy name>` while in combat, replacing the quest suffix
+- Combat state — shows `In combat with <enemy name>` while in combat, replacing the quest suffix
 - Session timer showing how long you've been playing
 - State-aware presence: Main Menu, Character Creation, Loading, and In-Game are all handled separately
 - Localization support — English labels can be replaced via a JSON file
@@ -28,39 +28,47 @@ While you play, Discord shows your character's name, race, level, current locati
 
 ## Installation
 
-1. Install SKSE64 for your Skyrim SE/AE runtime.
-2. Extract the archive. It contains:
-   ```
-   SKSE\Plugins\
-       DragonbornPresence.dll
-       DragonbornPresenceLocale.json
-       discord_game_sdk.dll
-   ```
-3. Copy the `SKSE\` folder into your Skyrim `Data\` directory (or install via mod manager).
-4. Launch the game through SKSE.
+**Mod manager (recommended):** Install the archive normally. The FOMOD installer will prompt you to pick a language.
 
-Discord must be running before or alongside the game. If it is not running the plugin loads normally — presence is simply disabled.
+**Manual:** Extract the archive, copy `SKSE\` into your Skyrim `Data\` directory, then copy the locale file for your language from `locales\<lang>\DragonbornPresenceLocale.json` to `Data\SKSE\Plugins\`.
+
+Launch the game through SKSE. Discord must be running before or alongside the game — if it is not running the plugin loads normally and presence is simply disabled.
 
 ---
 
 ## Localization
 
-The two UI strings shown in Discord (main menu and character creation labels) can be changed by editing:
+The archive includes locale files for 11 languages. The FOMOD installer lets you pick one during installation:
 
-```
-Data\SKSE\Plugins\DragonbornPresenceLocale.json
-```
+| Code | Language |
+|------|----------|
+| `en` | English |
+| `ru` | Russian / Русский |
+| `de` | German / Deutsch |
+| `fr` | French / Français |
+| `es` | Spanish / Español |
+| `it` | Italian / Italiano |
+| `pl` | Polish / Polski |
+| `zh` | Chinese (Simplified) / 中文 |
+| `ja` | Japanese / 日本語 |
+| `ko` | Korean / 한국어 |
+| `pt` | Portuguese (BR) / Português |
 
-The file format:
+You can also edit `Data\SKSE\Plugins\DragonbornPresenceLocale.json` directly at any time:
+
 ```json
 {
     "main_menu": "Main menu",
     "editing_character": "Editing character",
-    "combat_fighting": "Battling"
+    "combat_fighting": "In combat with {name}",
+    "combat_no_target": "In combat"
 }
 ```
 
-If the file is missing or a key is absent, English defaults are used.
+- `combat_fighting` — shown when an enemy name is known. `{name}` is replaced with the enemy's name at runtime (e.g. `"In combat with Alduin"`). Place it anywhere in the string; SOV languages can write `"{name}と戦闘中"`.
+- `combat_no_target` — shown when in combat but no enemy name is available (rare transient state). Falls back to `"In combat"` if the key is absent.
+
+If the file is missing or any key is absent, English defaults are used.
 
 ---
 
@@ -105,7 +113,7 @@ Pure C++ DLL — no `.esp`, no Papyrus scripts.
 - **`LocationChangeSink`** — listens to `TESActorLocationChangeEvent`; calls `RefreshPosition()` when the player changes named location.
 - **`CellLoadSink`** — listens to `TESCellFullyLoadedEvent`; calls `RefreshPosition()` when the player's cell finishes loading.
 - **`QuestStageSink`** / **`QuestStartStopSink`** — listen to quest stage and start/stop events; refresh presence via an SKSE task so the update runs on the game thread.
-- **`CombatSink`** — listens to `TESCombatEvent` filtered to the player. On `kCombat` stores `"Battling <target name>"` in `g_combatTarget` and triggers a refresh; on `kNone` clears it. While `g_combatTarget` is set it replaces the quest suffix in the presence state line.
+- **`CombatSink`** — listens to `TESCombatEvent` filtered to the player. On `kCombat` stores `"In combat with <target name>"` in `g_combatTarget` and triggers a refresh; on `kNone` clears it. While `g_combatTarget` is set it replaces the quest suffix in the presence state line.
 - **`BuildPosition()`** — traverses the `parentLoc` chain to find the first named ancestor. Returns `"Worldspace: Location"` for exterior, `"Location"` for interior, cell name as last resort. Caches the last non-empty result to handle null pointers during location boundary crossing.
 - **`BuildActiveQuest()`** — scans displayed quest objectives and returns the name of the highest-priority active quest. Appended to the location string with a `·` separator when not in combat.
 - **`BuildPlayerInfo()`** — returns `"Name - Race (Level)"`.

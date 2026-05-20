@@ -22,15 +22,36 @@ enum class State { Loading, MainMenu, EditingCharacter, Playing };
 State          g_state             = State::Loading;
 discord::Core* g_core              = nullptr;
 int64_t        g_startTime         = 0;
-std::string    g_localeMainMenu      = "Main menu";
-std::string    g_localeEditingChar   = "Editing character";
-std::string    g_localeCombatFighting = "Battling";
+std::unordered_map<std::string, std::string> g_locale = {
+    {"main_menu",         "Main menu"},
+    {"editing_character", "Editing character"},
+    {"combat_fighting",   "In combat with {name}"},
+    {"combat_no_target",  "In combat"},
+};
 std::string    g_lastPosition;
 std::string    g_combatTarget;
 
 static std::string SafeStr(const char* s) {
     if (!s || *s == '\0') return "";
     return IsValidUtf8(s) ? std::string(s) : Cp1251ToUtf8(s);
+}
+
+static const std::string& Locale(const std::string& key) {
+    static const std::string kFallback;
+    auto it = g_locale.find(key);
+    return it != g_locale.end() ? it->second : kFallback;
+}
+
+// Formats the combat string for a known enemy name.
+// If the template contains {name}, replaces it; otherwise appends " " + name (legacy fallback).
+static std::string FormatCombat(const std::string& tmpl, const std::string& name) {
+    constexpr std::string_view kPlaceholder = "{name}";
+    auto pos = tmpl.find(kPlaceholder);
+    if (pos == std::string::npos)
+        return tmpl + " " + name;
+    std::string result = tmpl;
+    result.replace(pos, kPlaceholder.size(), name);
+    return result;
 }
 
 static std::string BuildPosition(RE::PlayerCharacter* player) {
@@ -134,11 +155,11 @@ void TransitionTo(State next) {
     switch (g_state) {
     case State::MainMenu:
         SKSE::log::info("State -> MainMenu");
-        SendPresence(g_localeMainMenu.c_str(), nullptr);
+        SendPresence(Locale("main_menu").c_str(), nullptr);
         break;
     case State::EditingCharacter:
         SKSE::log::info("State -> EditingCharacter");
-        SendPresence(g_localeEditingChar.c_str(), nullptr);
+        SendPresence(Locale("editing_character").c_str(), nullptr);
         break;
     case State::Playing:
         SKSE::log::info("State -> Playing");
@@ -274,10 +295,10 @@ public:
             if (player->IsInCombat()) {
                 if (auto target = player->GetActorRuntimeData().currentCombatTarget.get()) {
                     std::string name = SafeStr(target->GetName());
-                    g_combatTarget = name.empty() ? g_localeCombatFighting
-                                                  : g_localeCombatFighting + " " + name;
+                    g_combatTarget = name.empty() ? Locale("combat_no_target")
+                                                  : FormatCombat(Locale("combat_fighting"), name);
                 } else if (g_combatTarget.empty()) {
-                    g_combatTarget = g_localeCombatFighting;
+                    g_combatTarget = Locale("combat_no_target");
                 }
                 // currentCombatTarget temporarily null — keep existing name
             } else {
@@ -343,9 +364,8 @@ void SetLocale() {
 
     try {
         auto j = nlohmann::json::parse(file);
-        if (j.contains("main_menu"))          g_localeMainMenu       = j["main_menu"].get<std::string>();
-        if (j.contains("editing_character")) g_localeEditingChar    = j["editing_character"].get<std::string>();
-        if (j.contains("combat_fighting"))   g_localeCombatFighting = j["combat_fighting"].get<std::string>();
+        for (auto& [key, val] : j.items())
+            if (val.is_string()) g_locale[key] = val.get<std::string>();
     } catch (const nlohmann::json::exception& e) {
         SKSE::log::error("Failed to parse locale JSON: {}", e.what());
     }

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(DragonbornPresence VERSION 2.1.1 LANGUAGES CXX)
+project(DragonbornPresence VERSION 2.2.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -118,13 +118,10 @@ target_link_options(DragonbornPresence PRIVATE /DELAYLOAD:discord_game_sdk.dll)
 
 set(_pkg_plugins "${CMAKE_CURRENT_BINARY_DIR}/_package/SKSE/Plugins")
 file(MAKE_DIRECTORY "${_pkg_plugins}")
-file(WRITE "${_pkg_plugins}/DragonbornPresenceLocale.json"
-"{\n\
-    \"main_menu\": \"Main menu\",\n\
-    \"editing_character\": \"Editing character\",\n\
-    \"combat_fighting\": \"Battling\"\n\
-}\n\
-")
+
+# Copy FOMOD installer and locale files into the package (configure time)
+file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/fomod"   DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/_package")
+file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/locales" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/_package")
 
 add_custom_command(TARGET DragonbornPresence POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -139,8 +136,9 @@ add_custom_command(TARGET DragonbornPresence POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E tar cf
         "${CMAKE_CURRENT_BINARY_DIR}/DragonbornPresence.zip" --format=zip
         -- "SKSE/Plugins/DragonbornPresence.dll"
-           "SKSE/Plugins/DragonbornPresenceLocale.json"
            "SKSE/Plugins/discord_game_sdk.dll"
+           "fomod"
+           "locales"
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_package"
     COMMENT "Packaging DragonbornPresence.zip"
 )
