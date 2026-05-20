@@ -1,0 +1,27 @@
+# Changelog
+
+## 2.2.0 — 2026-05-20
+
+FOMOD installer included — mod managers will now ask you to pick a language during installation
+Built-in translations for English, Russian, German, French, Spanish, Italian, Polish, Chinese (Simplified), Japanese, Korean, and Portuguese (Brazilian)
+Combat presence now correctly reads as "In combat with Alduin" — the enemy name is placed inside the phrase rather than just appended, so each language can put the name where its grammar expects it
+Added a separate display string for the rare moment when you are in combat but the game has not yet resolved the enemy name ("In combat" instead of nothing)
+
+## 2.1.1 — 2026-05-20
+
+discord_game_sdk.dll moved from the Skyrim root folder into Data\SKSE\Plugins where it belongs — mod managers now track and uninstall it cleanly
+If you have an old discord_game_sdk.dll sitting next to SkyrimSE.exe, you can delete it
+Fixed combat presence sometimes not clearing after combat ended
+
+## 2.1.0 — 2026-05-15
+
+Combat is now shown in Discord: while fighting, the active quest is replaced by the enemy's name (e.g. Skyrim: Helgen · In combat with Alduin)
+Presence reverts to the quest name as soon as combat ends
+
+## 2.0.1 — 2026-05-13
+
+Active quest name now appears in Discord alongside your location (e.g. Skyrim: Whiterun · Bleak Falls Barrow)
+Fixed a crash on startup when discord_game_sdk.dll was missing from the installation
+Fixed presence sometimes freezing for several seconds during location transitions
+Fixed a ghost "Loading" screen flash that appeared right after the game launched
+Locale file format changed from .txt to .json — if you had a custom locale file, rename it and wrap the values in standard JSON
