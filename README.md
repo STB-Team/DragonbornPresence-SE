@@ -112,6 +112,7 @@ To use custom branding:
 - `worldspace`, `location`, and `cell` match stable Creation Kit/xEdit Editor IDs.
 - `match` searches the displayed location name; ASCII matching is case-insensitive. When a rule contains several selectors, all of them must match.
 - The bundled rules map encounter locations to tierless creature keys such as `bandit`, `draugr`, and `falmer-dvemer`. Tier numbers and colors are not part of the asset key.
+- Dedicated city, settlement, temple, and castle rules use the portal keys `dawnstar`, `*capital`, `*castle`, `redoransettlement`, `telvannisettlement`, and `templeofmiraak`. Text matches are retained because runtime Location Editor IDs are not available for every city.
 - An empty general image key disables that image. Missing portal assets produce a blank image but do not stop Presence updates.
 - Crafting-specific keys override `crafting` for alchemy, smithing, enchanting, cooking, tanning, and smelting. An empty specific image key falls back to the generic crafting image; an unrecognized station uses the generic crafting mode.
 
@@ -125,6 +126,7 @@ The bundled example configuration expects these Discord Art Asset keys:
 |---|---|
 | Default large logo | `skyrim_logo.png` → `skyrim_logo` |
 | Tierless large location markers | `bandit.png`, `draugr.png`, `falmer.png`, `dvemer.png`, and the other keys referenced by `location_images` |
+| Large city and settlement images | `dawnstar`, `falkreathcapital`, `markarthcapital`, `morthalcapital`, `riftencapital`, `solitudecapital`, `whiteruncapital`, `windhelmcapital`, `winterholdcapital`, `redoransettlement`, `telvannisettlement`, `templeofmiraak`, `whiteruncastle`, `windhelmcastle`, `winterholdcastle` |
 | Existing small states | `loading.png`, `menu.png`, `character.png`, `exploring.png`, `quest.png`, `combat.png` |
 | Small UI and crafting states | `map.png`, `inventory.png`, `dialogue.png`, `crafting.png`, `alchemy.png`, `smithing.png`, `enchanting.png`, `cooking.png`, `tanning.png`, `smelting.png`, `waiting.png` |
 

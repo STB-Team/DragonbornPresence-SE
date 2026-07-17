@@ -352,6 +352,7 @@
 <h2>5. Большая картинка под каждую локацию</h2>
 <p>Правила находятся в массиве <code>assets.location_images</code> и проверяются сверху вниз. Первое совпавшее правило побеждает.</p>
 <p>В комплектной конфигурации боевые локации используют основные маркеры без тиров: <code>bandit</code>, <code>draugr</code>, <code>falmer-dvemer</code> и другие. Номер тира и цвет больше не входят в Asset key.</p>
+<p>Для городов и крупных поселений предусмотрены отдельные ключи: <code>dawnstar</code>, ключи с окончанием <code>capital</code> и <code>castle</code>, а также <code>redoransettlement</code>, <code>telvannisettlement</code> и <code>templeofmiraak</code>. Правила замков и особых поселений проверяются раньше общего названия города.</p>
 <h3>Основные маркеры без тиров</h3>
 <pre>"location_images": [
   { "match": "Нилхейм", "image": "bandit", "text": "Нилхейм" },
@@ -424,6 +425,7 @@
   <tbody>
     <tr><td>Логотип</td><td>stb_logo.png</td><td><code>stb_logo</code></td></tr>
     <tr><td>Основные маркеры локаций</td><td>bandit.png, draugr.png, falmer.png, dvemer.png и остальные PNG из подготовленного набора</td><td>Имена файлов без расширения, строчными буквами и без тиров</td></tr>
+    <tr><td>Города и поселения</td><td>dawnstar, falkreathcapital, markarthcapital, morthalcapital, riftencapital, solitudecapital, whiteruncapital, windhelmcapital, winterholdcapital, redoransettlement, telvannisettlement, templeofmiraak, whiteruncastle, windhelmcastle, winterholdcastle</td><td>Точно как в Discord Portal</td></tr>
     <tr><td>Основные состояния</td><td>loading.png, menu.png, character.png, exploring.png, quest.png, combat.png</td><td>Имена без расширения</td></tr>
     <tr><td>UI и крафт</td><td>map.png, inventory.png, dialogue.png, crafting.png, alchemy.png, smithing.png, enchanting.png, cooking.png, tanning.png, smelting.png, waiting.png</td><td>Имена без расширения</td></tr>
   </tbody>

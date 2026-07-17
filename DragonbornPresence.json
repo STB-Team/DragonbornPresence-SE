@@ -43,6 +43,21 @@
       "waiting": "waiting"
     },
     "location_images": [
+      {"match": "Коллегия Винтерхолда", "image": "winterholdcastle", "text": "Коллегия Винтерхолда"},
+      {"match": "Королевский дворец", "image": "windhelmcastle", "text": "Королевский дворец"},
+      {"match": "Драконий Предел", "image": "whiteruncastle", "text": "Драконий Предел"},
+      {"match": "Воронья Скала", "image": "redoransettlement", "text": "Воронья Скала"},
+      {"match": "Тель-Митрин", "image": "telvannisettlement", "text": "Тель-Митрин"},
+      {"match": "Храм Мирака", "image": "templeofmiraak", "text": "Храм Мирака"},
+      {"location": "DawnstarLocation", "image": "dawnstar", "text": "Данстар"},
+      {"location": "FalkreathLocation", "image": "falkreathcapital", "text": "Фолкрит"},
+      {"location": "MarkarthLocation", "image": "markarthcapital", "text": "Маркарт"},
+      {"location": "MorthalLocation", "image": "morthalcapital", "text": "Морфал"},
+      {"location": "RiftenLocation", "image": "riftencapital", "text": "Рифтен"},
+      {"location": "SolitudeLocation", "image": "solitudecapital", "text": "Солитьюд"},
+      {"location": "WhiterunLocation", "image": "whiteruncapital", "text": "Вайтран"},
+      {"location": "WindhelmLocation", "image": "windhelmcapital", "text": "Виндхельм"},
+      {"location": "WinterholdLocation", "image": "winterholdcapital", "text": "Винтерхолд"},
       {"match": "[Сол] [12-Дк] Драконий курган", "image": "drakon", "text": "Драконий курган"},
       {"match": "[Вайт] [5-Дк*] Драконий курган", "image": "drakon", "text": "Драконий курган"},
       {"match": "[Фолк] [1-Б] Лагерь Чаща", "image": "bandit", "text": "Лагерь Чаща"},
@@ -63,6 +78,11 @@
       {"match": "[Винт] [7-Др] Святилище Талоса", "image": "draugr", "text": "Святилище Талоса"},
       {"match": "[Дан] [7-Др • 8-Дк*] Драконий курган", "image": "draugr", "text": "Драконий курган"},
       {"match": "[Фолк] [2-С • ?-Дк*] Драконий курган", "image": "payk", "text": "Драконий курган"},
+      {"worldspace": "DLC2SolstheimWorld", "match": "Лагерь Чаща", "image": "rikling", "text": "Лагерь Чаща"},
+      {"match": "Лагерь Чаща", "image": "bandit", "text": "Лагерь Чаща"},
+      {"match": "Алтарь некроманта", "image": "nekromant", "text": "Алтарь некроманта"},
+      {"match": "Святилище Талоса", "image": "elf", "text": "Святилище Талоса"},
+      {"match": "Драконий курган", "image": "drakon", "text": "Драконий курган"},
       {"match": "Склад Восточной имперской компании", "image": "bandit", "text": "Склад Восточной имперской компании"},
       {"match": "Место крушения Бегущего по льду", "image": "bandit", "text": "Место крушения Бегущего по льду"},
       {"match": "Наблюдательный пост Белобережье", "image": "bandit", "text": "Наблюдательный пост Белобережье"},
@@ -427,7 +447,16 @@
       {"match": "Валтум", "image": "jrec", "text": "Валтум"},
       {"match": "Мзулфт", "image": "falmer-dvemer", "text": "Мзулфт"},
       {"match": "Хелген", "image": "bandit", "text": "Хелген"},
-      {"match": "Ковен", "image": "mag", "text": "Ковен"}
+      {"match": "Ковен", "image": "mag", "text": "Ковен"},
+      {"match": "Винтерхолд", "image": "winterholdcapital", "text": "Винтерхолд"},
+      {"match": "Виндхельм", "image": "windhelmcapital", "text": "Виндхельм"},
+      {"match": "Солитьюд", "image": "solitudecapital", "text": "Солитьюд"},
+      {"match": "Фолкрит", "image": "falkreathcapital", "text": "Фолкрит"},
+      {"match": "Маркарт", "image": "markarthcapital", "text": "Маркарт"},
+      {"match": "Данстар", "image": "dawnstar", "text": "Данстар"},
+      {"match": "Вайтран", "image": "whiteruncapital", "text": "Вайтран"},
+      {"match": "Рифтен", "image": "riftencapital", "text": "Рифтен"},
+      {"match": "Морфал", "image": "morthalcapital", "text": "Морфал"}
     ]
   }
 }
