@@ -1,6 +1,9 @@
 {
     "main_menu": "Menu principal",
     "editing_character": "Personnalisation du personnage",
+    "loading": "Chargement",
+    "exploring": "Exploration",
+    "active_quest": "Quête active",
     "combat_fighting": "En combat contre {name}",
     "combat_no_target": "En combat"
 }

@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.3.0 — 2026-07-17
+
+- Added `DragonbornPresence.json` for configuring the Discord application ID, activity fields, timer, separator, and image assets.
+- Added dynamic small images and localized hover text for loading, menus, character editing, exploration, active quests, and combat.
+- Added privacy controls for character details, location, quests, and combat information.
+- Added a visible loading presence instead of retaining stale activity during loading screens.
+- Added safe UTF-8 truncation for Discord's 127-byte text limit.
+- Skip duplicate Discord activity updates when the displayed content has not changed.
+- Include the default configuration in the FOMOD-ready release archive.
+- Added an optional CMake deployment directory for copying rebuilt DLLs directly into an MO2 mod without overwriting user configuration.
+
 ## 2.2.0 — 2026-05-20
 
 FOMOD installer included — mod managers will now ask you to pick a language during installation

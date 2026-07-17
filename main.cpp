@@ -29,6 +29,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* skse) {
     const auto& ver    = plugin->GetVersion();
     SKSE::log::info("DragonbornPresence {}.{}.{} — plugin loaded", ver.major(), ver.minor(), ver.patch());
 
+    DragonbornPresence::LoadConfig();
     DragonbornPresence::SetLocale();
 
     SKSE::GetMessagingInterface()->RegisterListener([](SKSE::MessagingInterface::Message* msg) {

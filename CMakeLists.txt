@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(DragonbornPresence VERSION 2.2.0 LANGUAGES CXX)
+project(DragonbornPresence VERSION 2.3.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -118,6 +118,11 @@ target_link_options(DragonbornPresence PRIVATE /DELAYLOAD:discord_game_sdk.dll)
 
 set(_pkg_plugins "${CMAKE_CURRENT_BINARY_DIR}/_package/SKSE/Plugins")
 file(MAKE_DIRECTORY "${_pkg_plugins}")
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/DragonbornPresence.json"
+    "${_pkg_plugins}/DragonbornPresence.json"
+    COPYONLY
+)
 
 # Copy FOMOD installer and locale files into the package (configure time)
 file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/fomod"   DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/_package")
@@ -137,8 +142,27 @@ add_custom_command(TARGET DragonbornPresence POST_BUILD
         "${CMAKE_CURRENT_BINARY_DIR}/DragonbornPresence.zip" --format=zip
         -- "SKSE/Plugins/DragonbornPresence.dll"
            "SKSE/Plugins/discord_game_sdk.dll"
+           "SKSE/Plugins/DragonbornPresence.json"
            "fomod"
            "locales"
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_package"
     COMMENT "Packaging DragonbornPresence.zip"
 )
+
+set(DRAGONBORNPRESENCE_DEPLOY_DIR "" CACHE PATH
+    "Optional MO2 mod SKSE/Plugins directory for post-build deployment")
+
+if(DRAGONBORNPRESENCE_DEPLOY_DIR)
+    add_custom_command(TARGET DragonbornPresence POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+            "${DRAGONBORNPRESENCE_DEPLOY_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE:DragonbornPresence>"
+            "${DRAGONBORNPRESENCE_DEPLOY_DIR}/DragonbornPresence.dll"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${_discord_sdk_dir}/lib/x86_64/discord_game_sdk.dll"
+            "${DRAGONBORNPRESENCE_DEPLOY_DIR}/discord_game_sdk.dll"
+        COMMENT "Deploying DragonbornPresence to ${DRAGONBORNPRESENCE_DEPLOY_DIR}"
+        VERBATIM
+    )
+endif()

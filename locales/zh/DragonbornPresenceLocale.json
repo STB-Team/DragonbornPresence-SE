@@ -1,6 +1,9 @@
 {
     "main_menu": "主菜单",
     "editing_character": "编辑角色",
+    "loading": "加载中",
+    "exploring": "探索中",
+    "active_quest": "当前任务",
     "combat_fighting": "对战 {name}",
     "combat_no_target": "战斗中"
 }

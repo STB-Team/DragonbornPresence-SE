@@ -1,6 +1,9 @@
 {
     "main_menu": "메인 메뉴",
     "editing_character": "캐릭터 편집 중",
+    "loading": "불러오는 중",
+    "exploring": "탐험 중",
+    "active_quest": "활성 퀘스트",
     "combat_fighting": "{name}와 교전 중",
     "combat_no_target": "교전 중"
 }

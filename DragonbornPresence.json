@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "discord": {
+    "enabled": true,
+    "application_id": "565627104608256015"
+  },
+  "display": {
+    "show_elapsed_time": true,
+    "show_character_details": true,
+    "show_location": true,
+    "show_quest": true,
+    "show_combat": true,
+    "separator": " · "
+  },
+  "assets": {
+    "large_image": "skyrim_logo",
+    "large_text": "The Elder Scrolls V: Skyrim",
+    "small_images": {
+      "loading": "loading",
+      "main_menu": "menu",
+      "editing_character": "character",
+      "exploring": "exploring",
+      "quest": "quest",
+      "combat": "combat"
+    }
+  }
+}

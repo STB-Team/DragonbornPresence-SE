@@ -2,10 +2,12 @@
 #include "AdditionalFunctions.h"
 #include "discord.h"
 #include <atomic>
+#include <charconv>
 #include <chrono>
 #include <ctime>
 #include <fstream>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <nlohmann/json.hpp>
 
@@ -13,23 +15,47 @@ namespace DragonbornPresence {
 
 namespace {
 
-constexpr discord::ClientId kAppId          = 565627104608256015LL;
-constexpr const char*       kLargeImageKey  = "skyrim_logo";
-constexpr const char*       kLargeImageText = "The Elder Scrolls V: Skyrim";
+constexpr discord::ClientId kDefaultAppId = 565627104608256015LL;
 
 enum class State { Loading, MainMenu, EditingCharacter, Playing };
+enum class PresenceMode { Loading, MainMenu, EditingCharacter, Exploring, Quest, Combat };
 
+struct Config {
+    bool              enabled              = true;
+    discord::ClientId applicationId        = kDefaultAppId;
+    bool              showElapsedTime      = true;
+    bool              showCharacterDetails = true;
+    bool              showLocation         = true;
+    bool              showQuest            = true;
+    bool              showCombat           = true;
+    std::string       separator            = " \xC2\xB7 ";
+    std::string       largeImage           = "skyrim_logo";
+    std::string       largeText            = "The Elder Scrolls V: Skyrim";
+    std::string       loadingImage;
+    std::string       mainMenuImage;
+    std::string       editingCharacterImage;
+    std::string       exploringImage;
+    std::string       questImage;
+    std::string       combatImage;
+};
+
+Config         g_config;
 State          g_state             = State::Loading;
 discord::Core* g_core              = nullptr;
 int64_t        g_startTime         = 0;
 std::unordered_map<std::string, std::string> g_locale = {
     {"main_menu",         "Main menu"},
     {"editing_character", "Editing character"},
+    {"loading",           "Loading"},
+    {"exploring",         "Exploring"},
+    {"active_quest",      "Active quest"},
     {"combat_fighting",   "In combat with {name}"},
     {"combat_no_target",  "In combat"},
 };
-std::string    g_lastPosition;
-std::string    g_combatTarget;
+std::string g_lastPosition;
+std::string g_combatTarget;
+std::string g_lastActivitySignature;
+std::string g_pendingActivitySignature;
 
 static std::string SafeStr(const char* s) {
     if (!s || *s == '\0') return "";
@@ -40,6 +66,103 @@ static const std::string& Locale(const std::string& key) {
     static const std::string kFallback;
     auto it = g_locale.find(key);
     return it != g_locale.end() ? it->second : kFallback;
+}
+
+static const nlohmann::json* FindObject(
+    const nlohmann::json& parent,
+    const char* key,
+    std::string_view path)
+{
+    auto it = parent.find(key);
+    if (it == parent.end()) return nullptr;
+    if (!it->is_object()) {
+        SKSE::log::warn("Config: '{}' must be an object; using defaults.", path);
+        return nullptr;
+    }
+    return &*it;
+}
+
+static void ReadBool(
+    const nlohmann::json& object,
+    const char* key,
+    bool& target,
+    std::string_view path)
+{
+    auto it = object.find(key);
+    if (it == object.end()) return;
+    if (!it->is_boolean()) {
+        SKSE::log::warn("Config: '{}.{}' must be a boolean; using default.", path, key);
+        return;
+    }
+    target = it->get<bool>();
+}
+
+static void ReadString(
+    const nlohmann::json& object,
+    const char* key,
+    std::string& target,
+    std::string_view path)
+{
+    auto it = object.find(key);
+    if (it == object.end()) return;
+    if (!it->is_string()) {
+        SKSE::log::warn("Config: '{}.{}' must be a string; using default.", path, key);
+        return;
+    }
+    target = it->get<std::string>();
+}
+
+static void ReadApplicationId(const nlohmann::json& object) {
+    auto it = object.find("application_id");
+    if (it == object.end()) return;
+    if (!it->is_string()) {
+        SKSE::log::warn("Config: 'discord.application_id' must be a string; using default.");
+        return;
+    }
+
+    const auto& text = it->get_ref<const std::string&>();
+    discord::ClientId value = 0;
+    const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
+    if (error != std::errc{} || end != text.data() + text.size() || value <= 0) {
+        SKSE::log::warn("Config: invalid Discord application ID '{}'; using default.", text);
+        return;
+    }
+    g_config.applicationId = value;
+}
+
+static std::string LimitDiscordText(std::string_view text) {
+    constexpr std::size_t kMaxBytes = 127;
+    if (text.size() <= kMaxBytes) return std::string(text);
+
+    std::size_t size = kMaxBytes;
+    while (size > 0 && (static_cast<unsigned char>(text[size]) & 0xC0) == 0x80)
+        --size;
+    return std::string(text.substr(0, size));
+}
+
+static const std::string& SmallImage(PresenceMode mode) {
+    switch (mode) {
+    case PresenceMode::Loading:          return g_config.loadingImage;
+    case PresenceMode::MainMenu:         return g_config.mainMenuImage;
+    case PresenceMode::EditingCharacter: return g_config.editingCharacterImage;
+    case PresenceMode::Exploring:        return g_config.exploringImage;
+    case PresenceMode::Quest:            return g_config.questImage;
+    case PresenceMode::Combat:           return g_config.combatImage;
+    }
+    return g_config.exploringImage;
+}
+
+static std::string SmallText(PresenceMode mode) {
+    switch (mode) {
+    case PresenceMode::Loading:          return Locale("loading");
+    case PresenceMode::MainMenu:         return Locale("main_menu");
+    case PresenceMode::EditingCharacter: return Locale("editing_character");
+    case PresenceMode::Exploring:        return Locale("exploring");
+    case PresenceMode::Quest:            return Locale("active_quest");
+    case PresenceMode::Combat:
+        return g_combatTarget.empty() ? Locale("combat_no_target") : g_combatTarget;
+    }
+    return {};
 }
 
 // Formats the combat string for a known enemy name.
@@ -92,6 +215,8 @@ static std::string BuildActiveQuest(RE::PlayerCharacter* player) {
 }
 
 static std::string BuildPlayerInfo(RE::PlayerCharacter* player) {
+    if (!g_config.showCharacterDetails) return "";
+
     auto* race = player->GetRace();
     // GetName() on the actor returns the display name (updated after char edit);
     // GetActorBase()->GetName() can lag behind by several frames.
@@ -100,21 +225,56 @@ static std::string BuildPlayerInfo(RE::PlayerCharacter* player) {
     return name + " - " + raceName + " (" + std::to_string(player->GetLevel()) + ")";
 }
 
-void SendPresence(const char* state, const char* details) {
+void SendPresence(std::string_view state, std::string_view details, PresenceMode mode) {
     if (!g_core) return;
 
-    discord::Activity activity{};
-    if (state   && *state)   activity.SetState(state);
-    if (details && *details) activity.SetDetails(details);
-    activity.GetTimestamps().SetStart(g_startTime);
-    activity.GetAssets().SetLargeImage(kLargeImageKey);
-    activity.GetAssets().SetLargeText(kLargeImageText);
+    const std::string stateText   = LimitDiscordText(state);
+    const std::string detailsText = LimitDiscordText(details);
+    const std::string smallText   = LimitDiscordText(SmallText(mode));
+    const std::string& smallImage = SmallImage(mode);
 
-    g_core->ActivityManager().UpdateActivity(activity, [](discord::Result r) {
-        if (r != discord::Result::Ok)
+    std::string signature;
+    signature.reserve(
+        stateText.size() + detailsText.size() + g_config.largeImage.size() +
+        g_config.largeText.size() + smallImage.size() + smallText.size() + 8);
+    for (const auto& value :
+         {std::string_view(stateText), std::string_view(detailsText),
+          std::string_view(g_config.largeImage), std::string_view(g_config.largeText),
+          std::string_view(smallImage), std::string_view(smallText)}) {
+        signature.append(value);
+        signature.push_back('\0');
+    }
+    signature.push_back(g_config.showElapsedTime ? '\1' : '\0');
+
+    if (signature == g_lastActivitySignature || signature == g_pendingActivitySignature) {
+        SKSE::log::debug("Discord: unchanged activity skipped.");
+        return;
+    }
+
+    discord::Activity activity{};
+    activity.SetType(discord::ActivityType::Playing);
+    if (!stateText.empty()) activity.SetState(stateText.c_str());
+    if (!detailsText.empty()) activity.SetDetails(detailsText.c_str());
+    if (g_config.showElapsedTime) activity.GetTimestamps().SetStart(g_startTime);
+    if (!g_config.largeImage.empty())
+        activity.GetAssets().SetLargeImage(g_config.largeImage.c_str());
+    if (!g_config.largeText.empty())
+        activity.GetAssets().SetLargeText(LimitDiscordText(g_config.largeText).c_str());
+    if (!smallImage.empty())
+        activity.GetAssets().SetSmallImage(smallImage.c_str());
+    if (!smallText.empty())
+        activity.GetAssets().SetSmallText(smallText.c_str());
+
+    g_pendingActivitySignature = signature;
+    g_core->ActivityManager().UpdateActivity(activity, [signature = std::move(signature)](discord::Result r) {
+        if (r != discord::Result::Ok) {
             SKSE::log::error("Discord: UpdateActivity failed (result={})", static_cast<int>(r));
-        else
+        } else {
+            g_lastActivitySignature = signature;
             SKSE::log::info("Presence updated.");
+        }
+        if (g_pendingActivitySignature == signature)
+            g_pendingActivitySignature.clear();
     });
 }
 
@@ -122,22 +282,41 @@ void RefreshPosition(const char* trigger = nullptr) {
     auto* player = RE::PlayerCharacter::GetSingleton();
     if (!player) return;
 
-    std::string position   = BuildPosition(player);
+    std::string position;
+    if (g_config.showLocation) {
+        position = BuildPosition(player);
+        if (!position.empty()) g_lastPosition = position;
+    }
     std::string playerInfo = BuildPlayerInfo(player);
 
-    const bool fallback = position.empty() && !g_lastPosition.empty();
-    if (!position.empty()) g_lastPosition = position;
-
+    const bool fallback = g_config.showLocation && position.empty() && !g_lastPosition.empty();
     const std::string& display = fallback ? g_lastPosition : position;
     std::string state = display;
 
-    std::string suffix = !g_combatTarget.empty() ? g_combatTarget : BuildActiveQuest(player);
-    if (!suffix.empty()) state += " \xC2\xB7 " + suffix;  // · (U+00B7)
+    std::string quest;
+    if (g_config.showQuest)
+        quest = BuildActiveQuest(player);
+
+    PresenceMode mode = PresenceMode::Exploring;
+    std::string suffix;
+    if (g_config.showCombat && !g_combatTarget.empty()) {
+        suffix = g_combatTarget;
+        mode = PresenceMode::Combat;
+    } else if (!quest.empty()) {
+        suffix = std::move(quest);
+        mode = PresenceMode::Quest;
+    }
+
+    if (!suffix.empty()) {
+        if (!state.empty()) state += g_config.separator;
+        state += suffix;
+    }
+    if (state.empty()) state = Locale("exploring");
 
     SKSE::log::info("[{}] player='{}' location='{}' suffix='{}'{}",
         trigger ? trigger : "refresh", playerInfo, display, suffix,
         fallback ? " [fallback]" : "");
-    SendPresence(state.c_str(), playerInfo.c_str());
+    SendPresence(state, playerInfo, mode);
 }
 
 void DeferredRefresh(int ticks) {
@@ -155,11 +334,11 @@ void TransitionTo(State next) {
     switch (g_state) {
     case State::MainMenu:
         SKSE::log::info("State -> MainMenu");
-        SendPresence(Locale("main_menu").c_str(), nullptr);
+        SendPresence(Locale("main_menu"), {}, PresenceMode::MainMenu);
         break;
     case State::EditingCharacter:
         SKSE::log::info("State -> EditingCharacter");
-        SendPresence(Locale("editing_character").c_str(), nullptr);
+        SendPresence(Locale("editing_character"), {}, PresenceMode::EditingCharacter);
         break;
     case State::Playing:
         SKSE::log::info("State -> Playing");
@@ -174,6 +353,7 @@ void TransitionTo(State next) {
     case State::Loading:
         SKSE::log::info("State -> Loading");
         g_combatTarget.clear();
+        SendPresence(Locale("loading"), {}, PresenceMode::Loading);
         break;
     }
 }
@@ -334,10 +514,15 @@ static void StartCallbackThread() {
 }
 
 void InitDiscord() {
+    if (!g_config.enabled) {
+        SKSE::log::info("Discord presence disabled by configuration.");
+        return;
+    }
+
     g_startTime = static_cast<int64_t>(std::time(nullptr));
     discord::Result result;
     try {
-        result = discord::Core::Create(kAppId, DiscordCreateFlags_Default, &g_core);
+        result = discord::Core::Create(g_config.applicationId, DiscordCreateFlags_Default, &g_core);
     } catch (...) {
         // discord_game_sdk.dll not found — delay-load threw; run without presence.
         SKSE::log::warn("Discord: discord_game_sdk.dll not found — presence disabled.");
@@ -352,11 +537,66 @@ void InitDiscord() {
     g_core->SetLogHook(discord::LogLevel::Warn, [](discord::LogLevel, const char* msg) {
         SKSE::log::warn("Discord: {}", msg);
     });
-    SKSE::log::info("Discord Game SDK initialized.");
+    SKSE::log::info("Discord Game SDK initialized for application {}.", g_config.applicationId);
     StartCallbackThread();
 }
 
 } // anonymous namespace
+
+void LoadConfig() {
+    g_config = Config{};
+
+    std::ifstream file(R"(Data\SKSE\Plugins\DragonbornPresence.json)");
+    if (!file) {
+        SKSE::log::info("Config not found; using defaults.");
+        return;
+    }
+
+    try {
+        const auto root = nlohmann::json::parse(file);
+        if (!root.is_object()) {
+            SKSE::log::warn("Config root must be an object; using defaults.");
+            return;
+        }
+
+        if (auto schema = root.find("schema_version"); schema != root.end() &&
+            (!schema->is_number_integer() || schema->get<int>() != 1)) {
+            SKSE::log::warn("Config: unsupported 'schema_version'; reading known fields only.");
+        }
+
+        if (const auto* discord = FindObject(root, "discord", "discord")) {
+            ReadBool(*discord, "enabled", g_config.enabled, "discord");
+            ReadApplicationId(*discord);
+        }
+
+        if (const auto* display = FindObject(root, "display", "display")) {
+            ReadBool(*display, "show_elapsed_time", g_config.showElapsedTime, "display");
+            ReadBool(*display, "show_character_details", g_config.showCharacterDetails, "display");
+            ReadBool(*display, "show_location", g_config.showLocation, "display");
+            ReadBool(*display, "show_quest", g_config.showQuest, "display");
+            ReadBool(*display, "show_combat", g_config.showCombat, "display");
+            ReadString(*display, "separator", g_config.separator, "display");
+        }
+
+        if (const auto* assets = FindObject(root, "assets", "assets")) {
+            ReadString(*assets, "large_image", g_config.largeImage, "assets");
+            ReadString(*assets, "large_text", g_config.largeText, "assets");
+            if (const auto* smallImages = FindObject(*assets, "small_images", "assets.small_images")) {
+                ReadString(*smallImages, "loading", g_config.loadingImage, "assets.small_images");
+                ReadString(*smallImages, "main_menu", g_config.mainMenuImage, "assets.small_images");
+                ReadString(*smallImages, "editing_character", g_config.editingCharacterImage, "assets.small_images");
+                ReadString(*smallImages, "exploring", g_config.exploringImage, "assets.small_images");
+                ReadString(*smallImages, "quest", g_config.questImage, "assets.small_images");
+                ReadString(*smallImages, "combat", g_config.combatImage, "assets.small_images");
+            }
+        }
+
+        SKSE::log::info("Config loaded.");
+    } catch (const nlohmann::json::exception& e) {
+        SKSE::log::error("Failed to parse config JSON: {}", e.what());
+        g_config = Config{};
+    }
+}
 
 void SetLocale() {
     std::ifstream file(R"(Data\SKSE\Plugins\DragonbornPresenceLocale.json)");

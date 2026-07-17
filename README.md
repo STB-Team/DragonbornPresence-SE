@@ -36,6 +36,50 @@ Launch the game through SKSE. Discord must be running before or alongside the ga
 
 ---
 
+## Discord configuration
+
+`Data\SKSE\Plugins\DragonbornPresence.json` controls the Discord application, displayed fields, timer, and image assets. Invalid or missing values are logged and fall back to built-in defaults.
+
+To use custom branding:
+
+1. Create an application in the Discord Developer Portal.
+2. Upload Rich Presence assets whose keys match the values under `assets`.
+3. Replace `discord.application_id` with your application's ID. Keep the ID quoted as a JSON string.
+
+```json
+{
+  "schema_version": 1,
+  "discord": {
+    "enabled": true,
+    "application_id": "565627104608256015"
+  },
+  "display": {
+    "show_elapsed_time": true,
+    "show_character_details": true,
+    "show_location": true,
+    "show_quest": true,
+    "show_combat": true,
+    "separator": " · "
+  },
+  "assets": {
+    "large_image": "skyrim_logo",
+    "large_text": "The Elder Scrolls V: Skyrim",
+    "small_images": {
+      "loading": "loading",
+      "main_menu": "menu",
+      "editing_character": "character",
+      "exploring": "exploring",
+      "quest": "quest",
+      "combat": "combat"
+    }
+  }
+}
+```
+
+Set an image key to an empty string to disable that image. Small images change automatically for loading, menus, exploration, quests, and combat. Discord text fields are truncated safely at their 127-byte UTF-8 limit, and unchanged activities are not sent again.
+
+---
+
 ## Localization
 
 The archive includes locale files for 11 languages. The FOMOD installer lets you pick one during installation:
@@ -97,6 +141,15 @@ cmake --build build --config Release
 On the first configure CMake downloads [CommonLibSSE-NG](https://github.com/CharmedBaryon/CommonLibSSE-NG) v3.7.0, [Discord Game SDK 3.2.1](https://discord.com/developers/docs/game-sdk/sdk-starter-guide), and several header-only libraries — this takes a minute or two. Subsequent builds use the cache and are fast.
 
 The post-build step produces `DragonbornPresence.zip` in the build directory with the full install layout ready to drop into the game.
+
+For local development, configure an optional MO2 deployment directory:
+
+```bash
+cmake -S . -B build -DDRAGONBORNPRESENCE_DEPLOY_DIR="D:/path/to/Mod Organizer/mods/DragonbornPresence SE/SKSE/Plugins"
+cmake --build build --config Release
+```
+
+Each successful build copies `DragonbornPresence.dll` and `discord_game_sdk.dll` to that directory. User-edited `DragonbornPresence.json` and `DragonbornPresenceLocale.json` files are intentionally left untouched.
 
 ---
 
