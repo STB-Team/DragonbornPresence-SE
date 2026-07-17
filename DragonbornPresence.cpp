@@ -30,25 +30,25 @@ struct StoneDefinition {
 };
 
 constexpr std::array kStoneDefinitions{
-    StoneDefinition{"aaMZs_DoomstoneWarriorDesc", "Воин"},
-    StoneDefinition{"aaMZs_DoomstoneSteedDesc", "Конь"},
-    StoneDefinition{"aaMZs_DoomstoneAtronachDesc", "Атронах"},
-    StoneDefinition{"aaMZs_DoomstoneApprenticeDesc", "Ученик"},
-    StoneDefinition{"aaMZs_DoomstoneLordDesc", "Лорд"},
-    StoneDefinition{"aaMZs_DoomstoneThiefDesc", "Вор"},
-    StoneDefinition{"aaMZs_DoomstoneMageDesc", "Маг"},
-    StoneDefinition{"aaMZs_DoomstoneRitualDesc", "Ритуал"},
-    StoneDefinition{"aaMZs_DoomstoneSnakeDesc", "Змея"},
-    StoneDefinition{"aaMZs_DoomstoneLadyDesc", "Леди"},
-    StoneDefinition{"aaMZs_DoomstoneLoverDesc", "Любовник"},
-    StoneDefinition{"aaMZs_DoomstoneShadowDesc", "Тень"},
-    StoneDefinition{"aaMZs_DoomstoneTowerDesc", "Башня"},
-    StoneDefinition{"aaMZs_DoomstoneBeastDesc", "Зверь"},
-    StoneDefinition{"aaMZs_DoomstoneWindDesc", "Ветер"},
-    StoneDefinition{"aaMZs_DoomstoneWaterDesc", "Вода"},
-    StoneDefinition{"aaMZs_DoomstoneTreeDesc", "Дерево"},
-    StoneDefinition{"aaMZs_DoomstoneSunDesc", "Солнце"},
-    StoneDefinition{"aaMZs_DoomstoneEarthDesc", "Земля"},
+    StoneDefinition{"aaMZs_DoomstoneWarriorDesc", "🪓-Воин"},
+    StoneDefinition{"aaMZs_DoomstoneSteedDesc", "🐴-Конь"},
+    StoneDefinition{"aaMZs_DoomstoneAtronachDesc", "🎭-Атронах"},
+    StoneDefinition{"aaMZs_DoomstoneApprenticeDesc", "📜-Ученик"},
+    StoneDefinition{"aaMZs_DoomstoneLordDesc", "👑-Лорд"},
+    StoneDefinition{"aaMZs_DoomstoneThiefDesc", "🧤-Вор"},
+    StoneDefinition{"aaMZs_DoomstoneMageDesc", "🧙‍-Маг"},
+    StoneDefinition{"aaMZs_DoomstoneRitualDesc", "👻-Ритуал"},
+    StoneDefinition{"aaMZs_DoomstoneSnakeDesc", "🐍-Змея"},
+    StoneDefinition{"aaMZs_DoomstoneLadyDesc", "👠-Леди"},
+    StoneDefinition{"aaMZs_DoomstoneLoverDesc", "💖-Любовник"},
+    StoneDefinition{"aaMZs_DoomstoneShadowDesc", "🌙-Тень"},
+    StoneDefinition{"aaMZs_DoomstoneTowerDesc", "🛡️-Башня"},
+    StoneDefinition{"aaMZs_DoomstoneBeastDesc", "🦧-Зверь"},
+    StoneDefinition{"aaMZs_DoomstoneWindDesc", "🌪️-Ветер"},
+    StoneDefinition{"aaMZs_DoomstoneWaterDesc", "🌊-Вода"},
+    StoneDefinition{"aaMZs_DoomstoneTreeDesc", "🌲-Дерево"},
+    StoneDefinition{"aaMZs_DoomstoneSunDesc", "☀️-Солнце"},
+    StoneDefinition{"aaMZs_DoomstoneEarthDesc", "⛰️-Земля"},
 };
 
 struct LocationImageRule {
@@ -64,7 +64,7 @@ struct Config {
     bool enabled = true;
     discord::ClientId applicationId = kDefaultAppId;
     std::string largeImage = "stb_logo";
-    std::string largeText = "The Elder Scrolls V: Skyrim";
+    std::string largeText = "Skyrim True Believer";
     std::string loadingImage = "loading";
     std::string combatImage = "combat";
     std::vector<LocationImageRule> locationImageRules;
@@ -405,11 +405,11 @@ static void InitializeStbData()
 static std::string DifficultyName(int index)
 {
     switch (index) {
-    case 0: return "Приключение";
-    case 1: return "Тактика";
-    case 2: return "Героический";
-    case 3: return "Испытание богов";
-    case 4: return "Свой";
+    case 0: return "🟢Приключение";
+    case 1: return "🟡Тактика";
+    case 2: return "🔴Героический";
+    case 3: return "⚫Испытание богов";
+    case 4: return "⚪Свой уровень сложности";
     default: return "не определена";
     }
 }
@@ -542,13 +542,13 @@ static void RefreshPresence(const char* trigger)
         ? std::to_string(*snapshot.deaths)
         : "—";
     const std::string firstLine = std::format(
-        "Уровень: {} • Камень: {}",
-        snapshot.level,
-        snapshot.stone);
-    const std::string secondLine = std::format(
-        "Смертей: {} • Сложность: {}",
-        deaths,
+        "{}",
         snapshot.difficulty);
+    const std::string secondLine = std::format(
+        "lvl-{} 💀-{} {}",
+        snapshot.level,
+        deaths,
+        snapshot.stone);
     const std::string_view smallImage = snapshot.inCombat
         ? std::string_view(g_config.combatImage)
         : std::string_view{};
