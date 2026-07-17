@@ -351,20 +351,15 @@
 
 <h2>5. Большая картинка под каждую локацию</h2>
 <p>Правила находятся в массиве <code>assets.location_images</code> и проверяются сверху вниз. Первое совпавшее правило побеждает.</p>
-<h3>Надёжный вариант: Editor ID</h3>
+<p>В комплектной конфигурации боевые локации используют основные маркеры без тиров: <code>bandit</code>, <code>draugr</code>, <code>falmer-dvemer</code> и другие. Номер тира и цвет больше не входят в Asset key.</p>
+<h3>Основные маркеры без тиров</h3>
 <pre>"location_images": [
-  { "location": "WhiterunLocation", "image": "whiterun", "text": "Whiterun" },
-  { "location": "SolitudeLocation", "image": "solitude", "text": "Solitude" },
-  { "location": "WindhelmLocation", "image": "windhelm", "text": "Windhelm" },
-  { "location": "RiftenLocation", "image": "riften", "text": "Riften" },
-  { "location": "MarkarthLocation", "image": "markarth", "text": "Markarth" },
-  { "worldspace": "DLC2SolstheimWorld", "image": "solstheim", "text": "Solstheim" },
-  { "worldspace": "Blackreach", "image": "blackreach", "text": "Blackreach" },
-  { "worldspace": "Tamriel", "image": "skyrim", "text": "Skyrim" }
+  { "match": "Нилхейм", "image": "bandit", "text": "Нилхейм" },
+  { "match": "Саартал", "image": "draugr", "text": "Саартал" },
+  { "match": "Мзулфт", "image": "falmer-dvemer", "text": "Мзулфт" }
 ]</pre>
-<h3>Быстрый вариант: видимое название</h3>
-<pre>{ "match": "Ривервуд", "image": "riverwood", "text": "Ривервуд" },
-{ "match": "STB Dev Room", "image": "stb_room", "text": "STB Dev Room" }</pre>
+<h3>Пользовательское правило через Editor ID</h3>
+<pre>{ "location": "WhiterunLocation", "image": "whiterun", "text": "Whiterun" }</pre>
 <table>
   <thead><tr><th>Селектор</th><th>Назначение</th></tr></thead>
   <tbody>
@@ -376,7 +371,7 @@
     <tr><td><code>text</code></td><td>Текст при наведении на большую картинку.</td></tr>
   </tbody>
 </table>
-<div class="callout"><strong>Порядок важен:</strong> конкретные города, помещения и подземелья размещай раньше общего правила <code>Tamriel</code>. Если указано несколько селекторов, совпасть должны все.</div>
+<div class="callout"><strong>Порядок важен:</strong> длинные названия проверяются раньше коротких подстрок. Для четырёх неоднозначных названий сохранены точные правила с игровыми префиксами; остальные правила не зависят от тира. Если совпадения нет, используется <code>large_image</code>.</div>
 
 <h2>6. Маленькие иконки действий</h2>
 <pre>"small_images": {
@@ -428,13 +423,13 @@
   <thead><tr><th>Роль</th><th>Рекомендуемые файлы</th><th>Portal keys</th></tr></thead>
   <tbody>
     <tr><td>Логотип</td><td>stb_logo.png</td><td><code>stb_logo</code></td></tr>
-    <tr><td>Миры</td><td>skyrim.png, solstheim.png, blackreach.png</td><td><code>skyrim</code>, <code>solstheim</code>, <code>blackreach</code></td></tr>
-    <tr><td>Города</td><td>whiterun.png, solitude.png, windhelm.png, riften.png, markarth.png</td><td>Имена без расширения</td></tr>
+    <tr><td>Основные маркеры локаций</td><td>bandit.png, draugr.png, falmer.png, dvemer.png и остальные PNG из подготовленного набора</td><td>Имена файлов без расширения, строчными буквами и без тиров</td></tr>
     <tr><td>Основные состояния</td><td>loading.png, menu.png, character.png, exploring.png, quest.png, combat.png</td><td>Имена без расширения</td></tr>
     <tr><td>UI и крафт</td><td>map.png, inventory.png, dialogue.png, crafting.png, alchemy.png, smithing.png, enchanting.png, cooking.png, tanning.png, smelting.png, waiting.png</td><td>Имена без расширения</td></tr>
   </tbody>
 </table>
 <p>Рекомендация: квадратный PNG 1024×1024 для больших изображений; прозрачный квадратный PNG 512×512 или 1024×1024 для маленьких иконок. Важные детали размещай по центру — Discord обрезает маленькую иконку до круга.</p>
+<p>Готовый набор для Portal находится в <code>DiscordAssets\markers-portal</code>. Все файлы имеют размер 1024×1024; их имена точно совпадают с ключами комплектного JSON.</p>
 
 <h2>9. Полный практический пример</h2>
 <pre>"assets": {
@@ -467,10 +462,9 @@
     "waiting": "waiting"
   },
   "location_images": [
-    { "location": "WhiterunLocation", "image": "whiterun", "text": "Whiterun" },
-    { "match": "Ривервуд", "image": "riverwood", "text": "Ривервуд" },
-    { "worldspace": "DLC2SolstheimWorld", "image": "solstheim", "text": "Solstheim" },
-    { "worldspace": "Tamriel", "image": "skyrim", "text": "Skyrim" }
+    { "match": "Нилхейм", "image": "bandit", "text": "Нилхейм" },
+    { "match": "Саартал", "image": "draugr", "text": "Саартал" },
+    { "match": "Мзулфт", "image": "falmer-dvemer", "text": "Мзулфт" }
   ]
 }</pre>
 

@@ -5,6 +5,7 @@
 - Added dedicated Presence modes, localized text, and configurable small-image keys for alchemy, smithing, enchanting, cooking, tanning, and smelting.
 - Detect crafting activities from the active crafting submenu, furniture bench metadata, and stable Editor ID hints.
 - Fall back to the generic `crafting` text and image for unsupported stations; an empty activity-specific image key also uses the generic crafting image.
+- Replaced tier-specific location image keys with 42 tierless creature and encounter markers; locations without an encounter marker use the configured large-image fallback.
 
 
 ## 2.4.0 — 2026-07-17
