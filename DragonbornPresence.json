@@ -10,18 +10,41 @@
     "show_location": true,
     "show_quest": true,
     "show_combat": true,
+    "show_ui_state": true,
     "separator": " · "
   },
   "assets": {
     "large_image": "skyrim_logo",
     "large_text": "The Elder Scrolls V: Skyrim",
+    "large_images": {
+      "loading": "skyrim_logo",
+      "main_menu": "skyrim_logo",
+      "editing_character": "skyrim_logo",
+      "playing": "skyrim_logo"
+    },
     "small_images": {
       "loading": "loading",
       "main_menu": "menu",
       "editing_character": "character",
       "exploring": "exploring",
       "quest": "quest",
-      "combat": "combat"
-    }
+      "combat": "combat",
+      "menu": "menu",
+      "map": "map",
+      "inventory": "inventory",
+      "dialogue": "dialogue",
+      "crafting": "crafting",
+      "waiting": "waiting"
+    },
+    "location_images": [
+      { "location": "WhiterunLocation", "image": "whiterun", "text": "Whiterun" },
+      { "location": "SolitudeLocation", "image": "solitude", "text": "Solitude" },
+      { "location": "WindhelmLocation", "image": "windhelm", "text": "Windhelm" },
+      { "location": "RiftenLocation", "image": "riften", "text": "Riften" },
+      { "location": "MarkarthLocation", "image": "markarth", "text": "Markarth" },
+      { "worldspace": "DLC2SolstheimWorld", "image": "solstheim", "text": "Solstheim" },
+      { "worldspace": "Blackreach", "image": "blackreach", "text": "Blackreach" },
+      { "worldspace": "Tamriel", "image": "skyrim", "text": "Skyrim" }
+    ]
   }
 }

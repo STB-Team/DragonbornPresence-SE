@@ -6,8 +6,11 @@
 #include <chrono>
 #include <ctime>
 #include <fstream>
+#include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_set>
+#include <vector>
 #include <thread>
 #include <nlohmann/json.hpp>
 
@@ -18,7 +21,29 @@ namespace {
 constexpr discord::ClientId kDefaultAppId = 565627104608256015LL;
 
 enum class State { Loading, MainMenu, EditingCharacter, Playing };
-enum class PresenceMode { Loading, MainMenu, EditingCharacter, Exploring, Quest, Combat };
+enum class PresenceMode {
+    Loading,
+    MainMenu,
+    EditingCharacter,
+    Exploring,
+    Quest,
+    Combat,
+    Menu,
+    Map,
+    Inventory,
+    Dialogue,
+    Crafting,
+    Waiting
+};
+
+struct LocationImageRule {
+    std::string worldspace;
+    std::string location;
+    std::string cell;
+    std::string match;
+    std::string image;
+    std::string text;
+};
 
 struct Config {
     bool              enabled              = true;
@@ -28,15 +53,27 @@ struct Config {
     bool              showLocation         = true;
     bool              showQuest            = true;
     bool              showCombat           = true;
+    bool              showUiState          = true;
     std::string       separator            = " \xC2\xB7 ";
     std::string       largeImage           = "skyrim_logo";
     std::string       largeText            = "The Elder Scrolls V: Skyrim";
+    std::string       loadingLargeImage;
+    std::string       mainMenuLargeImage;
+    std::string       editingCharacterLargeImage;
+    std::string       playingLargeImage;
     std::string       loadingImage;
     std::string       mainMenuImage;
     std::string       editingCharacterImage;
     std::string       exploringImage;
     std::string       questImage;
     std::string       combatImage;
+    std::string       menuImage;
+    std::string       mapImage;
+    std::string       inventoryImage;
+    std::string       dialogueImage;
+    std::string       craftingImage;
+    std::string       waitingImage;
+    std::vector<LocationImageRule> locationImageRules;
 };
 
 Config         g_config;
@@ -51,11 +88,18 @@ std::unordered_map<std::string, std::string> g_locale = {
     {"active_quest",      "Active quest"},
     {"combat_fighting",   "In combat with {name}"},
     {"combat_no_target",  "In combat"},
+    {"in_menu",           "In menus"},
+    {"viewing_map",       "Viewing map"},
+    {"inventory",         "Managing inventory"},
+    {"dialogue",          "In dialogue"},
+    {"crafting",          "Crafting"},
+    {"waiting",           "Waiting"},
 };
 std::string g_lastPosition;
 std::string g_combatTarget;
 std::string g_lastActivitySignature;
 std::string g_pendingActivitySignature;
+std::unordered_set<std::string> g_openContextMenus;
 
 static std::string SafeStr(const char* s) {
     if (!s || *s == '\0') return "";
@@ -130,6 +174,63 @@ static void ReadApplicationId(const nlohmann::json& object) {
     g_config.applicationId = value;
 }
 
+static void ReadLocationImageRules(const nlohmann::json& assets) {
+    auto rules = assets.find("location_images");
+    if (rules == assets.end()) return;
+    if (!rules->is_array()) {
+        SKSE::log::warn("Config: 'assets.location_images' must be an array; using defaults.");
+        return;
+    }
+
+    std::vector<LocationImageRule> parsed;
+    parsed.reserve(rules->size());
+    for (std::size_t index = 0; index < rules->size(); ++index) {
+        const auto& value = (*rules)[index];
+        if (!value.is_object()) {
+            SKSE::log::warn(
+                "Config: 'assets.location_images[{}]' must be an object; ignoring.",
+                index);
+            continue;
+        }
+
+        LocationImageRule rule;
+        bool valid = true;
+        const auto readOptional = [&](const char* key, std::string& target) {
+            auto field = value.find(key);
+            if (field == value.end()) return;
+            if (!field->is_string()) {
+                SKSE::log::warn(
+                    "Config: 'assets.location_images[{}].{}' must be a string; ignoring rule.",
+                    index,
+                    key);
+                valid = false;
+                return;
+            }
+            target = field->get<std::string>();
+        };
+
+        readOptional("worldspace", rule.worldspace);
+        readOptional("location", rule.location);
+        readOptional("cell", rule.cell);
+        readOptional("match", rule.match);
+        readOptional("image", rule.image);
+        readOptional("text", rule.text);
+
+        const bool hasSelector =
+            !rule.worldspace.empty() || !rule.location.empty() ||
+            !rule.cell.empty() || !rule.match.empty();
+        if (!valid || !hasSelector || rule.image.empty()) {
+            SKSE::log::warn(
+                "Config: 'assets.location_images[{}]' requires 'image' and at least one "
+                "of 'worldspace', 'location', 'cell', or 'match'; ignoring.",
+                index);
+            continue;
+        }
+        parsed.push_back(std::move(rule));
+    }
+    g_config.locationImageRules = std::move(parsed);
+}
+
 static std::string LimitDiscordText(std::string_view text) {
     constexpr std::size_t kMaxBytes = 127;
     if (text.size() <= kMaxBytes) return std::string(text);
@@ -140,6 +241,104 @@ static std::string LimitDiscordText(std::string_view text) {
     return std::string(text.substr(0, size));
 }
 
+struct LargeAssetSelection {
+    std::string_view image;
+    std::string_view text;
+};
+
+static bool ContainsAsciiInsensitive(std::string_view text, std::string_view pattern) {
+    if (pattern.empty()) return true;
+    if (pattern.size() > text.size()) return false;
+
+    const auto fold = [](unsigned char value) {
+        return value >= 'A' && value <= 'Z' ? static_cast<unsigned char>(value + ('a' - 'A'))
+                                            : value;
+    };
+    for (std::size_t offset = 0; offset + pattern.size() <= text.size(); ++offset) {
+        bool matches = true;
+        for (std::size_t index = 0; index < pattern.size(); ++index) {
+            if (fold(static_cast<unsigned char>(text[offset + index])) !=
+                fold(static_cast<unsigned char>(pattern[index]))) {
+                matches = false;
+                break;
+            }
+        }
+        if (matches) return true;
+    }
+    return false;
+}
+
+static bool EditorIdEquals(const RE::TESForm* form, std::string_view expected) {
+    if (expected.empty()) return true;
+    if (!form) return false;
+    const char* editorId = form->GetFormEditorID();
+    return editorId && expected == editorId;
+}
+
+static bool LocationRuleMatches(
+    const LocationImageRule& rule,
+    RE::PlayerCharacter* player,
+    std::string_view displayLocation)
+{
+    if (!player) return false;
+    if (!rule.worldspace.empty() &&
+        !EditorIdEquals(player->GetWorldspace(), rule.worldspace)) {
+        return false;
+    }
+    if (!rule.cell.empty() && !EditorIdEquals(player->GetParentCell(), rule.cell)) {
+        return false;
+    }
+    if (!rule.location.empty()) {
+        bool found = false;
+        for (auto* location = player->GetCurrentLocation(); location; location = location->parentLoc) {
+            if (EditorIdEquals(location, rule.location)) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) return false;
+    }
+    return rule.match.empty() || ContainsAsciiInsensitive(displayLocation, rule.match);
+}
+
+static const std::string& LargeImage(PresenceMode mode) {
+    const std::string* overrideImage = nullptr;
+    switch (mode) {
+    case PresenceMode::Loading:
+        overrideImage = &g_config.loadingLargeImage;
+        break;
+    case PresenceMode::MainMenu:
+        overrideImage = &g_config.mainMenuLargeImage;
+        break;
+    case PresenceMode::EditingCharacter:
+        overrideImage = &g_config.editingCharacterLargeImage;
+        break;
+    default:
+        overrideImage = &g_config.playingLargeImage;
+        break;
+    }
+    return overrideImage->empty() ? g_config.largeImage : *overrideImage;
+}
+
+static LargeAssetSelection ResolveLargeAsset(
+    PresenceMode mode,
+    RE::PlayerCharacter* player,
+    std::string_view displayLocation)
+{
+    if (player) {
+        for (const auto& rule : g_config.locationImageRules) {
+            if (LocationRuleMatches(rule, player, displayLocation)) {
+                return {
+                    rule.image,
+                    rule.text.empty() ? std::string_view(g_config.largeText)
+                                      : std::string_view(rule.text)
+                };
+            }
+        }
+    }
+    return {LargeImage(mode), g_config.largeText};
+}
+
 static const std::string& SmallImage(PresenceMode mode) {
     switch (mode) {
     case PresenceMode::Loading:          return g_config.loadingImage;
@@ -148,6 +347,12 @@ static const std::string& SmallImage(PresenceMode mode) {
     case PresenceMode::Exploring:        return g_config.exploringImage;
     case PresenceMode::Quest:            return g_config.questImage;
     case PresenceMode::Combat:           return g_config.combatImage;
+    case PresenceMode::Menu:             return g_config.menuImage;
+    case PresenceMode::Map:              return g_config.mapImage;
+    case PresenceMode::Inventory:        return g_config.inventoryImage;
+    case PresenceMode::Dialogue:         return g_config.dialogueImage;
+    case PresenceMode::Crafting:         return g_config.craftingImage;
+    case PresenceMode::Waiting:          return g_config.waitingImage;
     }
     return g_config.exploringImage;
 }
@@ -161,6 +366,12 @@ static std::string SmallText(PresenceMode mode) {
     case PresenceMode::Quest:            return Locale("active_quest");
     case PresenceMode::Combat:
         return g_combatTarget.empty() ? Locale("combat_no_target") : g_combatTarget;
+    case PresenceMode::Menu:      return Locale("in_menu");
+    case PresenceMode::Map:       return Locale("viewing_map");
+    case PresenceMode::Inventory: return Locale("inventory");
+    case PresenceMode::Dialogue:  return Locale("dialogue");
+    case PresenceMode::Crafting:  return Locale("crafting");
+    case PresenceMode::Waiting:   return Locale("waiting");
     }
     return {};
 }
@@ -225,21 +436,71 @@ static std::string BuildPlayerInfo(RE::PlayerCharacter* player) {
     return name + " - " + raceName + " (" + std::to_string(player->GetLevel()) + ")";
 }
 
-void SendPresence(std::string_view state, std::string_view details, PresenceMode mode) {
+static std::optional<PresenceMode> ContextModeForMenu(std::string_view menu) {
+    if (menu == RE::DialogueMenu::MENU_NAME) return PresenceMode::Dialogue;
+    if (menu == RE::CraftingMenu::MENU_NAME) return PresenceMode::Crafting;
+    if (menu == RE::MapMenu::MENU_NAME) return PresenceMode::Map;
+    if (menu == RE::SleepWaitMenu::MENU_NAME) return PresenceMode::Waiting;
+    if (menu == RE::InventoryMenu::MENU_NAME ||
+        menu == RE::MagicMenu::MENU_NAME ||
+        menu == RE::FavoritesMenu::MENU_NAME ||
+        menu == RE::StatsMenu::MENU_NAME ||
+        menu == RE::BarterMenu::MENU_NAME ||
+        menu == RE::ContainerMenu::MENU_NAME) {
+        return PresenceMode::Inventory;
+    }
+    if (menu == RE::JournalMenu::MENU_NAME || menu == RE::TweenMenu::MENU_NAME) {
+        return PresenceMode::Menu;
+    }
+    return std::nullopt;
+}
+
+static int ContextPriority(PresenceMode mode) {
+    switch (mode) {
+    case PresenceMode::Dialogue:  return 6;
+    case PresenceMode::Crafting:  return 5;
+    case PresenceMode::Map:       return 4;
+    case PresenceMode::Inventory: return 3;
+    case PresenceMode::Waiting:   return 2;
+    case PresenceMode::Menu:      return 1;
+    default:                      return 0;
+    }
+}
+
+static std::optional<PresenceMode> ActiveContextMode() {
+    std::optional<PresenceMode> selected;
+    for (const auto& menu : g_openContextMenus) {
+        const auto mode = ContextModeForMenu(menu);
+        if (mode && (!selected || ContextPriority(*mode) > ContextPriority(*selected))) {
+            selected = mode;
+        }
+    }
+    return selected;
+}
+
+void SendPresence(
+    std::string_view state,
+    std::string_view details,
+    PresenceMode mode,
+    RE::PlayerCharacter* player = nullptr,
+    std::string_view displayLocation = {})
+{
     if (!g_core) return;
 
     const std::string stateText   = LimitDiscordText(state);
     const std::string detailsText = LimitDiscordText(details);
     const std::string smallText   = LimitDiscordText(SmallText(mode));
     const std::string& smallImage = SmallImage(mode);
+    const auto largeAsset = ResolveLargeAsset(mode, player, displayLocation);
+    const std::string largeText = LimitDiscordText(largeAsset.text);
 
     std::string signature;
     signature.reserve(
-        stateText.size() + detailsText.size() + g_config.largeImage.size() +
-        g_config.largeText.size() + smallImage.size() + smallText.size() + 8);
-    for (const auto& value :
+        stateText.size() + detailsText.size() + largeAsset.image.size() +
+        largeText.size() + smallImage.size() + smallText.size() + 8);
+    for (const auto value :
          {std::string_view(stateText), std::string_view(detailsText),
-          std::string_view(g_config.largeImage), std::string_view(g_config.largeText),
+          largeAsset.image, std::string_view(largeText),
           std::string_view(smallImage), std::string_view(smallText)}) {
         signature.append(value);
         signature.push_back('\0');
@@ -256,15 +517,19 @@ void SendPresence(std::string_view state, std::string_view details, PresenceMode
     if (!stateText.empty()) activity.SetState(stateText.c_str());
     if (!detailsText.empty()) activity.SetDetails(detailsText.c_str());
     if (g_config.showElapsedTime) activity.GetTimestamps().SetStart(g_startTime);
-    if (!g_config.largeImage.empty())
-        activity.GetAssets().SetLargeImage(g_config.largeImage.c_str());
-    if (!g_config.largeText.empty())
-        activity.GetAssets().SetLargeText(LimitDiscordText(g_config.largeText).c_str());
+    if (!largeAsset.image.empty())
+        activity.GetAssets().SetLargeImage(largeAsset.image.data());
+    if (!largeText.empty())
+        activity.GetAssets().SetLargeText(largeText.c_str());
     if (!smallImage.empty())
         activity.GetAssets().SetSmallImage(smallImage.c_str());
     if (!smallText.empty())
         activity.GetAssets().SetSmallText(smallText.c_str());
 
+    SKSE::log::info(
+        "Presence assets: large='{}' small='{}'.",
+        largeAsset.image,
+        smallImage);
     g_pendingActivitySignature = signature;
     g_core->ActivityManager().UpdateActivity(activity, [signature = std::move(signature)](discord::Result r) {
         if (r != discord::Result::Ok) {
@@ -299,9 +564,13 @@ void RefreshPosition(const char* trigger = nullptr) {
 
     PresenceMode mode = PresenceMode::Exploring;
     std::string suffix;
+    const auto contextMode = g_config.showUiState ? ActiveContextMode() : std::nullopt;
     if (g_config.showCombat && !g_combatTarget.empty()) {
         suffix = g_combatTarget;
         mode = PresenceMode::Combat;
+    } else if (contextMode) {
+        mode = *contextMode;
+        suffix = SmallText(mode);
     } else if (!quest.empty()) {
         suffix = std::move(quest);
         mode = PresenceMode::Quest;
@@ -316,7 +585,7 @@ void RefreshPosition(const char* trigger = nullptr) {
     SKSE::log::info("[{}] player='{}' location='{}' suffix='{}'{}",
         trigger ? trigger : "refresh", playerInfo, display, suffix,
         fallback ? " [fallback]" : "");
-    SendPresence(state, playerInfo, mode);
+    SendPresence(state, playerInfo, mode, player, display);
 }
 
 void DeferredRefresh(int ticks) {
@@ -334,6 +603,7 @@ void TransitionTo(State next) {
     switch (g_state) {
     case State::MainMenu:
         SKSE::log::info("State -> MainMenu");
+        g_openContextMenus.clear();
         SendPresence(Locale("main_menu"), {}, PresenceMode::MainMenu);
         break;
     case State::EditingCharacter:
@@ -353,6 +623,7 @@ void TransitionTo(State next) {
     case State::Loading:
         SKSE::log::info("State -> Loading");
         g_combatTarget.clear();
+        g_openContextMenus.clear();
         SendPresence(Locale("loading"), {}, PresenceMode::Loading);
         break;
     }
@@ -382,9 +653,14 @@ public:
         } else if (menu == "RaceSex Menu") {
             SKSE::log::info("Menu: '{}' {}", menu.c_str(), opening ? "open" : "close");
             TransitionTo(opening ? State::EditingCharacter : State::Playing);
-        } else if (menu == "Journal Menu") {
-            if (!opening && g_state == State::Playing)
-                RefreshPosition("journal-close");
+        } else if (ContextModeForMenu(menu.c_str())) {
+            const bool changed = opening
+                ? g_openContextMenus.emplace(menu.c_str()).second
+                : g_openContextMenus.erase(menu.c_str()) > 0;
+            SKSE::log::info("Menu context: '{}' {}", menu.c_str(), opening ? "open" : "close");
+            if (changed && g_state == State::Playing) {
+                RefreshPosition(opening ? "menu-open" : "menu-close");
+            }
         }
         return RE::BSEventNotifyControl::kContinue;
     }
@@ -575,12 +851,19 @@ void LoadConfig() {
             ReadBool(*display, "show_location", g_config.showLocation, "display");
             ReadBool(*display, "show_quest", g_config.showQuest, "display");
             ReadBool(*display, "show_combat", g_config.showCombat, "display");
+            ReadBool(*display, "show_ui_state", g_config.showUiState, "display");
             ReadString(*display, "separator", g_config.separator, "display");
         }
 
         if (const auto* assets = FindObject(root, "assets", "assets")) {
             ReadString(*assets, "large_image", g_config.largeImage, "assets");
             ReadString(*assets, "large_text", g_config.largeText, "assets");
+            if (const auto* largeImages = FindObject(*assets, "large_images", "assets.large_images")) {
+                ReadString(*largeImages, "loading", g_config.loadingLargeImage, "assets.large_images");
+                ReadString(*largeImages, "main_menu", g_config.mainMenuLargeImage, "assets.large_images");
+                ReadString(*largeImages, "editing_character", g_config.editingCharacterLargeImage, "assets.large_images");
+                ReadString(*largeImages, "playing", g_config.playingLargeImage, "assets.large_images");
+            }
             if (const auto* smallImages = FindObject(*assets, "small_images", "assets.small_images")) {
                 ReadString(*smallImages, "loading", g_config.loadingImage, "assets.small_images");
                 ReadString(*smallImages, "main_menu", g_config.mainMenuImage, "assets.small_images");
@@ -588,7 +871,14 @@ void LoadConfig() {
                 ReadString(*smallImages, "exploring", g_config.exploringImage, "assets.small_images");
                 ReadString(*smallImages, "quest", g_config.questImage, "assets.small_images");
                 ReadString(*smallImages, "combat", g_config.combatImage, "assets.small_images");
+                ReadString(*smallImages, "menu", g_config.menuImage, "assets.small_images");
+                ReadString(*smallImages, "map", g_config.mapImage, "assets.small_images");
+                ReadString(*smallImages, "inventory", g_config.inventoryImage, "assets.small_images");
+                ReadString(*smallImages, "dialogue", g_config.dialogueImage, "assets.small_images");
+                ReadString(*smallImages, "crafting", g_config.craftingImage, "assets.small_images");
+                ReadString(*smallImages, "waiting", g_config.waitingImage, "assets.small_images");
             }
+            ReadLocationImageRules(*assets);
         }
 
         SKSE::log::info("Config loaded.");

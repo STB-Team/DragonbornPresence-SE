@@ -5,5 +5,11 @@
     "exploring": "探索中",
     "active_quest": "進行中のクエスト",
     "combat_fighting": "{name}と戦闘中",
-    "combat_no_target": "戦闘中"
+    "combat_no_target": "戦闘中",
+    "in_menu": "メニューを閲覧中",
+    "viewing_map": "マップを確認中",
+    "inventory": "所持品を整理中",
+    "dialogue": "会話中",
+    "crafting": "製作中",
+    "waiting": "待機中"
 }

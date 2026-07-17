@@ -5,5 +5,11 @@
     "exploring": "Exploring",
     "active_quest": "Active quest",
     "combat_fighting": "In combat with {name}",
-    "combat_no_target": "In combat"
+    "combat_no_target": "In combat",
+    "in_menu": "In menus",
+    "viewing_map": "Viewing map",
+    "inventory": "Managing inventory",
+    "dialogue": "In dialogue",
+    "crafting": "Crafting",
+    "waiting": "Waiting"
 }

@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.4.0 — 2026-07-17
+
+- Added configurable large-image overrides for loading, the main menu, character creation, and gameplay.
+- Added ordered location image rules using stable worldspace, location, or cell Editor IDs, with an optional display-name substring matcher.
+- Added Rich Presence states and small-image keys for menus, the map, inventory and magic screens, dialogue, crafting, and waiting.
+- Defined presence priority as combat, UI context, active quest, then exploration.
+- Added localized UI-state text to all 11 bundled languages.
+- Kept Discord Game SDK integration; no OAuth or additional authorization window is required.
+
 ## 2.3.0 — 2026-07-17
 
 - Added `DragonbornPresence.json` for configuring the Discord application ID, activity fields, timer, separator, and image assets.

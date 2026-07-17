@@ -5,5 +5,11 @@
     "exploring": "탐험 중",
     "active_quest": "활성 퀘스트",
     "combat_fighting": "{name}와 교전 중",
-    "combat_no_target": "교전 중"
+    "combat_no_target": "교전 중",
+    "in_menu": "메뉴 사용 중",
+    "viewing_map": "지도 확인 중",
+    "inventory": "소지품 정리 중",
+    "dialogue": "대화 중",
+    "crafting": "제작 중",
+    "waiting": "대기 중"
 }

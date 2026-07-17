@@ -38,13 +38,15 @@ Launch the game through SKSE. Discord must be running before or alongside the ga
 
 ## Discord configuration
 
-`Data\SKSE\Plugins\DragonbornPresence.json` controls the Discord application, displayed fields, timer, and image assets. Invalid or missing values are logged and fall back to built-in defaults.
+`Data\SKSE\Plugins\DragonbornPresence.json` controls the Discord application, displayed fields, event priorities, and image assets. Invalid values are logged and fall back to defaults. The plugin continues to use Discord Game SDK and does not open an OAuth or authorization window.
+
+A printable Russian guide with complete examples is available at [`docs/Discord-Presence-Configuration-RU.pdf`](docs/Discord-Presence-Configuration-RU.pdf).
 
 To use custom branding:
 
 1. Create an application in the Discord Developer Portal.
-2. Upload Rich Presence assets whose keys match the values under `assets`.
-3. Replace `discord.application_id` with your application's ID. Keep the ID quoted as a JSON string.
+2. Open **Rich Presence → Art Assets** and upload images with the keys used in `assets`.
+3. Replace `discord.application_id` with the application ID, kept as a quoted JSON string.
 
 ```json
 {
@@ -59,26 +61,66 @@ To use custom branding:
     "show_location": true,
     "show_quest": true,
     "show_combat": true,
+    "show_ui_state": true,
     "separator": " · "
   },
   "assets": {
     "large_image": "skyrim_logo",
     "large_text": "The Elder Scrolls V: Skyrim",
+    "large_images": {
+      "loading": "skyrim_logo",
+      "main_menu": "skyrim_logo",
+      "editing_character": "skyrim_logo",
+      "playing": "skyrim_logo"
+    },
     "small_images": {
       "loading": "loading",
       "main_menu": "menu",
       "editing_character": "character",
       "exploring": "exploring",
       "quest": "quest",
-      "combat": "combat"
-    }
+      "combat": "combat",
+      "menu": "menu",
+      "map": "map",
+      "inventory": "inventory",
+      "dialogue": "dialogue",
+      "crafting": "crafting",
+      "waiting": "waiting"
+    },
+    "location_images": [
+      { "location": "WhiterunLocation", "image": "whiterun", "text": "Whiterun" },
+      { "worldspace": "DLC2SolstheimWorld", "image": "solstheim", "text": "Solstheim" },
+      { "worldspace": "Tamriel", "image": "skyrim", "text": "Skyrim" },
+      { "match": "STB Dev Room", "image": "stb_room", "text": "STB Dev Room" }
+    ]
   }
 }
 ```
 
-Set an image key to an empty string to disable that image. Small images change automatically for loading, menus, exploration, quests, and combat. Discord text fields are truncated safely at their 127-byte UTF-8 limit, and unchanged activities are not sent again.
+### Asset selection
 
----
+- `large_image` is the final fallback.
+- `large_images` overrides the fallback for loading, the main menu, character creation, and normal gameplay.
+- `location_images` is evaluated from top to bottom; the first matching rule replaces the large image and optionally its hover text.
+- `worldspace`, `location`, and `cell` match stable Creation Kit/xEdit Editor IDs.
+- `match` searches the displayed location name; ASCII matching is case-insensitive. When a rule contains several selectors, all of them must match.
+- An empty image key disables that image. Missing portal assets produce a blank image but do not stop Presence updates.
+
+Presence priority is: **combat → active UI context → active quest → exploration**. Combat therefore keeps its own small icon even when another lower-priority event fires.
+
+### Images to upload
+
+The bundled example configuration expects these Discord Art Asset keys:
+
+| Role | Recommended file names / portal keys |
+|---|---|
+| Default large logo | `skyrim_logo.png` → `skyrim_logo` |
+| Large world images | `skyrim.png`, `solstheim.png`, `blackreach.png` |
+| Large city images | `whiterun.png`, `solitude.png`, `windhelm.png`, `riften.png`, `markarth.png` |
+| Existing small states | `loading.png`, `menu.png`, `character.png`, `exploring.png`, `quest.png`, `combat.png` |
+| New small UI states | `map.png`, `inventory.png`, `dialogue.png`, `crafting.png`, `waiting.png` |
+
+File names may differ; the **asset key entered in the Developer Portal** must match the JSON value. Square PNG images are recommended: 1024×1024 for large art, and transparent 512×512 or 1024×1024 icons for small art. Keep important details centered because Discord crops small assets to a circle.
 
 ## Localization
 
@@ -162,7 +204,7 @@ Pure C++ DLL — no `.esp`, no Papyrus scripts.
 **`DragonbornPresence.cpp`** — All state and Discord logic.
 
 - **State machine** (`enum class State`): `Loading → MainMenu → Playing / EditingCharacter`. Transitions via `TransitionTo()`.
-- **`MenuEventSink`** — listens to `MenuOpenCloseEvent`. Maps `"Main Menu"`, `"Loading Menu"`, `"RaceSex Menu"`, and `"Journal Menu"` to state transitions or presence refreshes.
+- **`MenuEventSink`** — maps main menu, loading, and character-creation menus to state transitions. It also tracks map, inventory, magic, favorites, stats, barter, container, dialogue, crafting, sleep/wait, journal, and tween menus as prioritized Presence contexts.
 - **`LocationChangeSink`** — listens to `TESActorLocationChangeEvent`; calls `RefreshPosition()` when the player changes named location.
 - **`CellLoadSink`** — listens to `TESCellFullyLoadedEvent`; calls `RefreshPosition()` when the player's cell finishes loading.
 - **`QuestStageSink`** / **`QuestStartStopSink`** — listen to quest stage and start/stop events; refresh presence via an SKSE task so the update runs on the game thread.
@@ -170,7 +212,7 @@ Pure C++ DLL — no `.esp`, no Papyrus scripts.
 - **`BuildPosition()`** — traverses the `parentLoc` chain to find the first named ancestor. Returns `"Worldspace: Location"` for exterior, `"Location"` for interior, cell name as last resort. Caches the last non-empty result to handle null pointers during location boundary crossing.
 - **`BuildActiveQuest()`** — scans displayed quest objectives and returns the name of the highest-priority active quest. Appended to the location string with a `·` separator when not in combat.
 - **`BuildPlayerInfo()`** — returns `"Name - Race (Level)"`.
-- **`SendPresence()`** — sends a `discord::Activity` to the Discord Game SDK.
+- **`SendPresence()`** — selects the configured state/location art, skips duplicate activity payloads, and sends a `discord::Activity` to Discord Game SDK.
 - **`StartCallbackThread()`** — background thread that posts one `SKSE::GetTaskInterface()->AddTask` per 100 ms to call `g_core->RunCallbacks()` on the game thread. Keeps Discord IPC processing off the hot path without per-frame overhead.
 - **`DeferredRefresh(int ticks)`** — self-rescheduling SKSE task used after `EditingCharacter → Playing` to wait ~10 frames for the engine to commit the new character name.
 

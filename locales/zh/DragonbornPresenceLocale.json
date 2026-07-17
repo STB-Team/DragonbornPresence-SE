@@ -5,5 +5,11 @@
     "exploring": "探索中",
     "active_quest": "当前任务",
     "combat_fighting": "对战 {name}",
-    "combat_no_target": "战斗中"
+    "combat_no_target": "战斗中",
+    "in_menu": "浏览菜单",
+    "viewing_map": "查看地图",
+    "inventory": "整理物品",
+    "dialogue": "对话中",
+    "crafting": "制作中",
+    "waiting": "等待中"
 }

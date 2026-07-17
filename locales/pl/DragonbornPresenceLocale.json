@@ -5,5 +5,11 @@
     "exploring": "Eksploracja",
     "active_quest": "Aktywne zadanie",
     "combat_fighting": "W walce z {name}",
-    "combat_no_target": "W walce"
+    "combat_no_target": "W walce",
+    "in_menu": "W menu",
+    "viewing_map": "Przeglądanie mapy",
+    "inventory": "Zarządzanie ekwipunkiem",
+    "dialogue": "W dialogu",
+    "crafting": "Wytwarzanie",
+    "waiting": "Oczekiwanie"
 }

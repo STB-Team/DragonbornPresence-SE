@@ -5,5 +5,11 @@
     "exploring": "Исследование",
     "active_quest": "Активное задание",
     "combat_fighting": "В бою с {name}",
-    "combat_no_target": "В бою"
+    "combat_no_target": "В бою",
+    "in_menu": "В меню",
+    "viewing_map": "Просматривает карту",
+    "inventory": "Управляет инвентарём",
+    "dialogue": "В диалоге",
+    "crafting": "Занимается ремеслом",
+    "waiting": "Ожидает"
 }
