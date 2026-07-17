@@ -4,43 +4,12 @@
     "enabled": true,
     "application_id": "1527543892151373937"
   },
-  "display": {
-    "show_elapsed_time": true,
-    "show_character_details": true,
-    "show_location": true,
-    "show_quest": true,
-    "show_combat": true,
-    "show_ui_state": true,
-    "separator": " · "
-  },
   "assets": {
     "large_image": "stb_logo",
     "large_text": "The Elder Scrolls V: Skyrim",
-    "large_images": {
-      "loading": "stb_logo",
-      "main_menu": "stb_logo",
-      "editing_character": "stb_logo",
-      "playing": "stb_logo"
-    },
     "small_images": {
       "loading": "loading",
-      "main_menu": "menu",
-      "editing_character": "character",
-      "exploring": "exploring",
-      "quest": "quest",
-      "combat": "combat",
-      "menu": "menu",
-      "map": "map",
-      "inventory": "inventory",
-      "dialogue": "dialogue",
-      "crafting": "crafting",
-      "alchemy": "alchemy",
-      "smithing": "smithing",
-      "enchanting": "enchanting",
-      "cooking": "",
-      "tanning": "",
-      "smelting": "",
-      "waiting": "waiting"
+      "combat": "combat"
     },
     "location_images": [
       {"match": "Коллегия Винтерхолда", "image": "winterholdcastle", "text": "Коллегия Винтерхолда"},

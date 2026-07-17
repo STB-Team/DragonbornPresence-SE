@@ -280,211 +280,135 @@
 </head>
 <body>
 <section class="cover">
-  <div class="badge">DragonbornPresence SE 2.5.0</div>
+  <div class="badge">DragonbornPresence SE — STB Presence</div>
   <h1>Настройка Discord Rich Presence</h1>
-  <p class="subtitle">Большие изображения локаций, маленькие иконки действий, приоритеты событий и диагностика assets.</p>
-  <p class="meta">Русское практическое руководство для конфигурации <strong>DragonbornPresence.json</strong><br>Discord Game SDK — без OAuth и дополнительных окон авторизации</p>
+  <p class="subtitle">Две строки данных STB, большие изображения локаций и маленькие иконки загрузки и боя.</p>
+  <p class="meta">Русское практическое руководство для <strong>DragonbornPresence.json</strong><br>Discord Game SDK — без OAuth и дополнительных окон авторизации</p>
 </section>
 <main>
 
-<h2>1. Быстрый старт</h2>
+<h2>1. Что отображается</h2>
+<p>Во время игры плагин отправляет в Discord фиксированный снимок персонажа:</p>
+<table>
+  <thead><tr><th>Поле Discord</th><th>Формат</th><th>Пример</th></tr></thead>
+  <tbody>
+    <tr><td><code>details</code></td><td><code>Уровень: &lt;уровень&gt; • Камень: &lt;камень&gt;</code></td><td>Уровень: 14 • Камень: Атронах</td></tr>
+    <tr><td><code>state</code></td><td><code>Смертей: &lt;число&gt; • Сложность: &lt;режим&gt;</code></td><td>Смертей: 3 • Сложность: Приключение</td></tr>
+  </tbody>
+</table>
+<p>Имя и раса персонажа, задания, меню, крафт, таймер, выбранные боги и другие состояния в Presence не передаются.</p>
+<div class="callout success"><strong>Обновление:</strong> данные STB, текущая локация, бой и имя цели опрашиваются на игровом потоке один раз в секунду. Перезапуск или пересборка для изменения значений не нужны.</div>
+
+<h2>2. Источники данных STB</h2>
+<table>
+  <thead><tr><th>Значение</th><th>Источник</th><th>Резервный текст</th></tr></thead>
+  <tbody>
+    <tr><td>Уровень</td><td>Текущий <code>PlayerCharacter</code></td><td><code>0</code>, пока игрок недоступен</td></tr>
+    <tr><td>Смерти</td><td>Global <code>aaMZgv_NowDeath</code></td><td><code>—</code></td></tr>
+    <tr><td>Камень</td><td>Активное заклинание описания одного из 19 камней STB</td><td><code>не выбран</code></td></tr>
+    <tr><td>Сложность</td><td><code>aaMZ_SelectedLevel_OfDifficulty</code> в alias-скрипте <code>aaMZ_MCMDataStorage</code></td><td><code>не определена</code></td></tr>
+  </tbody>
+</table>
+<p>Для значений STB необходимы установленный <code>STB.esp</code> и его MCM data-storage quest. Если отдельная форма недоступна, Discord Presence продолжает работать с резервным текстом.</p>
+
+<h2>3. Быстрый старт Discord</h2>
 <ol>
-  <li>Открой Discord Developer Portal и выбери приложение, чей ID указан в конфиге.</li>
+  <li>Открой Discord Developer Portal и выбери приложение с ID из конфига.</li>
   <li>В разделе <strong>Rich Presence → Art Assets</strong> загрузи квадратные PNG.</li>
-  <li>Назначь каждому изображению уникальный Asset key: например, <code>skyrim</code>, <code>combat</code>, <code>inventory</code>.</li>
-  <li>Открой файл <code>Data\SKSE\Plugins\DragonbornPresence.json</code>.</li>
-  <li>Укажи Asset keys в секциях <code>large_images</code>, <code>small_images</code> и <code>location_images</code>.</li>
-  <li>Полностью перезапусти Skyrim. Пересборка DLL после изменения JSON не требуется.</li>
+  <li>Проверь Asset keys: минимум <code>stb_logo</code>, <code>loading</code>, <code>combat</code> и нужные ключи локаций.</li>
+  <li>Открой <code>Data\SKSE\Plugins\DragonbornPresence.json</code>.</li>
+  <li>После изменения JSON полностью перезапусти Skyrim. Пересборка DLL не требуется.</li>
 </ol>
-<div class="callout success"><strong>Главное правило:</strong> имя PNG может быть любым, но Asset key в Discord Portal должен точно совпадать со строкой в JSON. Регистр и символы имеют значение.</div>
+<div class="callout warning"><strong>Главное правило:</strong> имя файла PNG может быть любым, но Asset key в Discord Portal должен точно совпадать со строкой в JSON. Регистр и символы имеют значение.</div>
 
-<h2>2. Как Discord выбирает размер картинки</h2>
-<div class="grid">
-  <div class="card"><h3>Большая картинка</h3><p>Передаётся через <code>LargeImage</code>. Обычно это логотип, регион, город, подземелье или игровой мир.</p></div>
-  <div class="card"><h3>Маленькая картинка</h3><p>Передаётся через <code>SmallImage</code>. Обычно это бой, квест, карта, инвентарь, диалог или крафт.</p></div>
-</div>
-<p>В Portal нет отдельных типов «большая» и «маленькая». Роль определяется полем, в которое плагин передал Asset key.</p>
-<div class="callout warning"><strong>Если большая картинка отсутствует в Portal,</strong> Discord может показать знак вопроса или визуально перенести маленькую картинку на основное место. Проверь строку <code>Presence assets: large='...' small='...'</code> в логе.</div>
-
-<h2>3. Базовая структура конфигурации</h2>
+<h2>4. Текущая структура JSON</h2>
 <pre>{
   "schema_version": 1,
   "discord": {
     "enabled": true,
     "application_id": "1527543892151373937"
   },
-  "display": {
-    "show_elapsed_time": true,
-    "show_character_details": true,
-    "show_location": true,
-    "show_quest": true,
-    "show_combat": true,
-    "show_ui_state": true,
-    "separator": " · "
-  },
   "assets": {
     "large_image": "stb_logo",
     "large_text": "The Elder Scrolls V: Skyrim",
-    "large_images": { },
-    "small_images": { },
-    "location_images": [ ]
+    "small_images": {
+      "loading": "loading",
+      "combat": "combat"
+    },
+    "location_images": [
+      {
+        "location": "WhiterunLocation",
+        "image": "whiteruncapital",
+        "text": "Вайтран"
+      }
+    ]
   }
 }</pre>
-<p><code>large_image</code> — финальный резервный Asset key. Он используется, если подходящего правила локации или состояния нет.</p>
-
-<h2>4. Большие картинки глобальных состояний</h2>
-<pre>"large_images": {
-  "loading": "stb_logo",
-  "main_menu": "stb_logo",
-  "editing_character": "stb_logo",
-  "playing": "stb_logo"
-}</pre>
 <table>
-  <thead><tr><th>Ключ</th><th>Когда используется</th></tr></thead>
+  <thead><tr><th>Ключ</th><th>Назначение</th></tr></thead>
   <tbody>
-    <tr><td><code>loading</code></td><td>Экран загрузки.</td></tr>
-    <tr><td><code>main_menu</code></td><td>Главное меню.</td></tr>
-    <tr><td><code>editing_character</code></td><td>Создание или редактирование персонажа.</td></tr>
-    <tr><td><code>playing</code></td><td>Игра, если правило конкретной локации не совпало.</td></tr>
+    <tr><td><code>discord.enabled</code></td><td>Полностью включает или отключает отправку Presence.</td></tr>
+    <tr><td><code>discord.application_id</code></td><td>ID приложения, в которое загружены Art Assets.</td></tr>
+    <tr><td><code>assets.large_image</code></td><td>Резервная большая картинка, если правило локации не совпало.</td></tr>
+    <tr><td><code>assets.large_text</code></td><td>Резервный текст при наведении на большую картинку.</td></tr>
+    <tr><td><code>assets.small_images.loading</code></td><td>Маленькая иконка загрузки.</td></tr>
+    <tr><td><code>assets.small_images.combat</code></td><td>Маленькая иконка боя.</td></tr>
   </tbody>
 </table>
 
-<h2>5. Большая картинка под каждую локацию</h2>
-<p>Правила находятся в массиве <code>assets.location_images</code> и проверяются сверху вниз. Первое совпавшее правило побеждает.</p>
-<p>В комплектной конфигурации боевые локации используют основные маркеры без тиров: <code>bandit</code>, <code>draugr</code>, <code>falmer-dvemer</code> и другие. Номер тира и цвет больше не входят в Asset key.</p>
-<p>Для городов и крупных поселений предусмотрены отдельные ключи: <code>dawnstar</code>, ключи с окончанием <code>capital</code> и <code>castle</code>, а также <code>redoransettlement</code>, <code>telvannisettlement</code> и <code>templeofmiraak</code>. Правила замков и особых поселений проверяются раньше общего названия города.</p>
-<h3>Основные маркеры без тиров</h3>
+<h2>5. Большая картинка текущей локации</h2>
+<p>В комплектном JSON находятся <strong>414</strong> правил. Они проверяются сверху вниз; первое полное совпадение выбирает большую картинку и текст подсказки.</p>
 <pre>"location_images": [
-  { "match": "Нилхейм", "image": "bandit", "text": "Нилхейм" },
-  { "match": "Саартал", "image": "draugr", "text": "Саартал" },
-  { "match": "Мзулфт", "image": "falmer-dvemer", "text": "Мзулфт" }
+  { "match": "Коллегия Винтерхолда", "image": "winterholdcastle", "text": "Коллегия Винтерхолда" },
+  { "location": "WhiterunLocation", "image": "whiteruncapital", "text": "Вайтран" },
+  { "match": "Нилхейм", "image": "bandit", "text": "Нилхейм" }
 ]</pre>
-<h3>Пользовательское правило через Editor ID</h3>
-<pre>{ "location": "WhiterunLocation", "image": "whiterun", "text": "Whiterun" }</pre>
 <table>
-  <thead><tr><th>Селектор</th><th>Назначение</th></tr></thead>
+  <thead><tr><th>Поле правила</th><th>Назначение</th></tr></thead>
   <tbody>
     <tr><td><code>worldspace</code></td><td>Editor ID игрового мира.</td></tr>
-    <tr><td><code>location</code></td><td>Editor ID текущей локации или её родителя.</td></tr>
-    <tr><td><code>cell</code></td><td>Editor ID конкретной ячейки.</td></tr>
-    <tr><td><code>match</code></td><td>Часть отображаемого названия локации. Для ASCII регистр игнорируется.</td></tr>
+    <tr><td><code>location</code></td><td>Editor ID текущей локации или любого её родителя.</td></tr>
+    <tr><td><code>cell</code></td><td>Editor ID текущей ячейки.</td></tr>
+    <tr><td><code>match</code></td><td>Подстрока отображаемого названия; для ASCII регистр не учитывается.</td></tr>
     <tr><td><code>image</code></td><td>Asset key большой картинки.</td></tr>
-    <tr><td><code>text</code></td><td>Текст при наведении на большую картинку.</td></tr>
+    <tr><td><code>text</code></td><td>Текст при наведении; при пустом значении используется <code>large_text</code>.</td></tr>
   </tbody>
 </table>
-<div class="callout"><strong>Порядок важен:</strong> длинные названия проверяются раньше коротких подстрок. Для четырёх неоднозначных названий сохранены точные правила с игровыми префиксами; остальные правила не зависят от тира. Если совпадения нет, используется <code>large_image</code>.</div>
+<p>Если указано несколько селекторов, должны совпасть все. Если ни одно правило не подошло, используется <code>large_image</code>. Новую локацию можно добавить только через JSON.</p>
 
-<h2>6. Маленькие иконки действий</h2>
-<pre>"small_images": {
-  "loading": "loading",
-  "main_menu": "menu",
-  "editing_character": "character",
-  "exploring": "exploring",
-  "quest": "quest",
-  "combat": "combat",
-  "menu": "menu",
-  "map": "map",
-  "inventory": "inventory",
-  "dialogue": "dialogue",
-  "crafting": "crafting",
-  "alchemy": "alchemy",
-  "smithing": "smithing",
-  "enchanting": "enchanting",
-  "cooking": "",
-  "tanning": "",
-  "smelting": "",
-  "waiting": "waiting"
-}</pre>
+<h2>6. Маленькие иконки и подсказки</h2>
 <table>
-  <thead><tr><th>Событие</th><th>Что охватывает</th><th>Asset key</th></tr></thead>
+  <thead><tr><th>Состояние</th><th>Asset key</th><th>Текст при наведении</th></tr></thead>
   <tbody>
-    <tr><td>Бой</td><td>Бой с известным или неизвестным противником.</td><td><code>combat</code></td></tr>
-    <tr><td>Квест</td><td>Активная отображаемая задача.</td><td><code>quest</code></td></tr>
-    <tr><td>Карта</td><td>Открытая карта мира или локации.</td><td><code>map</code></td></tr>
-    <tr><td>Инвентарь</td><td>Инвентарь, магия, избранное, характеристики, торговля и контейнеры.</td><td><code>inventory</code></td></tr>
-    <tr><td>Диалог</td><td>Разговор с NPC.</td><td><code>dialogue</code></td></tr>
-    <tr><td>Общий крафт</td><td>Неопознанная или неподдерживаемая Crafting Menu.</td><td><code>crafting</code></td></tr>
-    <tr><td>Алхимия</td><td>Алхимическая лаборатория.</td><td><code>alchemy</code></td></tr>
-    <tr><td>Кузнечное дело</td><td>Кузница, точильный камень и верстак.</td><td><code>smithing</code></td></tr>
-    <tr><td>Зачарование</td><td>Пентаграмма душ.</td><td><code>enchanting</code></td></tr>
-    <tr><td>Готовка</td><td>Котёл или печь.</td><td><code>cooking</code></td></tr>
-    <tr><td>Дубильный станок</td><td>Обработка кожи.</td><td><code>tanning</code></td></tr>
-    <tr><td>Плавильня</td><td>Плавка руды.</td><td><code>smelting</code></td></tr>
-    <tr><td>Ожидание</td><td>Сон или ожидание.</td><td><code>waiting</code></td></tr>
+    <tr><td>Загрузка</td><td><code>loading</code></td><td><code>Загрузка</code></td></tr>
+    <tr><td>Бой, цель известна</td><td><code>combat</code></td><td><code>В бою с &lt;имя противника&gt;</code></td></tr>
+    <tr><td>Бой, цель ещё не определена</td><td><code>combat</code></td><td><code>В бою</code></td></tr>
+    <tr><td>Обычная игра</td><td>нет</td><td>нет</td></tr>
   </tbody>
 </table>
-<p>Если ключ конкретного вида крафта пуст, плагин использует общую иконку <code>crafting</code>. Неопознанный станок также остаётся общим крафтом. Чтобы отключить другую конкретную иконку, укажи пустую строку: <code>"map": ""</code>. Чтобы отключить все UI-состояния, установи <code>"show_ui_state": false</code>.</p>
-<p>Все подписи состояний встроены в плагин на русском языке. Выбор языка и внешний файл <code>DragonbornPresenceLocale.json</code> не используются.</p>
+<p>При смене противника подсказка обновляется следующим секундным опросом. После завершения боя маленькая иконка и сохранённое имя цели удаляются.</p>
 
-<h2>7. Приоритет событий</h2>
-<pre>Бой → активный UI-контекст → активный квест → исследование</pre>
-<p>Пример: если во время квеста начинается бой, большая картинка локации остаётся прежней, а маленькая становится <code>combat</code>. После боя автоматически возвращается <code>quest</code> или <code>exploring</code>.</p>
+<h2>7. Ограничения интерфейса Discord</h2>
+<p>Discord сам рисует строки <code>details</code> и <code>state</code>. Клиент может показывать первую строку белой, вторую серой и добавлять перед строкой состояния значок людей/party status.</p>
+<div class="callout warning"><strong>Это нельзя изменить из плагина:</strong> Discord Game SDK позволяет передать текст, timestamps, party data и assets, но не цвет шрифта и не оформление встроенных строк клиента. Плагин не отправляет party data; отображаемый значок относится к интерфейсу Discord.</div>
 
-<h2>8. Какие файлы загрузить</h2>
-<table>
-  <thead><tr><th>Роль</th><th>Рекомендуемые файлы</th><th>Portal keys</th></tr></thead>
-  <tbody>
-    <tr><td>Логотип</td><td>stb_logo.png</td><td><code>stb_logo</code></td></tr>
-    <tr><td>Основные маркеры локаций</td><td>bandit.png, draugr.png, falmer.png, dvemer.png и остальные PNG из подготовленного набора</td><td>Имена файлов без расширения, строчными буквами и без тиров</td></tr>
-    <tr><td>Города и поселения</td><td>dawnstar, falkreathcapital, markarthcapital, morthalcapital, riftencapital, solitudecapital, whiteruncapital, windhelmcapital, winterholdcapital, redoransettlement, telvannisettlement, templeofmiraak, whiteruncastle, windhelmcastle, winterholdcastle</td><td>Точно как в Discord Portal</td></tr>
-    <tr><td>Основные состояния</td><td>loading.png, menu.png, character.png, exploring.png, quest.png, combat.png</td><td>Имена без расширения</td></tr>
-    <tr><td>UI и крафт</td><td>map.png, inventory.png, dialogue.png, crafting.png, alchemy.png, smithing.png, enchanting.png, cooking.png, tanning.png, smelting.png, waiting.png</td><td>Имена без расширения</td></tr>
-  </tbody>
-</table>
-<p>Рекомендация: квадратный PNG 1024×1024 для больших изображений; прозрачный квадратный PNG 512×512 или 1024×1024 для маленьких иконок. Важные детали размещай по центру — Discord обрезает маленькую иконку до круга.</p>
-<p>Готовый набор для Portal находится в <code>DiscordAssets\markers-portal</code>. Все файлы имеют размер 1024×1024; их имена точно совпадают с ключами комплектного JSON.</p>
+<h2>8. Подготовка изображений</h2>
+<ul>
+  <li>Большие картинки: квадратный PNG 1024×1024.</li>
+  <li>Маленькие иконки: прозрачный квадратный PNG 512×512 или 1024×1024.</li>
+  <li>Важные детали маленькой иконки размещай по центру: Discord обрезает её до круга.</li>
+  <li>Готовый набор локаций находится в <code>DiscordAssets\markers-portal</code>; имена файлов совпадают с Asset keys JSON.</li>
+</ul>
 
-<h2>9. Полный практический пример</h2>
-<pre>"assets": {
-  "large_image": "stb_logo",
-  "large_text": "STB Skyrim",
-  "large_images": {
-    "loading": "stb_logo",
-    "main_menu": "stb_logo",
-    "editing_character": "stb_logo",
-    "playing": "stb_logo"
-  },
-  "small_images": {
-    "loading": "loading",
-    "main_menu": "menu",
-    "editing_character": "character",
-    "exploring": "exploring",
-    "quest": "quest",
-    "combat": "combat",
-    "menu": "menu",
-    "map": "map",
-    "inventory": "inventory",
-    "dialogue": "dialogue",
-    "crafting": "crafting",
-    "alchemy": "alchemy",
-    "smithing": "smithing",
-    "enchanting": "enchanting",
-    "cooking": "",
-    "tanning": "",
-    "smelting": "",
-    "waiting": "waiting"
-  },
-  "location_images": [
-    { "match": "Нилхейм", "image": "bandit", "text": "Нилхейм" },
-    { "match": "Саартал", "image": "draugr", "text": "Саартал" },
-    { "match": "Мзулфт", "image": "falmer-dvemer", "text": "Мзулфт" }
-  ]
-}</pre>
-
-<h2>10. Диагностика</h2>
+<h2>9. Диагностика</h2>
 <ol>
-  <li>Проверь, что <code>application_id</code> относится к тому же приложению, куда загружены assets.</li>
-  <li>Открой публичный список: <code>https://discord.com/api/v10/oauth2/applications/&lt;APPLICATION_ID&gt;/assets</code>.</li>
-  <li>Убедись, что нужный <code>name</code> появился в JSON ответа.</li>
-  <li>Открой лог: <code>%USERPROFILE%\Documents\My Games\Skyrim Special Edition\SKSE\DragonbornPresence.log</code>.</li>
-  <li>Найди строку вида: <code>Presence assets: large='skyrim' small='combat'.</code></li>
+  <li>Проверь, что <code>application_id</code> относится к приложению с нужными assets.</li>
+  <li>Открой <code>https://discord.com/api/v10/oauth2/applications/&lt;APPLICATION_ID&gt;/assets</code> и найди нужный <code>name</code>.</li>
+  <li>Проверь лог <code>%USERPROFILE%\Documents\My Games\Skyrim Special Edition\SKSE\DragonbornPresence.log</code>.</li>
+  <li>В строках обновления проверь <code>large='...'</code> и <code>combat='...'</code>.</li>
   <li>После загрузки новых assets полностью перезапусти Discord и Skyrim для обновления кэша.</li>
 </ol>
-<div class="callout warning"><strong>Знак вопроса или большая иконка боя:</strong> выбранный большой Asset key отсутствует или ещё не появился в API. Временно укажи существующий <code>stb_logo</code>, а после появления нового ключа верни нужное правило.</div>
-
-<h2>11. Что требует изменения C++</h2>
-<p>Новые локации и новые изображения для уже поддерживаемых событий добавляются только через JSON. Пересборка не нужна. Изменение C++ требуется лишь для совершенно нового игрового события, которого нет среди поддерживаемых режимов.</p>
-<p class="small">Документ относится к DragonbornPresence SE 2.5.0. Конфигурация обратно совместима со схемой <code>schema_version: 1</code>.</p>
+<p class="small">Документ описывает текущий STB Presence контракт ветки master. Формат конфигурации: <code>schema_version: 1</code>.</p>
 </main>
 </body>
 </html>

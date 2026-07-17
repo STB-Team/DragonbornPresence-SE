@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — 2026-07-17
+
+- Replaced the general Skyrim activity feed with two stable STB Presence lines: level and standing stone, then deaths and selected difficulty.
+- Read STB deaths from `aaMZgv_NowDeath`, difficulty from the `aaMZ_MCMDataStorage` quest alias script, and the active standing stone from its description spell.
+- Removed character, quest, menu, crafting, timer, selected-god, and other state output.
+- Retained all 414 ordered large location-image rules and the `stb_logo` fallback.
+- Reduced small state images to `loading` and `combat`.
+- Added combat-icon hover text with the current enemy name, falling back to `В бою` while Skyrim has no resolved target.
+- Poll the runtime snapshot once per second so STB values and combat hover text update without rebuilding or per-frame work.
+- Updated the English README, Nexus description, and Russian configuration guide for the fixed STB Presence contract and Discord client styling limits.
+
 ## 2.5.0 — 2026-07-17
 
 - Added dedicated Presence modes, localized text, and configurable small-image keys for alchemy, smithing, enchanting, cooking, tanning, and smelting.

@@ -1,28 +1,32 @@
 # DragonbornPresence SE
 
-An SKSE plugin for **Skyrim Special Edition** that displays your current in-game state as Discord Rich Presence.
+An SKSE plugin for the **Skyrim True Believer** setup that publishes selected STB character data as Discord Rich Presence.
 
-While you play, Discord shows your character's name, race, level, current location, active quest, and current combat — and updates automatically as you move through the world.
+During gameplay Discord shows two stable lines: character level and active standing stone, then death count and selected difficulty. The large image follows the current location; loading and combat use the only small state icons.
 
 ---
 
 ## Features
 
-- Current location displayed in Discord (worldspace + named location)
-- Character info: name, race, and level
-- Active quest name shown alongside the location
-- Combat state — shows `In combat with <enemy name>` while in combat, replacing the quest suffix
-- Session timer showing how long you've been playing
-- State-aware presence: Main Menu, Character Creation, Loading, and In-Game are all handled separately
-- Built-in Russian labels with no language selection or external locale file
-- Graceful degradation if Discord is not running
+- Fixed first line: `Уровень: <value> • Камень: <value>`
+- Fixed second line: `Смертей: <value> • Сложность: <value>`
+- Level read directly from the player; deaths, difficulty, and standing stone read from STB runtime data
+- 414 ordered location rules with city, settlement, dungeon, and encounter art
+- `loading` small icon while the game is loading
+- `combat` small icon in combat; its hover text shows `В бою с <enemy name>` when Skyrim exposes the current target
+- One-second game-thread polling keeps STB values, combat, and location art current without per-frame work
+- Built-in Russian Presence text; no locale files or language installer
+- Graceful degradation if Discord is not running or an STB value is unavailable
 
 ---
 
 ## Requirements
 
-- Skyrim Special Edition or Anniversary Edition (any runtime — uses Address Library)
-- [SKSE64](https://skse.silverlock.org/) matching your runtime
+- Skyrim Special Edition or Anniversary Edition supported by CommonLibSSE-NG
+- [SKSE64](https://skse.silverlock.org/) matching the runtime
+- Address Library for SKSE Plugins
+- Skyrim True Believer data (`STB.esp` and its MCM data-storage quest) for deaths, standing stone, and difficulty
+- Discord Desktop with activity sharing enabled
 
 ---
 
@@ -38,99 +42,70 @@ Launch the game through SKSE. Discord must be running before or alongside the ga
 
 ## Discord configuration
 
-`Data\SKSE\Plugins\DragonbornPresence.json` controls the Discord application, displayed fields, event priorities, and image assets. Invalid values are logged and fall back to defaults. The plugin continues to use Discord Game SDK and does not open an OAuth or authorization window.
+`Data\SKSE\Plugins\DragonbornPresence.json` controls the Discord application and image assets. Invalid values are logged and fall back to built-in defaults. The plugin uses Discord Game SDK and does not open an OAuth or authorization window.
 
-A printable Russian guide with complete examples is available at [`docs/Discord-Presence-Configuration-RU.pdf`](docs/Discord-Presence-Configuration-RU.pdf).
-The same guide is published as a [GitHub Pages site](https://stb-team.github.io/DragonbornPresence-SE/).
-
-To use custom branding:
-
-1. Create an application in the Discord Developer Portal.
-2. Open **Rich Presence → Art Assets** and upload images with the keys used in `assets`.
-3. Replace `discord.application_id` with the application ID, kept as a quoted JSON string.
+A printable Russian guide is available at [`docs/Discord-Presence-Configuration-RU.pdf`](docs/Discord-Presence-Configuration-RU.pdf). The same guide is published as a [GitHub Pages site](https://stb-team.github.io/DragonbornPresence-SE/).
 
 ```json
 {
   "schema_version": 1,
   "discord": {
     "enabled": true,
-    "application_id": "565627104608256015"
-  },
-  "display": {
-    "show_elapsed_time": true,
-    "show_character_details": true,
-    "show_location": true,
-    "show_quest": true,
-    "show_combat": true,
-    "show_ui_state": true,
-    "separator": " · "
+    "application_id": "1527543892151373937"
   },
   "assets": {
-    "large_image": "skyrim_logo",
+    "large_image": "stb_logo",
     "large_text": "The Elder Scrolls V: Skyrim",
-    "large_images": {
-      "loading": "skyrim_logo",
-      "main_menu": "skyrim_logo",
-      "editing_character": "skyrim_logo",
-      "playing": "skyrim_logo"
-    },
     "small_images": {
       "loading": "loading",
-      "main_menu": "menu",
-      "editing_character": "character",
-      "exploring": "exploring",
-      "quest": "quest",
-      "combat": "combat",
-      "menu": "menu",
-      "map": "map",
-      "inventory": "inventory",
-      "dialogue": "dialogue",
-      "crafting": "crafting",
-      "alchemy": "alchemy",
-      "smithing": "smithing",
-      "enchanting": "enchanting",
-      "cooking": "",
-      "tanning": "",
-      "smelting": "",
-      "waiting": "waiting"
+      "combat": "combat"
     },
     "location_images": [
-      { "location": "WhiterunLocation", "image": "whiterun", "text": "Whiterun" },
-      { "worldspace": "DLC2SolstheimWorld", "image": "solstheim", "text": "Solstheim" },
-      { "worldspace": "Tamriel", "image": "skyrim", "text": "Skyrim" },
+      { "location": "WhiterunLocation", "image": "whiteruncapital", "text": "Вайтран" },
+      { "worldspace": "DLC2SolstheimWorld", "image": "solstheim", "text": "Солстхейм" },
       { "match": "STB Dev Room", "image": "stb_room", "text": "STB Dev Room" }
     ]
   }
 }
 ```
 
+### Fixed Presence contract
+
+The text layout is intentionally not configurable:
+
+| Discord field | Runtime text |
+|---|---|
+| `details` | `Уровень: <level> • Камень: <standing stone>` |
+| `state` | `Смертей: <deaths> • Сложность: <difficulty>` |
+| large-image hover | Matched location-rule `text`, otherwise `large_text` |
+| combat small-image hover | `В бою с <enemy>`; falls back to `В бою` while the target is unresolved |
+| loading small-image hover | `Загрузка` |
+
+No selected gods, character name, race, quest, menu, crafting, timer, or other state is sent.
+
+Discord itself renders `details` and `state` with different colors and may prefix the state/party-status row with a people glyph. Discord Game SDK exposes the text and asset fields, but not client font color or that built-in glyph, so the plugin cannot make both rows white or remove that UI element.
+
 ### Asset selection
 
-- `large_image` is the final fallback.
-- `large_images` overrides the fallback for loading, the main menu, character creation, and normal gameplay.
-- `location_images` is evaluated from top to bottom; the first matching rule replaces the large image and optionally its hover text.
+- `large_image` is the fallback when no location rule matches.
+- `large_text` is the fallback hover text for the large image.
+- `location_images` is evaluated from top to bottom; the first matching rule wins.
 - `worldspace`, `location`, and `cell` match stable Creation Kit/xEdit Editor IDs.
-- `match` searches the displayed location name; ASCII matching is case-insensitive. When a rule contains several selectors, all of them must match.
-- The bundled rules map encounter locations to tierless creature keys such as `bandit`, `draugr`, and `falmer-dvemer`. Tier numbers and colors are not part of the asset key.
-- Dedicated city, settlement, temple, and castle rules use the portal keys `dawnstar`, `*capital`, `*castle`, `redoransettlement`, `telvannisettlement`, and `templeofmiraak`. Text matches are retained because runtime Location Editor IDs are not available for every city.
-- An empty general image key disables that image. Missing portal assets produce a blank image but do not stop Presence updates.
-- Crafting-specific keys override `crafting` for alchemy, smithing, enchanting, cooking, tanning, and smelting. An empty specific image key falls back to the generic crafting image; an unrecognized station uses the generic crafting mode.
-
-Presence priority is: **combat → active UI context → active quest → exploration**. Combat therefore keeps its own small icon even when another lower-priority event fires.
+- `match` searches the displayed location; ASCII comparison is case-insensitive.
+- If a rule has several selectors, all selectors must match.
+- `image` is the Discord Art Asset key; `text` is its hover text.
+- The bundled JSON contains 414 location rules. Adding or changing a location requires only a JSON edit and a full Skyrim restart; it does not require rebuilding the DLL.
+- `small_images` supports only `loading` and `combat`.
 
 ### Images to upload
 
-The bundled example configuration expects these Discord Art Asset keys:
+The Discord application referenced by `application_id` must contain:
 
-| Role | Recommended file names / portal keys |
-|---|---|
-| Default large logo | `skyrim_logo.png` → `skyrim_logo` |
-| Tierless large location markers | `bandit.png`, `draugr.png`, `falmer.png`, `dvemer.png`, and the other keys referenced by `location_images` |
-| Large city and settlement images | `dawnstar`, `falkreathcapital`, `markarthcapital`, `morthalcapital`, `riftencapital`, `solitudecapital`, `whiteruncapital`, `windhelmcapital`, `winterholdcapital`, `redoransettlement`, `telvannisettlement`, `templeofmiraak`, `whiteruncastle`, `windhelmcastle`, `winterholdcastle` |
-| Existing small states | `loading.png`, `menu.png`, `character.png`, `exploring.png`, `quest.png`, `combat.png` |
-| Small UI and crafting states | `map.png`, `inventory.png`, `dialogue.png`, `crafting.png`, `alchemy.png`, `smithing.png`, `enchanting.png`, `cooking.png`, `tanning.png`, `smelting.png`, `waiting.png` |
+- `stb_logo` or another configured fallback image;
+- every `image` key used by the desired `location_images` rules;
+- `loading` and `combat`.
 
-File names may differ; the **asset key entered in the Developer Portal** must match the JSON value. Square PNG images are recommended: 1024×1024 for large art, and transparent 512×512 or 1024×1024 icons for small art. Keep important details centered because Discord crops small assets to a circle.
+File names may differ, but the **Asset key in Discord Developer Portal** must exactly match the JSON value. Square 1024×1024 PNG files are recommended. Discord crops small assets to a circle, so keep important details centered.
 
 ## Language
 
@@ -176,28 +151,26 @@ Each successful build copies `DragonbornPresence.dll` and `discord_game_sdk.dll`
 
 ## Architecture
 
-Pure C++ DLL — no `.esp`, no Papyrus scripts.
+Pure C++ SKSE DLL — no plugin-owned `.esp` or Papyrus scripts. The plugin reads data exposed by the installed STB mod.
 
-**`main.cpp`** — Plugin entry point (`SKSEPluginLoad`). Sets up spdlog logging, loads the plugin configuration, and registers the SKSE messaging listener. Reacts to `kDataLoaded` (registers event sinks) and `kNewGame`/`kPostLoadGame` (forces presence refresh).
+**`main.cpp`** — plugin entry point, logging, configuration load, and SKSE messaging. `kDataLoaded` initializes STB forms and event sinks; `kNewGame` and `kPostLoadGame` trigger the first gameplay refresh.
 
-**`DragonbornPresence.cpp`** — All state and Discord logic.
+**`DragonbornPresence.cpp`** — STB data collection and Discord activity:
 
-- **State machine** (`enum class State`): `Loading → MainMenu → Playing / EditingCharacter`. Transitions via `TransitionTo()`.
-- **`MenuEventSink`** — maps main menu, loading, and character-creation menus to state transitions. It also tracks map, inventory, magic, favorites, stats, barter, container, dialogue, crafting, sleep/wait, journal, and tween menus as prioritized Presence contexts. Crafting submenus and furniture metadata select dedicated alchemy, smithing, enchanting, cooking, tanning, or smelting text and image keys; unknown stations use the generic `crafting` fallback.
-- **`LocationChangeSink`** — listens to `TESActorLocationChangeEvent`; calls `RefreshPosition()` when the player changes named location.
-- **`CellLoadSink`** — listens to `TESCellFullyLoadedEvent`; calls `RefreshPosition()` when the player's cell finishes loading.
-- **`QuestStageSink`** / **`QuestStartStopSink`** — listen to quest stage and start/stop events; refresh presence via an SKSE task so the update runs on the game thread.
-- **`CombatSink`** — listens to `TESCombatEvent` filtered to the player. On `kCombat` stores `"In combat with <target name>"` in `g_combatTarget` and triggers a refresh; on `kNone` clears it. While `g_combatTarget` is set it replaces the quest suffix in the presence state line.
-- **`BuildPosition()`** — traverses the `parentLoc` chain to find the first named ancestor. Returns `"Worldspace: Location"` for exterior, `"Location"` for interior, cell name as last resort. Caches the last non-empty result to handle null pointers during location boundary crossing.
-- **`BuildActiveQuest()`** — scans displayed quest objectives and returns the name of the highest-priority active quest. Appended to the location string with a `·` separator when not in combat.
-- **`BuildPlayerInfo()`** — returns `"Name - Race (Level)"`.
-- **`SendPresence()`** — selects the configured state/location art, skips duplicate activity payloads, and sends a `discord::Activity` to Discord Game SDK.
-- **`StartCallbackThread()`** — background thread that posts one `SKSE::GetTaskInterface()->AddTask` per 100 ms to call `g_core->RunCallbacks()` on the game thread. Keeps Discord IPC processing off the hot path without per-frame overhead.
-- **`DeferredRefresh(int ticks)`** — self-rescheduling SKSE task used after `EditingCharacter → Playing` to wait ~10 frames for the engine to commit the new character name.
+- **`InitializeStbData()`** resolves `aaMZgv_NowDeath`, the STB MCM data-storage quest, and the 19 standing-stone description spells.
+- **`ReadPlayerSnapshot()`** reads player level, deaths, selected stone, selected difficulty, location, combat state, and the current combat target.
+- **`BuildPosition()`** walks the parent-location chain and produces a stable worldspace/location string used only for location-image matching.
+- **`ResolveLargeAsset()`** applies the 414 ordered JSON rules and falls back to `assets.large_image`.
+- **`MenuEventSink`** switches to loading Presence for the main menu and loading screens.
+- **`CombatSink`** requests an immediate refresh on player combat transitions.
+- **`StartCallbackThread()`** posts Discord callbacks to the game thread every 100 ms and polls the complete Presence snapshot once per second.
+- **`SendActivity()`** enforces Discord's 127-byte UTF-8 limits, skips duplicate payloads, sends both fixed text rows, location art, and loading/combat hover text.
 
-**`AdditionalFunctions.cpp`** — `Cp1251ToUtf8`, `IsValidUtf8`. Used by `SafeStr()` to handle Russian locale game data.
+**`ScriptUtils.h`** — reads the selected difficulty from `aaMZ_MCMDataStorage` through the quest alias script property/variable.
 
-**`discord_loader.cpp`** — `__pfnDliNotifyHook2` delay-load hook. Intercepts `discord_game_sdk.dll` load and resolves it from the plugin's own directory instead of the system search path.
+**`AdditionalFunctions.cpp`** — UTF-8 validation and CP1251-to-UTF-8 conversion for Russian game data.
+
+**`discord_loader.cpp`** — delay-load hook resolving `discord_game_sdk.dll` from the SKSE plugin directory.
 
 ### Log file
 

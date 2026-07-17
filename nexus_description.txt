@@ -3,19 +3,19 @@
 [font=Tahoma][size=5][b]DRAGONBORN PRESENCE[/b][/size]
 [size=3]DISCORD RICH PRESENCE SKSE PLUGIN[/size][/font][/center]
 
-[font=Tahoma]Show your friends what you're up to in Skyrim — right in Discord. Dragonborn Presence displays your current location, character name, race, level, active quest, and combat state as Discord Rich Presence, updating in real time as you explore and fight your way through the world.[/font]
+[font=Tahoma]Dragonborn Presence publishes the Skyrim True Believer character snapshot to Discord: level and active standing stone on the first line, deaths and selected difficulty on the second. The large image follows the current location; loading and combat use dedicated small icons.[/font]
 
-[font=Tahoma][url=https://www.nexusmods.com/skyrim/mods/97371]Legendary Edition version[/url]   [url=https://github.com/Fozar/DragonbornPresence-SE]Source Code[/url][/font]
+[font=Tahoma][url=https://www.nexusmods.com/skyrim/mods/97371]Legendary Edition version[/url]   [url=https://github.com/STB-Team/DragonbornPresence-SE]Source Code[/url][/font]
 
 [font=Tahoma][size=4][b]— What it shows —[/b][/size][/font]
 
 [font=Tahoma][list]
-[*][b]Location[/b] — worldspace and named location, e.g. [i]Skyrim: Riverwood[/i] or [i]Nightcaller Temple[/i]. Updates immediately when you cross a location boundary or enter a new cell.
-[*][b]Character[/b] — name, race, and level, e.g. [i]Dovahkiin - Nord (42)[/i]. Updates correctly after character creation and name changes.
-[*][b]Active quest[/b] — name of your current tracked quest, shown alongside the location, e.g. [i]Skyrim: Whiterun · Bleak Falls Barrow[/i].
-[*][b]Combat[/b] — while fighting, the quest is replaced with the enemy's name, e.g. [i]Скайрим: Хелген · В бою с Алдуин[/i]. Reverts to the quest when combat ends.
-[*][b]Session timer[/b] — shows how long you've been playing this session.
-[*][b]Menu states[/b] — displays [i]Главное меню[/i] on the title screen and [i]Редактирование персонажа[/i] during character creation.
+[*][b]Character[/b] — [i]Уровень: 14 • Камень: Атронах[/i].
+[*][b]STB progress[/b] — [i]Смертей: 3 • Сложность: Приключение[/i].
+[*][b]Location art[/b] — 414 ordered rules select city, settlement, dungeon, and encounter images.
+[*][b]Combat[/b] — the small [font=Courier New]combat[/font] icon appears during combat; hover text shows [i]В бою с <имя противника>[/i] when Skyrim exposes the target.
+[*][b]Loading[/b] — the small [font=Courier New]loading[/font] icon replaces stale gameplay status during loading screens.
+[*][b]Updates[/b] — STB values, combat, and location art refresh once per second without per-frame polling.
 [/list][/font]
 
 [font=Tahoma][size=4][b]— How to install —[/b][/size][/font]
@@ -34,13 +34,14 @@ No .esp. No plugins to enable. Just drop and play.
 
 [font=Tahoma][size=4][b]— Compatibility —[/b][/size][/font]
 
-[font=Tahoma]Compatible with everything. The plugin is pure C++ with no scripts, no .esp, and no patches required.[/font]
+[font=Tahoma]Pure C++ SKSE plugin with no plugin-owned .esp or Papyrus scripts. STB character values require the Skyrim True Believer setup and [font=Courier New]STB.esp[/font]. Missing STB values degrade to safe fallback text instead of stopping the plugin.[/font]
 
 [font=Tahoma][size=4][b]— Requirements —[/b][/size][/font]
 
 [font=Tahoma][list]
 [*]SKSE64 (any runtime — SE, AE, or newer)
 [*][url=https://www.nexusmods.com/skyrimspecialedition/mods/32444]Address Library for SKSE Plugins[/url]
+[*]Skyrim True Believer / STB.esp
 [*]Discord Desktop
 [/list][/font]
 
@@ -52,7 +53,7 @@ No .esp. No plugins to enable. Just drop and play.
 [*]Discord Game SDK
 [/list][/font]
 
-[font=Tahoma][size=2]Source code on [url=https://github.com/Fozar/DragonbornPresence-SE]GitHub[/url][/size][/font]
+[font=Tahoma][size=2]Source code on [url=https://github.com/STB-Team/DragonbornPresence-SE]GitHub[/url][/size][/font]
 
 [line]
 
