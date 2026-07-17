@@ -33,6 +33,12 @@ enum class PresenceMode {
     Inventory,
     Dialogue,
     Crafting,
+    Alchemy,
+    Smithing,
+    Enchanting,
+    Cooking,
+    Tanning,
+    Smelting,
     Waiting
 };
 
@@ -72,6 +78,12 @@ struct Config {
     std::string       inventoryImage;
     std::string       dialogueImage;
     std::string       craftingImage;
+    std::string       alchemyImage;
+    std::string       smithingImage;
+    std::string       enchantingImage;
+    std::string       cookingImage;
+    std::string       tanningImage;
+    std::string       smeltingImage;
     std::string       waitingImage;
     std::vector<LocationImageRule> locationImageRules;
 };
@@ -93,6 +105,12 @@ std::unordered_map<std::string, std::string> g_locale = {
     {"inventory",         "Managing inventory"},
     {"dialogue",          "In dialogue"},
     {"crafting",          "Crafting"},
+    {"crafting_alchemy",    "Brewing potions"},
+    {"crafting_smithing",   "Smithing"},
+    {"crafting_enchanting", "Enchanting"},
+    {"crafting_cooking",    "Cooking"},
+    {"crafting_tanning",    "Tanning hides"},
+    {"crafting_smelting",   "Smelting ore"},
     {"waiting",           "Waiting"},
 };
 std::string g_lastPosition;
@@ -339,6 +357,10 @@ static LargeAssetSelection ResolveLargeAsset(
     return {LargeImage(mode), g_config.largeText};
 }
 
+static const std::string& SpecificCraftingImage(const std::string& image) {
+    return image.empty() ? g_config.craftingImage : image;
+}
+
 static const std::string& SmallImage(PresenceMode mode) {
     switch (mode) {
     case PresenceMode::Loading:          return g_config.loadingImage;
@@ -352,6 +374,12 @@ static const std::string& SmallImage(PresenceMode mode) {
     case PresenceMode::Inventory:        return g_config.inventoryImage;
     case PresenceMode::Dialogue:         return g_config.dialogueImage;
     case PresenceMode::Crafting:         return g_config.craftingImage;
+    case PresenceMode::Alchemy:          return SpecificCraftingImage(g_config.alchemyImage);
+    case PresenceMode::Smithing:         return SpecificCraftingImage(g_config.smithingImage);
+    case PresenceMode::Enchanting:       return SpecificCraftingImage(g_config.enchantingImage);
+    case PresenceMode::Cooking:          return SpecificCraftingImage(g_config.cookingImage);
+    case PresenceMode::Tanning:          return SpecificCraftingImage(g_config.tanningImage);
+    case PresenceMode::Smelting:         return SpecificCraftingImage(g_config.smeltingImage);
     case PresenceMode::Waiting:          return g_config.waitingImage;
     }
     return g_config.exploringImage;
@@ -371,6 +399,12 @@ static std::string SmallText(PresenceMode mode) {
     case PresenceMode::Inventory: return Locale("inventory");
     case PresenceMode::Dialogue:  return Locale("dialogue");
     case PresenceMode::Crafting:  return Locale("crafting");
+    case PresenceMode::Alchemy:    return Locale("crafting_alchemy");
+    case PresenceMode::Smithing:   return Locale("crafting_smithing");
+    case PresenceMode::Enchanting: return Locale("crafting_enchanting");
+    case PresenceMode::Cooking:    return Locale("crafting_cooking");
+    case PresenceMode::Tanning:    return Locale("crafting_tanning");
+    case PresenceMode::Smelting:   return Locale("crafting_smelting");
     case PresenceMode::Waiting:   return Locale("waiting");
     }
     return {};
@@ -436,9 +470,65 @@ static std::string BuildPlayerInfo(RE::PlayerCharacter* player) {
     return name + " - " + raceName + " (" + std::to_string(player->GetLevel()) + ")";
 }
 
+static PresenceMode CurrentCraftingMode() {
+    auto* ui = RE::UI::GetSingleton();
+    if (!ui) return PresenceMode::Crafting;
+
+    const auto menu = ui->GetMenu<RE::CraftingMenu>();
+    const auto* subMenu = menu ? menu->GetCraftingSubMenu() : nullptr;
+    if (skyrim_cast<const RE::CraftingSubMenus::AlchemyMenu*>(subMenu))
+        return PresenceMode::Alchemy;
+    if (skyrim_cast<const RE::CraftingSubMenus::EnchantConstructMenu*>(subMenu))
+        return PresenceMode::Enchanting;
+    if (skyrim_cast<const RE::CraftingSubMenus::SmithingMenu*>(subMenu))
+        return PresenceMode::Smithing;
+
+    const auto* furniture = subMenu ? subMenu->furniture : nullptr;
+    if (!furniture) return PresenceMode::Crafting;
+
+    using BenchType = RE::TESFurniture::WorkBenchData::BenchType;
+    switch (furniture->workBenchData.benchType.get()) {
+    case BenchType::kAlchemy:
+    case BenchType::kAlchemyExperiment:
+        return PresenceMode::Alchemy;
+    case BenchType::kEnchanting:
+    case BenchType::kEnchantingExperiment:
+        return PresenceMode::Enchanting;
+    case BenchType::kSmithingWeapon:
+    case BenchType::kSmithingArmor:
+        return PresenceMode::Smithing;
+    case BenchType::kCreateObject:
+        break;
+    default:
+        return PresenceMode::Crafting;
+    }
+
+    const std::string editorId = SafeStr(furniture->GetFormEditorID());
+    if (ContainsAsciiInsensitive(editorId, "cook") ||
+        ContainsAsciiInsensitive(editorId, "oven")) {
+        return PresenceMode::Cooking;
+    }
+    if (ContainsAsciiInsensitive(editorId, "tanning") ||
+        ContainsAsciiInsensitive(editorId, "tanrack")) {
+        return PresenceMode::Tanning;
+    }
+    if (ContainsAsciiInsensitive(editorId, "smelter") ||
+        ContainsAsciiInsensitive(editorId, "smelting")) {
+        return PresenceMode::Smelting;
+    }
+    if (furniture->workBenchData.usesSkill.get() == RE::ActorValue::kSmithing ||
+        ContainsAsciiInsensitive(editorId, "forge") ||
+        ContainsAsciiInsensitive(editorId, "smith") ||
+        ContainsAsciiInsensitive(editorId, "grindstone") ||
+        ContainsAsciiInsensitive(editorId, "armorbench")) {
+        return PresenceMode::Smithing;
+    }
+    return PresenceMode::Crafting;
+}
+
 static std::optional<PresenceMode> ContextModeForMenu(std::string_view menu) {
     if (menu == RE::DialogueMenu::MENU_NAME) return PresenceMode::Dialogue;
-    if (menu == RE::CraftingMenu::MENU_NAME) return PresenceMode::Crafting;
+    if (menu == RE::CraftingMenu::MENU_NAME) return CurrentCraftingMode();
     if (menu == RE::MapMenu::MENU_NAME) return PresenceMode::Map;
     if (menu == RE::SleepWaitMenu::MENU_NAME) return PresenceMode::Waiting;
     if (menu == RE::InventoryMenu::MENU_NAME ||
@@ -459,6 +549,13 @@ static int ContextPriority(PresenceMode mode) {
     switch (mode) {
     case PresenceMode::Dialogue:  return 6;
     case PresenceMode::Crafting:  return 5;
+    case PresenceMode::Alchemy:
+    case PresenceMode::Smithing:
+    case PresenceMode::Enchanting:
+    case PresenceMode::Cooking:
+    case PresenceMode::Tanning:
+    case PresenceMode::Smelting:
+        return 5;
     case PresenceMode::Map:       return 4;
     case PresenceMode::Inventory: return 3;
     case PresenceMode::Waiting:   return 2;
@@ -543,7 +640,10 @@ void SendPresence(
     });
 }
 
-void RefreshPosition(const char* trigger = nullptr) {
+void RefreshPosition(
+    const char* trigger = nullptr,
+    std::optional<PresenceMode> contextOverride = std::nullopt)
+{
     auto* player = RE::PlayerCharacter::GetSingleton();
     if (!player) return;
 
@@ -564,7 +664,9 @@ void RefreshPosition(const char* trigger = nullptr) {
 
     PresenceMode mode = PresenceMode::Exploring;
     std::string suffix;
-    const auto contextMode = g_config.showUiState ? ActiveContextMode() : std::nullopt;
+    const auto contextMode = contextOverride
+        ? contextOverride
+        : (g_config.showUiState ? ActiveContextMode() : std::nullopt);
     if (g_config.showCombat && !g_combatTarget.empty()) {
         suffix = g_combatTarget;
         mode = PresenceMode::Combat;
@@ -588,14 +690,26 @@ void RefreshPosition(const char* trigger = nullptr) {
     SendPresence(state, playerInfo, mode, player, display);
 }
 
-void DeferredRefresh(int ticks) {
-    SKSE::GetTaskInterface()->AddTask([ticks]() {
+void DeferredRefresh(int ticks, std::string trigger) {
+    SKSE::GetTaskInterface()->AddTask([ticks, trigger = std::move(trigger)]() mutable {
         if (ticks > 1)
-            DeferredRefresh(ticks - 1);
+            DeferredRefresh(ticks - 1, std::move(trigger));
         else if (g_state == State::Playing)
-            RefreshPosition("post-charcreate");
+            RefreshPosition(trigger.c_str());
     });
 }
+void DeferredCraftingRefresh(int attempts) {
+    SKSE::GetTaskInterface()->AddTask([attempts]() {
+        if (g_state != State::Playing) return;
+        const PresenceMode mode = CurrentCraftingMode();
+        if (mode == PresenceMode::Crafting && attempts > 1) {
+            DeferredCraftingRefresh(attempts - 1);
+            return;
+        }
+        RefreshPosition("crafting-menu-open", mode);
+    });
+}
+
 
 void TransitionTo(State next) {
     State prev = g_state;
@@ -615,7 +729,7 @@ void TransitionTo(State next) {
         if (prev == State::EditingCharacter) {
             // Skyrim commits new name/race to actor base after the menu-close
             // event fires — defer 10 ticks (~167ms at 60fps) to let it finish.
-            DeferredRefresh(10);
+            DeferredRefresh(10, "post-charcreate");
         } else {
             RefreshPosition("state-change");
         }
@@ -659,7 +773,10 @@ public:
                 : g_openContextMenus.erase(menu.c_str()) > 0;
             SKSE::log::info("Menu context: '{}' {}", menu.c_str(), opening ? "open" : "close");
             if (changed && g_state == State::Playing) {
-                RefreshPosition(opening ? "menu-open" : "menu-close");
+                if (opening && menu == RE::CraftingMenu::MENU_NAME)
+                    DeferredCraftingRefresh(30);
+                else
+                    RefreshPosition(opening ? "menu-open" : "menu-close");
             }
         }
         return RE::BSEventNotifyControl::kContinue;
@@ -876,6 +993,12 @@ void LoadConfig() {
                 ReadString(*smallImages, "inventory", g_config.inventoryImage, "assets.small_images");
                 ReadString(*smallImages, "dialogue", g_config.dialogueImage, "assets.small_images");
                 ReadString(*smallImages, "crafting", g_config.craftingImage, "assets.small_images");
+                ReadString(*smallImages, "alchemy", g_config.alchemyImage, "assets.small_images");
+                ReadString(*smallImages, "smithing", g_config.smithingImage, "assets.small_images");
+                ReadString(*smallImages, "enchanting", g_config.enchantingImage, "assets.small_images");
+                ReadString(*smallImages, "cooking", g_config.cookingImage, "assets.small_images");
+                ReadString(*smallImages, "tanning", g_config.tanningImage, "assets.small_images");
+                ReadString(*smallImages, "smelting", g_config.smeltingImage, "assets.small_images");
                 ReadString(*smallImages, "waiting", g_config.waitingImage, "assets.small_images");
             }
             ReadLocationImageRules(*assets);

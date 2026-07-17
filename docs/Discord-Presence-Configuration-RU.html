@@ -280,7 +280,7 @@
 </head>
 <body>
 <section class="cover">
-  <div class="badge">DragonbornPresence SE 2.4.0</div>
+  <div class="badge">DragonbornPresence SE 2.5.0</div>
   <h1>Настройка Discord Rich Presence</h1>
   <p class="subtitle">Большие изображения локаций, маленькие иконки действий, приоритеты событий и диагностика assets.</p>
   <p class="meta">Русское практическое руководство для конфигурации <strong>DragonbornPresence.json</strong><br>Discord Game SDK — без OAuth и дополнительных окон авторизации</p>
@@ -391,6 +391,12 @@
   "inventory": "inventory",
   "dialogue": "dialogue",
   "crafting": "crafting",
+  "alchemy": "alchemy",
+  "smithing": "smithing",
+  "enchanting": "enchanting",
+  "cooking": "",
+  "tanning": "",
+  "smelting": "",
   "waiting": "waiting"
 }</pre>
 <table>
@@ -401,11 +407,17 @@
     <tr><td>Карта</td><td>Открытая карта мира или локации.</td><td><code>map</code></td></tr>
     <tr><td>Инвентарь</td><td>Инвентарь, магия, избранное, характеристики, торговля и контейнеры.</td><td><code>inventory</code></td></tr>
     <tr><td>Диалог</td><td>Разговор с NPC.</td><td><code>dialogue</code></td></tr>
-    <tr><td>Крафт</td><td>Кузница, алхимия, зачарование и другие Crafting Menu.</td><td><code>crafting</code></td></tr>
+    <tr><td>Общий крафт</td><td>Неопознанная или неподдерживаемая Crafting Menu.</td><td><code>crafting</code></td></tr>
+    <tr><td>Алхимия</td><td>Алхимическая лаборатория.</td><td><code>alchemy</code></td></tr>
+    <tr><td>Кузнечное дело</td><td>Кузница, точильный камень и верстак.</td><td><code>smithing</code></td></tr>
+    <tr><td>Зачарование</td><td>Пентаграмма душ.</td><td><code>enchanting</code></td></tr>
+    <tr><td>Готовка</td><td>Котёл или печь.</td><td><code>cooking</code></td></tr>
+    <tr><td>Дубильный станок</td><td>Обработка кожи.</td><td><code>tanning</code></td></tr>
+    <tr><td>Плавильня</td><td>Плавка руды.</td><td><code>smelting</code></td></tr>
     <tr><td>Ожидание</td><td>Сон или ожидание.</td><td><code>waiting</code></td></tr>
   </tbody>
 </table>
-<p>Чтобы отключить конкретную иконку, укажи пустую строку: <code>"map": ""</code>. Чтобы отключить все UI-состояния, установи <code>"show_ui_state": false</code>.</p>
+<p>Если ключ конкретного вида крафта пуст, плагин использует общую иконку <code>crafting</code>. Неопознанный станок также остаётся общим крафтом. Чтобы отключить другую конкретную иконку, укажи пустую строку: <code>"map": ""</code>. Чтобы отключить все UI-состояния, установи <code>"show_ui_state": false</code>.</p>
 
 <h2>7. Приоритет событий</h2>
 <pre>Бой → активный UI-контекст → активный квест → исследование</pre>
@@ -419,7 +431,7 @@
     <tr><td>Миры</td><td>skyrim.png, solstheim.png, blackreach.png</td><td><code>skyrim</code>, <code>solstheim</code>, <code>blackreach</code></td></tr>
     <tr><td>Города</td><td>whiterun.png, solitude.png, windhelm.png, riften.png, markarth.png</td><td>Имена без расширения</td></tr>
     <tr><td>Основные состояния</td><td>loading.png, menu.png, character.png, exploring.png, quest.png, combat.png</td><td>Имена без расширения</td></tr>
-    <tr><td>UI-состояния</td><td>map.png, inventory.png, dialogue.png, crafting.png, waiting.png</td><td>Имена без расширения</td></tr>
+    <tr><td>UI и крафт</td><td>map.png, inventory.png, dialogue.png, crafting.png, alchemy.png, smithing.png, enchanting.png, cooking.png, tanning.png, smelting.png, waiting.png</td><td>Имена без расширения</td></tr>
   </tbody>
 </table>
 <p>Рекомендация: квадратный PNG 1024×1024 для больших изображений; прозрачный квадратный PNG 512×512 или 1024×1024 для маленьких иконок. Важные детали размещай по центру — Discord обрезает маленькую иконку до круга.</p>
@@ -446,6 +458,12 @@
     "inventory": "inventory",
     "dialogue": "dialogue",
     "crafting": "crafting",
+    "alchemy": "alchemy",
+    "smithing": "smithing",
+    "enchanting": "enchanting",
+    "cooking": "",
+    "tanning": "",
+    "smelting": "",
     "waiting": "waiting"
   },
   "location_images": [
@@ -469,7 +487,7 @@
 
 <h2>11. Что требует изменения C++</h2>
 <p>Новые локации и новые изображения для уже поддерживаемых событий добавляются только через JSON. Пересборка не нужна. Изменение C++ требуется лишь для совершенно нового игрового события, которого нет среди поддерживаемых режимов.</p>
-<p class="small">Документ относится к DragonbornPresence SE 2.4.0. Конфигурация обратно совместима со схемой <code>schema_version: 1</code>.</p>
+<p class="small">Документ относится к DragonbornPresence SE 2.5.0. Конфигурация обратно совместима со схемой <code>schema_version: 1</code>.</p>
 </main>
 </body>
 </html>

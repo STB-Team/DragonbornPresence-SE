@@ -86,6 +86,12 @@ To use custom branding:
       "inventory": "inventory",
       "dialogue": "dialogue",
       "crafting": "crafting",
+      "alchemy": "alchemy",
+      "smithing": "smithing",
+      "enchanting": "enchanting",
+      "cooking": "",
+      "tanning": "",
+      "smelting": "",
       "waiting": "waiting"
     },
     "location_images": [
@@ -105,7 +111,8 @@ To use custom branding:
 - `location_images` is evaluated from top to bottom; the first matching rule replaces the large image and optionally its hover text.
 - `worldspace`, `location`, and `cell` match stable Creation Kit/xEdit Editor IDs.
 - `match` searches the displayed location name; ASCII matching is case-insensitive. When a rule contains several selectors, all of them must match.
-- An empty image key disables that image. Missing portal assets produce a blank image but do not stop Presence updates.
+- An empty general image key disables that image. Missing portal assets produce a blank image but do not stop Presence updates.
+- Crafting-specific keys override `crafting` for alchemy, smithing, enchanting, cooking, tanning, and smelting. An empty specific image key falls back to the generic crafting image; an unrecognized station uses the generic crafting mode.
 
 Presence priority is: **combat → active UI context → active quest → exploration**. Combat therefore keeps its own small icon even when another lower-priority event fires.
 
@@ -119,7 +126,7 @@ The bundled example configuration expects these Discord Art Asset keys:
 | Large world images | `skyrim.png`, `solstheim.png`, `blackreach.png` |
 | Large city images | `whiterun.png`, `solitude.png`, `windhelm.png`, `riften.png`, `markarth.png` |
 | Existing small states | `loading.png`, `menu.png`, `character.png`, `exploring.png`, `quest.png`, `combat.png` |
-| New small UI states | `map.png`, `inventory.png`, `dialogue.png`, `crafting.png`, `waiting.png` |
+| Small UI and crafting states | `map.png`, `inventory.png`, `dialogue.png`, `crafting.png`, `alchemy.png`, `smithing.png`, `enchanting.png`, `cooking.png`, `tanning.png`, `smelting.png`, `waiting.png` |
 
 File names may differ; the **asset key entered in the Developer Portal** must match the JSON value. Square PNG images are recommended: 1024×1024 for large art, and transparent 512×512 or 1024×1024 icons for small art. Keep important details centered because Discord crops small assets to a circle.
 
@@ -205,7 +212,7 @@ Pure C++ DLL — no `.esp`, no Papyrus scripts.
 **`DragonbornPresence.cpp`** — All state and Discord logic.
 
 - **State machine** (`enum class State`): `Loading → MainMenu → Playing / EditingCharacter`. Transitions via `TransitionTo()`.
-- **`MenuEventSink`** — maps main menu, loading, and character-creation menus to state transitions. It also tracks map, inventory, magic, favorites, stats, barter, container, dialogue, crafting, sleep/wait, journal, and tween menus as prioritized Presence contexts.
+- **`MenuEventSink`** — maps main menu, loading, and character-creation menus to state transitions. It also tracks map, inventory, magic, favorites, stats, barter, container, dialogue, crafting, sleep/wait, journal, and tween menus as prioritized Presence contexts. Crafting submenus and furniture metadata select dedicated alchemy, smithing, enchanting, cooking, tanning, or smelting text and image keys; unknown stations use the generic `crafting` fallback.
 - **`LocationChangeSink`** — listens to `TESActorLocationChangeEvent`; calls `RefreshPosition()` when the player changes named location.
 - **`CellLoadSink`** — listens to `TESCellFullyLoadedEvent`; calls `RefreshPosition()` when the player's cell finishes loading.
 - **`QuestStageSink`** / **`QuestStartStopSink`** — listen to quest stage and start/stop events; refresh presence via an SKSE task so the update runs on the game thread.
