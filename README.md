@@ -41,6 +41,7 @@ Launch the game through SKSE. Discord must be running before or alongside the ga
 `Data\SKSE\Plugins\DragonbornPresence.json` controls the Discord application, displayed fields, event priorities, and image assets. Invalid values are logged and fall back to defaults. The plugin continues to use Discord Game SDK and does not open an OAuth or authorization window.
 
 A printable Russian guide with complete examples is available at [`docs/Discord-Presence-Configuration-RU.pdf`](docs/Discord-Presence-Configuration-RU.pdf).
+The same guide is published as a [GitHub Pages site](https://stb-team.github.io/DragonbornPresence-SE/).
 
 To use custom branding:
 
