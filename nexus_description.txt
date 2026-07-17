@@ -13,40 +13,24 @@
 [*][b]Location[/b] — worldspace and named location, e.g. [i]Skyrim: Riverwood[/i] or [i]Nightcaller Temple[/i]. Updates immediately when you cross a location boundary or enter a new cell.
 [*][b]Character[/b] — name, race, and level, e.g. [i]Dovahkiin - Nord (42)[/i]. Updates correctly after character creation and name changes.
 [*][b]Active quest[/b] — name of your current tracked quest, shown alongside the location, e.g. [i]Skyrim: Whiterun · Bleak Falls Barrow[/i].
-[*][b]Combat[/b] — while fighting, the quest is replaced with the enemy's name, e.g. [i]Skyrim: Helgen · In combat with Alduin[/i]. Reverts to the quest when combat ends.
+[*][b]Combat[/b] — while fighting, the quest is replaced with the enemy's name, e.g. [i]Скайрим: Хелген · В бою с Алдуин[/i]. Reverts to the quest when combat ends.
 [*][b]Session timer[/b] — shows how long you've been playing this session.
-[*][b]Menu states[/b] — displays [i]Main menu[/i] while on the title screen and [i]Editing character[/i] during character creation.
+[*][b]Menu states[/b] — displays [i]Главное меню[/i] on the title screen and [i]Редактирование персонажа[/i] during character creation.
 [/list][/font]
 
 [font=Tahoma][size=4][b]— How to install —[/b][/size][/font]
 
-[font=Tahoma][b]Mod manager (recommended):[/b] Install the archive normally. The FOMOD installer will ask you to pick a language — that's all.
+[font=Tahoma][b]Mod manager (recommended):[/b] Install the archive normally. The FOMOD installer has no language-selection step.
 
-[b]Manual:[/b] Extract the archive, copy [font=Courier New]SKSE\[/font] into your Skyrim [font=Courier New]Data\[/font] directory, then copy the locale file for your language from [font=Courier New]locales\<lang>\DragonbornPresenceLocale.json[/font] to [font=Courier New]Data\SKSE\Plugins\[/font].
+[b]Manual:[/b] Extract the archive and copy [font=Courier New]SKSE\[/font] into your Skyrim [font=Courier New]Data\[/font] directory.
 
 No .esp. No plugins to enable. Just drop and play.
 
 [b]Upgrading from an old version:[/b] If you have [font=Courier New]discord_game_sdk.dll[/font] sitting in the root of your Skyrim directory (next to [font=Courier New]SkyrimSE.exe[/font]), delete it — it was placed there by older versions and is no longer needed. The file now lives in [font=Courier New]Data\SKSE\Plugins\[/font] where it belongs.[/font]
 
-[font=Tahoma][size=4][b]— Localization —[/b][/size][/font]
+[font=Tahoma][size=4][b]— Language —[/b][/size][/font]
 
-[font=Tahoma]The archive includes translations for 11 languages. Pick yours during installation:[/font]
-
-[font=Tahoma][list]
-[*]English
-[*]Russian / Русский
-[*]German / Deutsch
-[*]French / Français
-[*]Spanish / Español
-[*]Italian / Italiano
-[*]Polish / Polski
-[*]Chinese (Simplified) / 中文
-[*]Japanese / 日本語
-[*]Korean / 한국어
-[*]Portuguese (BR) / Português
-[/list][/font]
-
-[font=Tahoma]You can also edit [font=Courier New]Data\SKSE\Plugins\DragonbornPresenceLocale.json[/font] at any time. The file is optional — if it is absent, English defaults are used.[/font]
+[font=Tahoma]All Presence state labels are built into the plugin in Russian. There is no language selector or external locale file.[/font]
 
 [font=Tahoma][size=4][b]— Compatibility —[/b][/size][/font]
 

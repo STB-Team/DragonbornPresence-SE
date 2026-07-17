@@ -92,27 +92,27 @@ Config         g_config;
 State          g_state             = State::Loading;
 discord::Core* g_core              = nullptr;
 int64_t        g_startTime         = 0;
-std::unordered_map<std::string, std::string> g_locale = {
-    {"main_menu",         "Main menu"},
-    {"editing_character", "Editing character"},
-    {"loading",           "Loading"},
-    {"exploring",         "Exploring"},
-    {"active_quest",      "Active quest"},
-    {"combat_fighting",   "In combat with {name}"},
-    {"combat_no_target",  "In combat"},
-    {"in_menu",           "In menus"},
-    {"viewing_map",       "Viewing map"},
-    {"inventory",         "Managing inventory"},
-    {"dialogue",          "In dialogue"},
-    {"crafting",          "Crafting"},
-    {"crafting_alchemy",    "Brewing potions"},
-    {"crafting_smithing",   "Smithing"},
-    {"crafting_enchanting", "Enchanting"},
-    {"crafting_cooking",    "Cooking"},
-    {"crafting_tanning",    "Tanning hides"},
-    {"crafting_smelting",   "Smelting ore"},
-    {"waiting",           "Waiting"},
-};
+namespace Text {
+constexpr std::string_view MainMenu         = "Главное меню";
+constexpr std::string_view EditingCharacter = "Редактирование персонажа";
+constexpr std::string_view Loading          = "Загрузка";
+constexpr std::string_view Exploring        = "Исследование";
+constexpr std::string_view ActiveQuest      = "Активное задание";
+constexpr std::string_view CombatFighting   = "В бою с ";
+constexpr std::string_view CombatNoTarget   = "В бою";
+constexpr std::string_view InMenu           = "В меню";
+constexpr std::string_view ViewingMap       = "Просматривает карту";
+constexpr std::string_view Inventory        = "Управляет инвентарём";
+constexpr std::string_view Dialogue         = "В диалоге";
+constexpr std::string_view Crafting         = "Занимается ремеслом";
+constexpr std::string_view Alchemy          = "Занимается алхимией";
+constexpr std::string_view Smithing         = "Работает в кузнице";
+constexpr std::string_view Enchanting       = "Зачаровывает предметы";
+constexpr std::string_view Cooking          = "Готовит еду";
+constexpr std::string_view Tanning          = "Дубит кожу";
+constexpr std::string_view Smelting         = "Плавит руду";
+constexpr std::string_view Waiting          = "Ожидает";
+}
 std::string g_lastPosition;
 std::string g_combatTarget;
 std::string g_lastActivitySignature;
@@ -124,11 +124,6 @@ static std::string SafeStr(const char* s) {
     return IsValidUtf8(s) ? std::string(s) : Cp1251ToUtf8(s);
 }
 
-static const std::string& Locale(const std::string& key) {
-    static const std::string kFallback;
-    auto it = g_locale.find(key);
-    return it != g_locale.end() ? it->second : kFallback;
-}
 
 static const nlohmann::json* FindObject(
     const nlohmann::json& parent,
@@ -385,42 +380,31 @@ static const std::string& SmallImage(PresenceMode mode) {
     return g_config.exploringImage;
 }
 
-static std::string SmallText(PresenceMode mode) {
+static std::string_view SmallText(PresenceMode mode) {
     switch (mode) {
-    case PresenceMode::Loading:          return Locale("loading");
-    case PresenceMode::MainMenu:         return Locale("main_menu");
-    case PresenceMode::EditingCharacter: return Locale("editing_character");
-    case PresenceMode::Exploring:        return Locale("exploring");
-    case PresenceMode::Quest:            return Locale("active_quest");
+    case PresenceMode::Loading:          return Text::Loading;
+    case PresenceMode::MainMenu:         return Text::MainMenu;
+    case PresenceMode::EditingCharacter: return Text::EditingCharacter;
+    case PresenceMode::Exploring:        return Text::Exploring;
+    case PresenceMode::Quest:            return Text::ActiveQuest;
     case PresenceMode::Combat:
-        return g_combatTarget.empty() ? Locale("combat_no_target") : g_combatTarget;
-    case PresenceMode::Menu:      return Locale("in_menu");
-    case PresenceMode::Map:       return Locale("viewing_map");
-    case PresenceMode::Inventory: return Locale("inventory");
-    case PresenceMode::Dialogue:  return Locale("dialogue");
-    case PresenceMode::Crafting:  return Locale("crafting");
-    case PresenceMode::Alchemy:    return Locale("crafting_alchemy");
-    case PresenceMode::Smithing:   return Locale("crafting_smithing");
-    case PresenceMode::Enchanting: return Locale("crafting_enchanting");
-    case PresenceMode::Cooking:    return Locale("crafting_cooking");
-    case PresenceMode::Tanning:    return Locale("crafting_tanning");
-    case PresenceMode::Smelting:   return Locale("crafting_smelting");
-    case PresenceMode::Waiting:   return Locale("waiting");
+        return g_combatTarget.empty() ? Text::CombatNoTarget : std::string_view(g_combatTarget);
+    case PresenceMode::Menu:       return Text::InMenu;
+    case PresenceMode::Map:        return Text::ViewingMap;
+    case PresenceMode::Inventory:  return Text::Inventory;
+    case PresenceMode::Dialogue:   return Text::Dialogue;
+    case PresenceMode::Crafting:   return Text::Crafting;
+    case PresenceMode::Alchemy:    return Text::Alchemy;
+    case PresenceMode::Smithing:   return Text::Smithing;
+    case PresenceMode::Enchanting: return Text::Enchanting;
+    case PresenceMode::Cooking:    return Text::Cooking;
+    case PresenceMode::Tanning:    return Text::Tanning;
+    case PresenceMode::Smelting:   return Text::Smelting;
+    case PresenceMode::Waiting:    return Text::Waiting;
     }
     return {};
 }
 
-// Formats the combat string for a known enemy name.
-// If the template contains {name}, replaces it; otherwise appends " " + name (legacy fallback).
-static std::string FormatCombat(const std::string& tmpl, const std::string& name) {
-    constexpr std::string_view kPlaceholder = "{name}";
-    auto pos = tmpl.find(kPlaceholder);
-    if (pos == std::string::npos)
-        return tmpl + " " + name;
-    std::string result = tmpl;
-    result.replace(pos, kPlaceholder.size(), name);
-    return result;
-}
 
 static std::string BuildPosition(RE::PlayerCharacter* player) {
     auto* ws   = player->GetWorldspace();
@@ -682,7 +666,7 @@ void RefreshPosition(
         if (!state.empty()) state += g_config.separator;
         state += suffix;
     }
-    if (state.empty()) state = Locale("exploring");
+    if (state.empty()) state = Text::Exploring;
 
     SKSE::log::info("[{}] player='{}' location='{}' suffix='{}'{}",
         trigger ? trigger : "refresh", playerInfo, display, suffix,
@@ -718,11 +702,11 @@ void TransitionTo(State next) {
     case State::MainMenu:
         SKSE::log::info("State -> MainMenu");
         g_openContextMenus.clear();
-        SendPresence(Locale("main_menu"), {}, PresenceMode::MainMenu);
+        SendPresence(Text::MainMenu, {}, PresenceMode::MainMenu);
         break;
     case State::EditingCharacter:
         SKSE::log::info("State -> EditingCharacter");
-        SendPresence(Locale("editing_character"), {}, PresenceMode::EditingCharacter);
+        SendPresence(Text::EditingCharacter, {}, PresenceMode::EditingCharacter);
         break;
     case State::Playing:
         SKSE::log::info("State -> Playing");
@@ -738,7 +722,7 @@ void TransitionTo(State next) {
         SKSE::log::info("State -> Loading");
         g_combatTarget.clear();
         g_openContextMenus.clear();
-        SendPresence(Locale("loading"), {}, PresenceMode::Loading);
+        SendPresence(Text::Loading, {}, PresenceMode::Loading);
         break;
     }
 }
@@ -868,10 +852,14 @@ public:
             if (player->IsInCombat()) {
                 if (auto target = player->GetActorRuntimeData().currentCombatTarget.get()) {
                     std::string name = SafeStr(target->GetName());
-                    g_combatTarget = name.empty() ? Locale("combat_no_target")
-                                                  : FormatCombat(Locale("combat_fighting"), name);
+                    if (name.empty()) {
+                        g_combatTarget = Text::CombatNoTarget;
+                    } else {
+                        g_combatTarget.assign(Text::CombatFighting);
+                        g_combatTarget.append(name);
+                    }
                 } else if (g_combatTarget.empty()) {
-                    g_combatTarget = Locale("combat_no_target");
+                    g_combatTarget = Text::CombatNoTarget;
                 }
                 // currentCombatTarget temporarily null — keep existing name
             } else {
@@ -1011,18 +999,6 @@ void LoadConfig() {
     }
 }
 
-void SetLocale() {
-    std::ifstream file(R"(Data\SKSE\Plugins\DragonbornPresenceLocale.json)");
-    if (!file) return;
-
-    try {
-        auto j = nlohmann::json::parse(file);
-        for (auto& [key, val] : j.items())
-            if (val.is_string()) g_locale[key] = val.get<std::string>();
-    } catch (const nlohmann::json::exception& e) {
-        SKSE::log::error("Failed to parse locale JSON: {}", e.what());
-    }
-}
 
 void RegisterGameEventHandlers() {
     SKSE::log::info("Registering game event handlers...");

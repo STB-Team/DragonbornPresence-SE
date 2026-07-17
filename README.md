@@ -14,7 +14,7 @@ While you play, Discord shows your character's name, race, level, current locati
 - Combat state — shows `In combat with <enemy name>` while in combat, replacing the quest suffix
 - Session timer showing how long you've been playing
 - State-aware presence: Main Menu, Character Creation, Loading, and In-Game are all handled separately
-- Localization support — English labels can be replaced via a JSON file
+- Built-in Russian labels with no language selection or external locale file
 - Graceful degradation if Discord is not running
 
 ---
@@ -28,9 +28,9 @@ While you play, Discord shows your character's name, race, level, current locati
 
 ## Installation
 
-**Mod manager (recommended):** Install the archive normally. The FOMOD installer will prompt you to pick a language.
+**Mod manager (recommended):** Install the archive normally. The FOMOD installer has no language-selection step.
 
-**Manual:** Extract the archive, copy `SKSE\` into your Skyrim `Data\` directory, then copy the locale file for your language from `locales\<lang>\DragonbornPresenceLocale.json` to `Data\SKSE\Plugins\`.
+**Manual:** Extract the archive and copy `SKSE\` into your Skyrim `Data\` directory.
 
 Launch the game through SKSE. Discord must be running before or alongside the game — if it is not running the plugin loads normally and presence is simply disabled.
 
@@ -132,42 +132,11 @@ The bundled example configuration expects these Discord Art Asset keys:
 
 File names may differ; the **asset key entered in the Developer Portal** must match the JSON value. Square PNG images are recommended: 1024×1024 for large art, and transparent 512×512 or 1024×1024 icons for small art. Keep important details centered because Discord crops small assets to a circle.
 
-## Localization
+## Language
 
-The archive includes locale files for 11 languages. The FOMOD installer lets you pick one during installation:
-
-| Code | Language |
-|------|----------|
-| `en` | English |
-| `ru` | Russian / Русский |
-| `de` | German / Deutsch |
-| `fr` | French / Français |
-| `es` | Spanish / Español |
-| `it` | Italian / Italiano |
-| `pl` | Polish / Polski |
-| `zh` | Chinese (Simplified) / 中文 |
-| `ja` | Japanese / 日本語 |
-| `ko` | Korean / 한국어 |
-| `pt` | Portuguese (BR) / Português |
-
-You can also edit `Data\SKSE\Plugins\DragonbornPresenceLocale.json` directly at any time:
-
-```json
-{
-    "main_menu": "Main menu",
-    "editing_character": "Editing character",
-    "combat_fighting": "In combat with {name}",
-    "combat_no_target": "In combat"
-}
-```
-
-- `combat_fighting` — shown when an enemy name is known. `{name}` is replaced with the enemy's name at runtime (e.g. `"In combat with Alduin"`). Place it anywhere in the string; SOV languages can write `"{name}と戦闘中"`.
-- `combat_no_target` — shown when in combat but no enemy name is available (rare transient state). Falls back to `"In combat"` if the key is absent.
-
-If the file is missing or any key is absent, English defaults are used.
+All Presence state labels are built into the plugin in Russian. The archive does not include language choices or `DragonbornPresenceLocale.json`; changing the game language does not change these labels.
 
 ---
-
 ## Building from Source
 
 ### Requirements
@@ -201,7 +170,7 @@ cmake -S . -B build -DDRAGONBORNPRESENCE_DEPLOY_DIR="D:/path/to/Mod Organizer/mo
 cmake --build build --config Release
 ```
 
-Each successful build copies `DragonbornPresence.dll` and `discord_game_sdk.dll` to that directory. User-edited `DragonbornPresence.json` and `DragonbornPresenceLocale.json` files are intentionally left untouched.
+Each successful build copies `DragonbornPresence.dll` and `discord_game_sdk.dll` to that directory. The user-edited `DragonbornPresence.json` file is intentionally left untouched.
 
 ---
 
@@ -209,7 +178,7 @@ Each successful build copies `DragonbornPresence.dll` and `discord_game_sdk.dll`
 
 Pure C++ DLL — no `.esp`, no Papyrus scripts.
 
-**`main.cpp`** — Plugin entry point (`SKSEPluginLoad`). Sets up spdlog logging, reads the locale file, registers the SKSE messaging listener. Reacts to `kDataLoaded` (registers event sinks) and `kNewGame`/`kPostLoadGame` (forces presence refresh).
+**`main.cpp`** — Plugin entry point (`SKSEPluginLoad`). Sets up spdlog logging, loads the plugin configuration, and registers the SKSE messaging listener. Reacts to `kDataLoaded` (registers event sinks) and `kNewGame`/`kPostLoadGame` (forces presence refresh).
 
 **`DragonbornPresence.cpp`** — All state and Discord logic.
 

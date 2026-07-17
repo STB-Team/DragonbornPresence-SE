@@ -42,7 +42,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(rapidcsv)
 set(RAPIDCSV_INCLUDE_DIRS "${rapidcsv_SOURCE_DIR}/src" CACHE PATH "" FORCE)
 
-# nlohmann/json — header-only JSON parser for locale file
+# nlohmann/json — header-only JSON parser for the plugin configuration
 FetchContent_Declare(
     nlohmann_json
     GIT_REPOSITORY https://github.com/nlohmann/json.git
@@ -115,6 +115,7 @@ target_precompile_headers(DragonbornPresence PRIVATE
 
 target_link_libraries(DragonbornPresence PRIVATE discord_cpp delayimp nlohmann_json::nlohmann_json)
 target_link_options(DragonbornPresence PRIVATE /DELAYLOAD:discord_game_sdk.dll)
+target_compile_options(DragonbornPresence PRIVATE /utf-8)
 
 set(_pkg_plugins "${CMAKE_CURRENT_BINARY_DIR}/_package/SKSE/Plugins")
 file(MAKE_DIRECTORY "${_pkg_plugins}")
@@ -124,9 +125,8 @@ configure_file(
     COPYONLY
 )
 
-# Copy FOMOD installer and locale files into the package (configure time)
-file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/fomod"   DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/_package")
-file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/locales" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/_package")
+# Copy the FOMOD metadata into the package (configure time)
+file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/fomod" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/_package")
 
 add_custom_command(TARGET DragonbornPresence POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -144,7 +144,6 @@ add_custom_command(TARGET DragonbornPresence POST_BUILD
            "SKSE/Plugins/discord_game_sdk.dll"
            "SKSE/Plugins/DragonbornPresence.json"
            "fomod"
-           "locales"
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_package"
     COMMENT "Packaging DragonbornPresence.zip"
 )

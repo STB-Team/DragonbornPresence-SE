@@ -5,7 +5,6 @@
 namespace DragonbornPresence {
 
 void LoadConfig();
-void SetLocale();
 void RegisterGameEventHandlers();
 void OnGameLoaded();
 

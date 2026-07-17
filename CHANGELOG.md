@@ -7,6 +7,7 @@
 - Fall back to the generic `crafting` text and image for unsupported stations; an empty activity-specific image key also uses the generic crafting image.
 - Replaced tier-specific location image keys with 42 tierless creature and encounter markers; locations without an encounter marker use the configured large-image fallback.
 - Added dedicated large-image rules for nine Skyrim cities, three castles, Raven Rock, Tel Mithryn, and the Temple of Miraak; added runtime-name fallbacks for ambiguous encounter locations.
+- Removed the language-selection installer and external locale files; all Presence state labels are now built into the plugin in Russian.
 
 
 ## 2.4.0 — 2026-07-17
