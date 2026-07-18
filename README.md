@@ -123,7 +123,7 @@ All Presence state labels are built into the plugin in Russian. The archive does
 ### Steps
 
 ```bash
-git clone https://github.com/your-repo/DragonbornPresence-SE.git
+git clone https://github.com/STB-Team/DragonbornPresence-SE.git
 cd DragonbornPresence-SE
 ```
 
@@ -147,24 +147,38 @@ cmake --build build --config Release
 
 Each successful build copies `DragonbornPresence.dll` and `discord_game_sdk.dll` to that directory. The user-edited `DragonbornPresence.json` file is intentionally left untouched.
 
+### Publishing a GitHub Release
+
+The repository workflow `.github/workflows/release.yml` builds and publishes
+`DragonbornPresence.zip` whenever a version tag matching `v*` is pushed:
+
+```bash
+git tag -a v2.5.0 -m "DragonbornPresence 2.5.0"
+git push origin v2.5.0
+```
+
+GitHub Actions performs a clean Windows Release build, creates the GitHub
+Release with generated release notes, and attaches the ready-to-install ZIP.
+Track the run on the repository's **Actions** tab; after it succeeds, the
+archive is available under **Releases → Assets**. The tag must be new because
+the workflow intentionally refuses to replace an existing release.
+
 ---
 
 ## Architecture
 
-Pure C++ SKSE DLL — no plugin-owned `.esp` or Papyrus scripts. The plugin reads data exposed by the installed STB mod.
+Pure C++ SKSE DLL — no plugin-owned `.esp` or Papyrus scripts. The plugin reads data exposed by the installed STB mod. `DragonbornPresence.cpp` keeps the implementation in one translation unit while separating responsibilities into explicit internal layers:
 
-**`main.cpp`** — plugin entry point, logging, configuration load, and SKSE messaging. `kDataLoaded` initializes STB forms and event sinks; `kNewGame` and `kPostLoadGame` trigger the first gameplay refresh.
+- **`model`** owns configuration, snapshots, activity payloads, and strongly typed state enums.
+- **`text`** validates game strings, converts CP1251 to UTF-8, truncates Discord fields safely, and performs ASCII-insensitive matching.
+- **`configuration::ConfigLoader`** parses and validates `DragonbornPresence.json` while preserving defaults for missing or invalid values.
+- **`assets::LocationAssetResolver`** applies the ordered location rules and falls back to `assets.large_image`.
+- **`game::StbDataProvider`** resolves STB forms and reads player level, deaths, selected stone, selected difficulty, location, combat state, and combat target.
+- **`integration::DiscordPresenceClient`** owns the Discord Game SDK connection, enforces field limits, suppresses duplicate payloads, and runs callbacks.
+- **`application::PresenceCoordinator`** coordinates loading state, gameplay refreshes, event sinks, Discord callbacks, and one-second polling.
+- **`MenuEventSink`** and **`CombatEventSink`** adapt Skyrim events without containing presence business logic.
 
-**`DragonbornPresence.cpp`** — STB data collection and Discord activity:
-
-- **`InitializeStbData()`** resolves `aaMZgv_NowDeath`, the STB MCM data-storage quest, and the 19 standing-stone description spells.
-- **`ReadPlayerSnapshot()`** reads player level, deaths, selected stone, selected difficulty, location, combat state, and the current combat target.
-- **`BuildPosition()`** walks the parent-location chain and produces a stable worldspace/location string used only for location-image matching.
-- **`ResolveLargeAsset()`** applies the 414 ordered JSON rules and falls back to `assets.large_image`.
-- **`MenuEventSink`** switches to loading Presence for the main menu and loading screens.
-- **`CombatSink`** requests an immediate refresh on player combat transitions.
-- **`StartCallbackThread()`** posts Discord callbacks to the game thread every 100 ms and polls the complete Presence snapshot once per second.
-- **`SendActivity()`** enforces Discord's 127-byte UTF-8 limits, skips duplicate payloads, sends both fixed text rows, location art, and loading/combat hover text.
+**`main.cpp`** remains the plugin entry point. It loads configuration and forwards SKSE lifecycle messages to the public `DragonbornPresence` interface.
 
 **`ScriptUtils.h`** — reads the selected difficulty from `aaMZ_MCMDataStorage` through the quest alias script property/variable.
 

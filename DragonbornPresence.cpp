@@ -7,11 +7,15 @@
 #include <atomic>
 #include <charconv>
 #include <chrono>
+#include <cstdint>
 #include <fstream>
+#include <format>
 #include <optional>
+#include <ranges>
 #include <string>
 #include <string_view>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include <nlohmann/json.hpp>
@@ -20,10 +24,31 @@ namespace DragonbornPresence {
 
 namespace {
 
-constexpr discord::ClientId kDefaultAppId = 1527543892151373937LL;
-constexpr std::chrono::milliseconds kCallbackInterval{100};
-constexpr std::uint8_t kPresencePollTicks = 10;
+namespace constants {
 
+constexpr discord::ClientId kDefaultApplicationId = 1527543892151373937;
+constexpr std::string_view kConfigPath = R"(Data\SKSE\Plugins\DragonbornPresence.json)";
+constexpr std::chrono::milliseconds kDiscordCallbackInterval{100};
+constexpr std::uint8_t kPresencePollIntervalInCallbackTicks = 10;
+constexpr std::size_t kDiscordTextMaxBytes = 127;
+constexpr std::uint32_t kDifficultyQuestFormId = 0x1417C4;
+constexpr std::string_view kStbPluginName = "STB.esp";
+constexpr std::string_view kDifficultyScriptName = "aamz_mcmdatastorage";
+constexpr std::string_view kDifficultyPropertyName = "aaMZ_SelectedLevel_OfDifficulty";
+constexpr std::string_view kDeathsGlobalEditorId = "aaMZgv_NowDeath";
+constexpr std::string_view kMainMenuName = "Main Menu";
+constexpr std::string_view kLoadingMenuName = "Loading Menu";
+constexpr std::string_view kLoadingText = "Загрузка";
+constexpr std::string_view kUnknownDeathsText = "—";
+constexpr std::string_view kUnknownDifficultyText = "не определена";
+constexpr std::string_view kNoStoneText = "не выбран";
+constexpr std::string_view kCombatText = "В бою";
+
+}  // namespace constants
+
+namespace model {
+
+/// Describes an STB standing stone and the localized fallback shown by Discord.
 struct StoneDefinition {
     std::string_view descriptionSpellEditorId;
     std::string_view fallbackName;
@@ -38,7 +63,7 @@ constexpr std::array kStoneDefinitions{
     StoneDefinition{"aaMZs_DoomstoneThiefDesc", "🧤-Вор"},
     StoneDefinition{"aaMZs_DoomstoneMageDesc", "🧙‍-Маг"},
     StoneDefinition{"aaMZs_DoomstoneRitualDesc", "👻-Ритуал"},
-    StoneDefinition{"aaMZs_DoomstoneSnakeDesc", "🐍-Змея"},
+    StoneDefinition{"aaMZs_DoomstoneSnakeDesc", "🐍-Змей"},
     StoneDefinition{"aaMZs_DoomstoneLadyDesc", "👠-Леди"},
     StoneDefinition{"aaMZs_DoomstoneLoverDesc", "💖-Любовник"},
     StoneDefinition{"aaMZs_DoomstoneShadowDesc", "🌙-Тень"},
@@ -51,6 +76,7 @@ constexpr std::array kStoneDefinitions{
     StoneDefinition{"aaMZs_DoomstoneEarthDesc", "⛰️-Земля"},
 };
 
+/// Defines one ordered rule that maps the player's location to a Discord asset.
 struct LocationImageRule {
     std::string worldspace;
     std::string location;
@@ -60,9 +86,10 @@ struct LocationImageRule {
     std::string text;
 };
 
+/// Contains all user-configurable Discord presence settings.
 struct Config {
     bool enabled = true;
-    discord::ClientId applicationId = kDefaultAppId;
+    discord::ClientId applicationId = constants::kDefaultApplicationId;
     std::string largeImage = "stb_logo";
     std::string largeText = "Skyrim True Believer";
     std::string loadingImage = "loading";
@@ -70,17 +97,20 @@ struct Config {
     std::vector<LocationImageRule> locationImageRules;
 };
 
+/// Stores a resolved standing-stone spell and its display name.
 struct StoneRuntimeData {
     RE::SpellItem* descriptionSpell = nullptr;
     std::string name;
 };
 
+/// Caches STB forms required to read player data without repeated lookups.
 struct StbRuntimeData {
     RE::TESGlobal* deaths = nullptr;
     RE::TESQuest* difficultyQuest = nullptr;
     std::vector<StoneRuntimeData> stones;
 };
 
+/// Immutable value snapshot used to build one Discord presence update.
 struct PlayerSnapshot {
     int level = 0;
     std::optional<int> deaths;
@@ -91,173 +121,94 @@ struct PlayerSnapshot {
     bool inCombat = false;
 };
 
-Config g_config;
-StbRuntimeData g_stb;
-discord::Core* g_core = nullptr;
-std::string g_lastActivitySignature;
-std::string g_pendingActivitySignature;
-std::atomic<bool> g_callbackThreadRunning{false};
-bool g_loading = true;
-bool g_gameLoaded = false;
-bool g_lastCombat = false;
-std::string g_lastCombatTargetName;
+/// References the selected large image key and hover text in the active config.
+struct LargeAssetSelection {
+    std::string_view image;
+    std::string_view text;
+};
 
-static std::string SafeStr(const char* value)
+/// Carries all text and asset fields required for one Discord activity.
+struct ActivityPayload {
+    std::string_view details;
+    std::string_view state;
+    std::string_view largeImage;
+    std::string_view largeText;
+    std::string_view smallImage;
+    std::string_view smallText;
+};
+
+/// Identifies why a presence refresh was requested.
+enum class RefreshReason {
+    kGameLoaded,
+    kLoadingFinished,
+    kCombat,
+    kPoll,
+};
+
+/// Provides the stable log label associated with a refresh reason.
+[[nodiscard]] constexpr std::string_view ToLogLabel(RefreshReason reason) noexcept
+{
+    switch (reason) {
+    case RefreshReason::kGameLoaded: return "game-loaded";
+    case RefreshReason::kLoadingFinished: return "loading-finished";
+    case RefreshReason::kCombat: return "combat";
+    case RefreshReason::kPoll: return "poll";
+    }
+    return "unknown";
+}
+
+/// Strongly types the numeric difficulty values stored by the STB quest.
+enum class Difficulty : int {
+    kAdventure = 0,
+    kTactics = 1,
+    kHeroic = 2,
+    kTrialOfTheGods = 3,
+    kCustom = 4,
+};
+
+}  // namespace model
+
+namespace text {
+
+/// Converts a nullable Skyrim string to valid UTF-8 without altering valid input.
+[[nodiscard]] std::string FromGameString(const char* value)
 {
     if (!value || *value == '\0') return {};
     return IsValidUtf8(value) ? std::string(value) : Cp1251ToUtf8(value);
 }
 
-static std::string LimitDiscordText(std::string_view text)
+/// Truncates a Discord text field at a UTF-8 code-point boundary.
+[[nodiscard]] std::string LimitForDiscord(std::string_view value)
 {
-    constexpr std::size_t kMaxBytes = 127;
-    if (text.size() <= kMaxBytes) return std::string(text);
+    if (value.size() <= constants::kDiscordTextMaxBytes) return std::string(value);
 
-    std::size_t size = kMaxBytes;
-    while (size > 0 && (static_cast<unsigned char>(text[size]) & 0xC0) == 0x80) {
-        --size;
+    std::size_t validSize = constants::kDiscordTextMaxBytes;
+    while (validSize > 0 &&
+           (static_cast<unsigned char>(value[validSize]) & 0xC0) == 0x80) {
+        --validSize;
     }
-    return std::string(text.substr(0, size));
+    return std::string(value.substr(0, validSize));
 }
 
-static const nlohmann::json* FindObject(
-    const nlohmann::json& parent,
-    const char* key,
-    std::string_view path)
-{
-    const auto value = parent.find(key);
-    if (value == parent.end()) return nullptr;
-    if (!value->is_object()) {
-        SKSE::log::warn("Config: '{}' must be an object; using defaults.", path);
-        return nullptr;
-    }
-    return &*value;
-}
-
-static void ReadBool(
-    const nlohmann::json& object,
-    const char* key,
-    bool& target,
-    std::string_view path)
-{
-    const auto value = object.find(key);
-    if (value == object.end()) return;
-    if (!value->is_boolean()) {
-        SKSE::log::warn("Config: '{}.{}' must be a boolean; using default.", path, key);
-        return;
-    }
-    target = value->get<bool>();
-}
-
-static void ReadString(
-    const nlohmann::json& object,
-    const char* key,
-    std::string& target,
-    std::string_view path)
-{
-    const auto value = object.find(key);
-    if (value == object.end()) return;
-    if (!value->is_string()) {
-        SKSE::log::warn("Config: '{}.{}' must be a string; using default.", path, key);
-        return;
-    }
-    target = value->get<std::string>();
-}
-
-static void ReadApplicationId(const nlohmann::json& discord)
-{
-    const auto value = discord.find("application_id");
-    if (value == discord.end()) return;
-
-    if (value->is_number_integer()) {
-        const auto parsed = value->get<std::int64_t>();
-        if (parsed > 0) g_config.applicationId = parsed;
-        return;
-    }
-    if (value->is_string()) {
-        const std::string text = value->get<std::string>();
-        discord::ClientId parsed = 0;
-        const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), parsed);
-        if (error == std::errc{} && end == text.data() + text.size() && parsed > 0) {
-            g_config.applicationId = parsed;
-            return;
-        }
-    }
-    SKSE::log::warn("Config: 'discord.application_id' is invalid; using default.");
-}
-
-static void ReadLocationImageRules(const nlohmann::json& assets)
-{
-    const auto rules = assets.find("location_images");
-    if (rules == assets.end()) return;
-    if (!rules->is_array()) {
-        SKSE::log::warn("Config: 'assets.location_images' must be an array; using defaults.");
-        return;
-    }
-
-    std::vector<LocationImageRule> parsed;
-    parsed.reserve(rules->size());
-    for (std::size_t index = 0; index < rules->size(); ++index) {
-        const auto& value = (*rules)[index];
-        if (!value.is_object()) {
-            SKSE::log::warn(
-                "Config: 'assets.location_images[{}]' must be an object; ignoring.",
-                index);
-            continue;
-        }
-
-        LocationImageRule rule;
-        bool valid = true;
-        const auto readOptional = [&](const char* key, std::string& target) {
-            const auto field = value.find(key);
-            if (field == value.end()) return;
-            if (!field->is_string()) {
-                SKSE::log::warn(
-                    "Config: 'assets.location_images[{}].{}' must be a string; ignoring rule.",
-                    index,
-                    key);
-                valid = false;
-                return;
-            }
-            target = field->get<std::string>();
-        };
-
-        readOptional("worldspace", rule.worldspace);
-        readOptional("location", rule.location);
-        readOptional("cell", rule.cell);
-        readOptional("match", rule.match);
-        readOptional("image", rule.image);
-        readOptional("text", rule.text);
-
-        const bool hasSelector =
-            !rule.worldspace.empty() || !rule.location.empty() ||
-            !rule.cell.empty() || !rule.match.empty();
-        if (!valid || !hasSelector || rule.image.empty()) {
-            SKSE::log::warn(
-                "Config: 'assets.location_images[{}]' requires 'image' and a selector; ignoring.",
-                index);
-            continue;
-        }
-        parsed.push_back(std::move(rule));
-    }
-    g_config.locationImageRules = std::move(parsed);
-}
-
-static bool ContainsAsciiInsensitive(std::string_view text, std::string_view pattern)
+/// Tests whether an ASCII pattern occurs in text using case-insensitive comparison.
+[[nodiscard]] bool ContainsAsciiInsensitive(
+    std::string_view value,
+    std::string_view pattern) noexcept
 {
     if (pattern.empty()) return true;
-    if (pattern.size() > text.size()) return false;
+    if (pattern.size() > value.size()) return false;
 
-    const auto fold = [](unsigned char value) {
-        return value >= 'A' && value <= 'Z'
-            ? static_cast<unsigned char>(value + ('a' - 'A'))
-            : value;
+    const auto foldAscii = [](unsigned char character) {
+        return character >= 'A' && character <= 'Z'
+            ? static_cast<unsigned char>(character + ('a' - 'A'))
+            : character;
     };
-    for (std::size_t offset = 0; offset + pattern.size() <= text.size(); ++offset) {
+
+    for (std::size_t offset = 0; offset + pattern.size() <= value.size(); ++offset) {
         bool matches = true;
         for (std::size_t index = 0; index < pattern.size(); ++index) {
-            if (fold(static_cast<unsigned char>(text[offset + index])) !=
-                fold(static_cast<unsigned char>(pattern[index]))) {
+            if (foldAscii(static_cast<unsigned char>(value[offset + index])) !=
+                foldAscii(static_cast<unsigned char>(pattern[index]))) {
                 matches = false;
                 break;
             }
@@ -267,512 +218,842 @@ static bool ContainsAsciiInsensitive(std::string_view text, std::string_view pat
     return false;
 }
 
-static bool EditorIdEquals(const RE::TESForm* form, std::string_view expected)
-{
-    if (expected.empty()) return true;
-    if (!form) return false;
-    const char* editorId = form->GetFormEditorID();
-    return editorId && expected == editorId;
-}
+}  // namespace text
 
-static bool LocationRuleMatches(
-    const LocationImageRule& rule,
-    RE::PlayerCharacter* player,
-    std::string_view displayLocation)
-{
-    if (!player) return false;
-    if (!rule.worldspace.empty() &&
-        !EditorIdEquals(player->GetWorldspace(), rule.worldspace)) {
-        return false;
-    }
-    if (!rule.cell.empty() && !EditorIdEquals(player->GetParentCell(), rule.cell)) {
-        return false;
-    }
-    if (!rule.location.empty()) {
-        bool found = false;
-        for (auto* location = player->GetCurrentLocation();
-             location;
-             location = location->parentLoc) {
-            if (EditorIdEquals(location, rule.location)) {
-                found = true;
-                break;
-            }
-        }
-        if (!found) return false;
-    }
-    return rule.match.empty() || ContainsAsciiInsensitive(displayLocation, rule.match);
-}
+namespace configuration {
 
-static std::string BuildPosition(RE::PlayerCharacter* player)
-{
-    if (!player) return {};
-
-    auto* worldspace = player->GetWorldspace();
-    auto* location = player->GetCurrentLocation();
-    auto* cell = player->GetParentCell();
-
-    std::string locationName;
-    for (auto* current = location; current && locationName.empty(); current = current->parentLoc) {
-        locationName = SafeStr(current->GetName());
-    }
-
-    const std::string worldspaceName = worldspace ? SafeStr(worldspace->GetName()) : "";
-    const std::string cellName = cell ? SafeStr(cell->GetName()) : "";
-    if (!worldspaceName.empty()) {
-        return !locationName.empty() && locationName != worldspaceName
-            ? worldspaceName + ": " + locationName
-            : worldspaceName;
-    }
-    return !locationName.empty() ? locationName : cellName;
-}
-
-struct LargeAssetSelection {
-    std::string_view image;
-    std::string_view text;
-};
-
-static LargeAssetSelection ResolveLargeAsset(
-    RE::PlayerCharacter* player,
-    std::string_view displayLocation)
-{
-    if (player) {
-        for (const auto& rule : g_config.locationImageRules) {
-            if (LocationRuleMatches(rule, player, displayLocation)) {
-                return {
-                    rule.image,
-                    rule.text.empty() ? std::string_view(g_config.largeText)
-                                      : std::string_view(rule.text)
-                };
-            }
-        }
-    }
-    return {g_config.largeImage, g_config.largeText};
-}
-
-static std::string ParseStoneName(RE::SpellItem* descriptionSpell, std::string_view fallback)
-{
-    if (!descriptionSpell) return std::string(fallback);
-
-    RE::BSString description;
-    descriptionSpell->GetDescription(description, descriptionSpell);
-    if (description.empty()) return std::string(fallback);
-
-    try {
-        const auto root = nlohmann::json::parse(description.c_str());
-        const auto name = root.find("name");
-        if (name != root.end() && name->is_string()) {
-            const auto parsed = name->get<std::string>();
-            if (!parsed.empty()) return parsed;
-        }
-    } catch (const nlohmann::json::exception& error) {
-        SKSE::log::warn(
-            "STB stone '{}': invalid description JSON: {}",
-            descriptionSpell->GetFormEditorID(),
-            error.what());
-    }
-    return std::string(fallback);
-}
-
-static void InitializeStbData()
-{
-    auto* data = RE::TESDataHandler::GetSingleton();
-    if (!data) {
-        SKSE::log::error("STB integration: TESDataHandler is unavailable.");
-        return;
-    }
-
-    g_stb.deaths = RE::TESForm::LookupByEditorID<RE::TESGlobal>("aaMZgv_NowDeath");
-    g_stb.difficultyQuest = data->LookupForm<RE::TESQuest>(0x1417C4, "STB.esp");
-
-    g_stb.stones.clear();
-    g_stb.stones.reserve(kStoneDefinitions.size());
-    for (const auto& definition : kStoneDefinitions) {
-        auto* spell = RE::TESForm::LookupByEditorID<RE::SpellItem>(
-            definition.descriptionSpellEditorId.data());
-        g_stb.stones.push_back({spell, ParseStoneName(spell, definition.fallbackName)});
-    }
-
-    SKSE::log::info(
-        "STB integration: deaths={} difficulty={} stones={}/{}.",
-        g_stb.deaths != nullptr,
-        g_stb.difficultyQuest != nullptr,
-        std::ranges::count_if(g_stb.stones, [](const auto& stone) {
-            return stone.descriptionSpell != nullptr;
-        }),
-        g_stb.stones.size());
-}
-
-static std::string DifficultyName(int index)
-{
-    switch (index) {
-    case 0: return "🟢Приключение";
-    case 1: return "🟡Тактика";
-    case 2: return "🔴Героический";
-    case 3: return "⚫Испытание богов";
-    case 4: return "⚪Свой уровень сложности";
-    default: return "не определена";
-    }
-}
-
-static std::string SelectedDifficulty()
-{
-    const auto value = ScriptUtils::GetFirstAliasScriptPropertyOrVariable<int>(
-        g_stb.difficultyQuest,
-        "aamz_mcmdatastorage",
-        "aaMZ_SelectedLevel_OfDifficulty");
-    return value ? DifficultyName(*value) : "не определена";
-}
-
-static std::string SelectedStone(RE::PlayerCharacter* player)
-{
-    if (!player) return "не выбран";
-    const auto stone = std::ranges::find_if(g_stb.stones, [player](const auto& value) {
-        return value.descriptionSpell && player->HasSpell(value.descriptionSpell);
-    });
-    return stone != g_stb.stones.end() ? stone->name : "не выбран";
-}
-
-
-static PlayerSnapshot ReadPlayerSnapshot()
-{
-    PlayerSnapshot snapshot;
-    auto* player = RE::PlayerCharacter::GetSingleton();
-    if (!player) return snapshot;
-
-    snapshot.level = player->GetLevel();
-    if (g_stb.deaths) snapshot.deaths = static_cast<int>(g_stb.deaths->value);
-    snapshot.stone = SelectedStone(player);
-    snapshot.difficulty = SelectedDifficulty();
-    snapshot.location = BuildPosition(player);
-    snapshot.inCombat = player->IsInCombat();
-    if (snapshot.inCombat) {
-        if (const auto target = player->GetActorRuntimeData().currentCombatTarget.get()) {
-            const std::string targetName = SafeStr(target->GetName());
-            if (!targetName.empty()) g_lastCombatTargetName = targetName;
-        }
-        snapshot.combatText = g_lastCombatTargetName.empty()
-            ? "В бою"
-            : "В бою с " + g_lastCombatTargetName;
-    } else {
-        g_lastCombatTargetName.clear();
-    }
-    return snapshot;
-}
-
-static void SendActivity(
-    std::string_view details,
-    std::string_view state,
-    std::string_view largeImage,
-    std::string_view largeText,
-    std::string_view smallImage,
-    std::string_view smallText)
-{
-    if (!g_core) return;
-
-    const std::string detailsText = LimitDiscordText(details);
-    const std::string stateText = LimitDiscordText(state);
-    const std::string hoverText = LimitDiscordText(largeText);
-    const std::string smallHoverText = LimitDiscordText(smallText);
-
-    std::string signature;
-    signature.reserve(
-        detailsText.size() + stateText.size() + largeImage.size() +
-        hoverText.size() + smallImage.size() + smallHoverText.size() + 6);
-    for (const auto value : {
-             std::string_view(detailsText),
-             std::string_view(stateText),
-             largeImage,
-             std::string_view(hoverText),
-             smallImage,
-             std::string_view(smallHoverText)}) {
-        signature.append(value);
-        signature.push_back('\0');
-    }
-
-    if (signature == g_lastActivitySignature || signature == g_pendingActivitySignature) return;
-
-    discord::Activity activity{};
-    activity.SetType(discord::ActivityType::Playing);
-    if (!detailsText.empty()) activity.SetDetails(detailsText.c_str());
-    if (!stateText.empty()) activity.SetState(stateText.c_str());
-    if (!largeImage.empty()) activity.GetAssets().SetLargeImage(largeImage.data());
-    if (!hoverText.empty()) activity.GetAssets().SetLargeText(hoverText.c_str());
-    if (!smallImage.empty()) activity.GetAssets().SetSmallImage(smallImage.data());
-    if (!smallHoverText.empty())
-        activity.GetAssets().SetSmallText(smallHoverText.c_str());
-
-    g_pendingActivitySignature = signature;
-    g_core->ActivityManager().UpdateActivity(
-        activity,
-        [signature = std::move(signature)](discord::Result result) {
-            if (result == discord::Result::Ok) {
-                g_lastActivitySignature = signature;
-                SKSE::log::info("Presence updated.");
-            } else {
-                SKSE::log::error(
-                    "Discord: UpdateActivity failed (result={}).",
-                    static_cast<int>(result));
-            }
-            if (g_pendingActivitySignature == signature) {
-                g_pendingActivitySignature.clear();
-            }
-        });
-}
-
-static void SendLoadingPresence()
-{
-    SendActivity(
-        {},
-        "Загрузка",
-        g_config.largeImage,
-        g_config.largeText,
-        g_config.loadingImage,
-        "Загрузка");
-}
-
-static void RefreshPresence(const char* trigger)
-{
-    if (g_loading || !g_gameLoaded) {
-        SendLoadingPresence();
-        return;
-    }
-
-    const PlayerSnapshot snapshot = ReadPlayerSnapshot();
-    const std::string deaths = snapshot.deaths
-        ? std::to_string(*snapshot.deaths)
-        : "—";
-    const std::string firstLine = std::format(
-        "{}",
-        snapshot.difficulty);
-    const std::string secondLine = std::format(
-        "lvl-{} 💀-{} {}",
-        snapshot.level,
-        deaths,
-        snapshot.stone);
-    const std::string_view smallImage = snapshot.inCombat
-        ? std::string_view(g_config.combatImage)
-        : std::string_view{};
-    const std::string_view smallText = snapshot.inCombat
-        ? std::string_view(snapshot.combatText)
-        : std::string_view{};
-    const auto largeAsset = ResolveLargeAsset(
-        RE::PlayerCharacter::GetSingleton(),
-        snapshot.location);
-
-    g_lastCombat = snapshot.inCombat;
-    SKSE::log::info(
-        "[{}] level={} deaths={} stone='{}' difficulty='{}' location='{}' "
-        "large='{}' combat='{}'.",
-        trigger,
-        snapshot.level,
-        deaths,
-        snapshot.stone,
-        snapshot.difficulty,
-        snapshot.location,
-        largeAsset.image,
-        snapshot.combatText);
-    SendActivity(
-        firstLine,
-        secondLine,
-        largeAsset.image,
-        largeAsset.text,
-        smallImage,
-        smallText);
-}
-
-static void SetLoading(bool loading)
-{
-    g_loading = loading;
-    if (loading) {
-        SendLoadingPresence();
-    } else if (g_gameLoaded) {
-        RefreshPresence("loading-finished");
-    }
-}
-
-class MenuEventSink final : public RE::BSTEventSink<RE::MenuOpenCloseEvent> {
+/// Loads and validates DragonbornPresence.json while preserving safe defaults.
+class ConfigLoader final {
 public:
-    RE::BSEventNotifyControl ProcessEvent(
-        const RE::MenuOpenCloseEvent* event,
-        RE::BSTEventSource<RE::MenuOpenCloseEvent>*) override
+    /// Reads the configured file and returns defaults for missing or invalid input.
+    [[nodiscard]] static model::Config Load()
     {
-        if (!event) return RE::BSEventNotifyControl::kContinue;
+        model::Config config;
+        std::ifstream file(constants::kConfigPath.data());
+        if (!file) {
+            SKSE::log::info("Config not found; using defaults.");
+            return config;
+        }
 
-        if (event->menuName == "Main Menu" && event->opening) {
-            g_gameLoaded = false;
-            SetLoading(true);
-        } else if (event->menuName == "Loading Menu") {
-            if (event->opening) {
-                SetLoading(true);
-            } else if (g_gameLoaded) {
-                SetLoading(false);
+        try {
+            const auto root = nlohmann::json::parse(file);
+            if (!root.is_object()) {
+                SKSE::log::warn("Config root must be an object; using defaults.");
+                return config;
             }
-        }
-        return RE::BSEventNotifyControl::kContinue;
-    }
-};
 
-class CombatSink final : public RE::BSTEventSink<RE::TESCombatEvent> {
-public:
-    RE::BSEventNotifyControl ProcessEvent(
-        const RE::TESCombatEvent* event,
-        RE::BSTEventSource<RE::TESCombatEvent>*) override
-    {
-        if (!event || !g_gameLoaded || g_loading) {
-            return RE::BSEventNotifyControl::kContinue;
-        }
-
-        const bool involvesPlayer =
-            (event->actor && event->actor->IsPlayerRef()) ||
-            (event->targetActor && event->targetActor->IsPlayerRef());
-        const bool mayEndCombat =
-            event->newState.get() == RE::ACTOR_COMBAT_STATE::kNone && g_lastCombat;
-        if (involvesPlayer || mayEndCombat) {
-            SKSE::GetTaskInterface()->AddTask([]() {
-                RefreshPresence("combat");
-            });
-        }
-        return RE::BSEventNotifyControl::kContinue;
-    }
-};
-
-MenuEventSink g_menuSink;
-CombatSink g_combatSink;
-
-static void StartCallbackThread()
-{
-    if (g_callbackThreadRunning.exchange(true)) return;
-
-    std::thread([]() {
-        while (g_callbackThreadRunning) {
-            std::this_thread::sleep_for(kCallbackInterval);
-            SKSE::GetTaskInterface()->AddTask([]() {
-                if (g_core) g_core->RunCallbacks();
-
-                static std::uint8_t pollTicks = 0;
-                if (++pollTicks >= kPresencePollTicks) {
-                    pollTicks = 0;
-                    if (g_gameLoaded && !g_loading) {
-                        RefreshPresence("poll");
-                    }
+            if (const auto* discordConfig = FindObject(root, "discord", "discord")) {
+                ReadBool(*discordConfig, "enabled", config.enabled, "discord");
+                ReadApplicationId(*discordConfig, config);
+            }
+            if (const auto* assets = FindObject(root, "assets", "assets")) {
+                ReadString(*assets, "large_image", config.largeImage, "assets");
+                ReadString(*assets, "large_text", config.largeText, "assets");
+                if (const auto* smallImages =
+                        FindObject(*assets, "small_images", "assets.small_images")) {
+                    ReadString(
+                        *smallImages,
+                        "loading",
+                        config.loadingImage,
+                        "assets.small_images");
+                    ReadString(
+                        *smallImages,
+                        "combat",
+                        config.combatImage,
+                        "assets.small_images");
                 }
-            });
+                ReadLocationImageRules(*assets, config);
+            }
+            SKSE::log::info("Config loaded.");
+        } catch (const nlohmann::json::exception& error) {
+            SKSE::log::error("Failed to parse config JSON: {}", error.what());
+            return {};
         }
-    }).detach();
-}
-
-static void InitDiscord()
-{
-    if (!g_config.enabled) {
-        SKSE::log::info("Discord presence disabled by configuration.");
-        return;
+        return config;
     }
 
-    discord::Result result;
-    try {
-        result = discord::Core::Create(
-            g_config.applicationId,
-            DiscordCreateFlags_Default,
-            &g_core);
-    } catch (...) {
+private:
+    /// Returns an object-valued child or reports a type mismatch.
+    [[nodiscard]] static const nlohmann::json* FindObject(
+        const nlohmann::json& parent,
+        const char* key,
+        std::string_view path)
+    {
+        const auto value = parent.find(key);
+        if (value == parent.end()) return nullptr;
+        if (!value->is_object()) {
+            SKSE::log::warn("Config: '{}' must be an object; using defaults.", path);
+            return nullptr;
+        }
+        return &*value;
+    }
+
+    /// Reads an optional boolean property without replacing its default on error.
+    static void ReadBool(
+        const nlohmann::json& object,
+        const char* key,
+        bool& target,
+        std::string_view path)
+    {
+        const auto value = object.find(key);
+        if (value == object.end()) return;
+        if (!value->is_boolean()) {
+            SKSE::log::warn(
+                "Config: '{}.{}' must be a boolean; using default.",
+                path,
+                key);
+            return;
+        }
+        target = value->get<bool>();
+    }
+
+    /// Reads an optional string property without replacing its default on error.
+    static void ReadString(
+        const nlohmann::json& object,
+        const char* key,
+        std::string& target,
+        std::string_view path)
+    {
+        const auto value = object.find(key);
+        if (value == object.end()) return;
+        if (!value->is_string()) {
+            SKSE::log::warn(
+                "Config: '{}.{}' must be a string; using default.",
+                path,
+                key);
+            return;
+        }
+        target = value->get<std::string>();
+    }
+
+    /// Parses a positive Discord application ID from an integer or decimal string.
+    static void ReadApplicationId(
+        const nlohmann::json& discordConfig,
+        model::Config& config)
+    {
+        const auto value = discordConfig.find("application_id");
+        if (value == discordConfig.end()) return;
+
+        if (value->is_number_integer()) {
+            const auto parsedId = value->get<std::int64_t>();
+            if (parsedId > 0) config.applicationId = parsedId;
+            return;
+        }
+        if (value->is_string()) {
+            const std::string encodedId = value->get<std::string>();
+            discord::ClientId parsedId = 0;
+            const auto [end, error] = std::from_chars(
+                encodedId.data(),
+                encodedId.data() + encodedId.size(),
+                parsedId);
+            if (error == std::errc{} && end == encodedId.data() + encodedId.size() &&
+                parsedId > 0) {
+                config.applicationId = parsedId;
+                return;
+            }
+        }
         SKSE::log::warn(
-            "Discord: discord_game_sdk.dll not found — presence disabled.");
-        g_core = nullptr;
-        return;
-    }
-    if (result != discord::Result::Ok) {
-        SKSE::log::error(
-            "Discord: failed to initialize (result={}).",
-            static_cast<int>(result));
-        g_core = nullptr;
-        return;
+            "Config: 'discord.application_id' is invalid; using default.");
     }
 
-    g_core->SetLogHook(discord::LogLevel::Warn, [](discord::LogLevel, const char* message) {
-        SKSE::log::warn("Discord: {}", message);
-    });
-    SKSE::log::info(
-        "Discord Game SDK initialized for application {}.",
-        g_config.applicationId);
-    StartCallbackThread();
-}
-
-}  // namespace
-
-void LoadConfig()
-{
-    g_config = Config{};
-
-    std::ifstream file(R"(Data\SKSE\Plugins\DragonbornPresence.json)");
-    if (!file) {
-        SKSE::log::info("Config not found; using defaults.");
-        return;
-    }
-
-    try {
-        const auto root = nlohmann::json::parse(file);
-        if (!root.is_object()) {
-            SKSE::log::warn("Config root must be an object; using defaults.");
+    /// Parses ordered location-image rules and discards malformed entries.
+    static void ReadLocationImageRules(
+        const nlohmann::json& assets,
+        model::Config& config)
+    {
+        const auto rules = assets.find("location_images");
+        if (rules == assets.end()) return;
+        if (!rules->is_array()) {
+            SKSE::log::warn(
+                "Config: 'assets.location_images' must be an array; using defaults.");
             return;
         }
 
-        if (const auto* discord = FindObject(root, "discord", "discord")) {
-            ReadBool(*discord, "enabled", g_config.enabled, "discord");
-            ReadApplicationId(*discord);
-        }
-        if (const auto* assets = FindObject(root, "assets", "assets")) {
-            ReadString(*assets, "large_image", g_config.largeImage, "assets");
-            ReadString(*assets, "large_text", g_config.largeText, "assets");
-            if (const auto* smallImages = FindObject(
-                    *assets,
-                    "small_images",
-                    "assets.small_images")) {
-                ReadString(
-                    *smallImages,
-                    "loading",
-                    g_config.loadingImage,
-                    "assets.small_images");
-                ReadString(
-                    *smallImages,
-                    "combat",
-                    g_config.combatImage,
-                    "assets.small_images");
+        std::vector<model::LocationImageRule> parsedRules;
+        parsedRules.reserve(rules->size());
+        for (std::size_t ruleIndex = 0; ruleIndex < rules->size(); ++ruleIndex) {
+            const auto& value = (*rules)[ruleIndex];
+            if (!value.is_object()) {
+                SKSE::log::warn(
+                    "Config: 'assets.location_images[{}]' must be an object; ignoring.",
+                    ruleIndex);
+                continue;
             }
-            ReadLocationImageRules(*assets);
+
+            model::LocationImageRule rule;
+            bool isValid = true;
+            const auto readOptionalString = [&](const char* key, std::string& target) {
+                const auto field = value.find(key);
+                if (field == value.end()) return;
+                if (!field->is_string()) {
+                    SKSE::log::warn(
+                        "Config: 'assets.location_images[{}].{}' must be a string; "
+                        "ignoring rule.",
+                        ruleIndex,
+                        key);
+                    isValid = false;
+                    return;
+                }
+                target = field->get<std::string>();
+            };
+
+            readOptionalString("worldspace", rule.worldspace);
+            readOptionalString("location", rule.location);
+            readOptionalString("cell", rule.cell);
+            readOptionalString("match", rule.match);
+            readOptionalString("image", rule.image);
+            readOptionalString("text", rule.text);
+
+            const bool hasSelector =
+                !rule.worldspace.empty() || !rule.location.empty() ||
+                !rule.cell.empty() || !rule.match.empty();
+            if (!isValid || !hasSelector || rule.image.empty()) {
+                SKSE::log::warn(
+                    "Config: 'assets.location_images[{}]' requires 'image' and a "
+                    "selector; ignoring.",
+                    ruleIndex);
+                continue;
+            }
+            parsedRules.push_back(std::move(rule));
         }
-        SKSE::log::info("Config loaded.");
-    } catch (const nlohmann::json::exception& error) {
-        SKSE::log::error("Failed to parse config JSON: {}", error.what());
-        g_config = Config{};
+        config.locationImageRules = std::move(parsedRules);
     }
+};
+
+}  // namespace configuration
+
+namespace assets {
+
+/// Resolves the first configured Discord image rule matching the player location.
+class LocationAssetResolver final {
+public:
+    /// Binds the resolver to the active immutable configuration.
+    explicit LocationAssetResolver(const model::Config& config) noexcept : config_(config) {}
+
+    /// Returns the matched location asset or the configured fallback asset.
+    [[nodiscard]] model::LargeAssetSelection Resolve(
+        RE::PlayerCharacter* player,
+        std::string_view displayLocation) const
+    {
+        if (player) {
+            for (const auto& rule : config_.locationImageRules) {
+                if (RuleMatches(rule, player, displayLocation)) {
+                    return {
+                        rule.image,
+                        rule.text.empty() ? std::string_view(config_.largeText)
+                                          : std::string_view(rule.text),
+                    };
+                }
+            }
+        }
+        return {config_.largeImage, config_.largeText};
+    }
+
+private:
+    /// Compares a form's Editor ID to a configured selector.
+    [[nodiscard]] static bool EditorIdEquals(
+        const RE::TESForm* form,
+        std::string_view expected)
+    {
+        if (expected.empty()) return true;
+        if (!form) return false;
+        const char* editorId = form->GetFormEditorID();
+        return editorId && expected == editorId;
+    }
+
+    /// Checks every non-empty selector in a location-image rule.
+    [[nodiscard]] static bool RuleMatches(
+        const model::LocationImageRule& rule,
+        RE::PlayerCharacter* player,
+        std::string_view displayLocation)
+    {
+        if (!player) return false;
+        if (!rule.worldspace.empty() &&
+            !EditorIdEquals(player->GetWorldspace(), rule.worldspace)) {
+            return false;
+        }
+        if (!rule.cell.empty() && !EditorIdEquals(player->GetParentCell(), rule.cell)) {
+            return false;
+        }
+        if (!rule.location.empty()) {
+            bool found = false;
+            for (auto* location = player->GetCurrentLocation(); location;
+                 location = location->parentLoc) {
+                if (EditorIdEquals(location, rule.location)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) return false;
+        }
+        return rule.match.empty() ||
+               text::ContainsAsciiInsensitive(displayLocation, rule.match);
+    }
+
+    const model::Config& config_;
+};
+
+}  // namespace assets
+
+namespace game {
+
+/// Resolves STB forms and creates stable snapshots of the current player state.
+class StbDataProvider final {
+public:
+    /// Resolves and caches all STB forms used by Discord presence.
+    void Initialize()
+    {
+        auto* dataHandler = RE::TESDataHandler::GetSingleton();
+        if (!dataHandler) {
+            SKSE::log::error("STB integration: TESDataHandler is unavailable.");
+            return;
+        }
+
+        runtimeData_.deaths = RE::TESForm::LookupByEditorID<RE::TESGlobal>(
+            constants::kDeathsGlobalEditorId.data());
+        runtimeData_.difficultyQuest = dataHandler->LookupForm<RE::TESQuest>(
+            constants::kDifficultyQuestFormId,
+            constants::kStbPluginName.data());
+
+        runtimeData_.stones.clear();
+        runtimeData_.stones.reserve(model::kStoneDefinitions.size());
+        for (const auto& definition : model::kStoneDefinitions) {
+            auto* descriptionSpell = RE::TESForm::LookupByEditorID<RE::SpellItem>(
+                definition.descriptionSpellEditorId.data());
+            runtimeData_.stones.push_back({
+                descriptionSpell,
+                ParseStoneName(descriptionSpell, definition.fallbackName),
+            });
+        }
+
+        SKSE::log::info(
+            "STB integration: deaths={} difficulty={} stones={}/{}.",
+            runtimeData_.deaths != nullptr,
+            runtimeData_.difficultyQuest != nullptr,
+            std::ranges::count_if(runtimeData_.stones, [](const auto& stone) {
+                return stone.descriptionSpell != nullptr;
+            }),
+            runtimeData_.stones.size());
+    }
+
+    /// Reads all game values required for a single presence refresh.
+    [[nodiscard]] model::PlayerSnapshot ReadPlayerSnapshot()
+    {
+        model::PlayerSnapshot snapshot;
+        auto* player = RE::PlayerCharacter::GetSingleton();
+        if (!player) return snapshot;
+
+        snapshot.level = player->GetLevel();
+        if (runtimeData_.deaths) {
+            snapshot.deaths = static_cast<int>(runtimeData_.deaths->value);
+        }
+        snapshot.stone = ReadSelectedStone(player);
+        snapshot.difficulty = ReadSelectedDifficulty();
+        snapshot.location = BuildDisplayPosition(player);
+        snapshot.inCombat = player->IsInCombat();
+        if (snapshot.inCombat) {
+            if (const auto target = player->GetActorRuntimeData().currentCombatTarget.get()) {
+                const std::string targetName = text::FromGameString(target->GetName());
+                if (!targetName.empty()) lastCombatTargetName_ = targetName;
+            }
+            snapshot.combatText = lastCombatTargetName_.empty()
+                ? std::string(constants::kCombatText)
+                : std::format("{} с {}", constants::kCombatText, lastCombatTargetName_);
+        } else {
+            lastCombatTargetName_.clear();
+        }
+        return snapshot;
+    }
+
+private:
+    /// Extracts a localized stone name from the spell description JSON.
+    [[nodiscard]] static std::string ParseStoneName(
+        RE::SpellItem* descriptionSpell,
+        std::string_view fallbackName)
+    {
+        if (!descriptionSpell) return std::string(fallbackName);
+
+        RE::BSString description;
+        descriptionSpell->GetDescription(description, descriptionSpell);
+        if (description.empty()) return std::string(fallbackName);
+
+        try {
+            const auto root = nlohmann::json::parse(description.c_str());
+            const auto name = root.find("name");
+            if (name != root.end() && name->is_string()) {
+                const auto parsedName = name->get<std::string>();
+                if (!parsedName.empty()) return parsedName;
+            }
+        } catch (const nlohmann::json::exception& error) {
+            SKSE::log::warn(
+                "STB stone '{}': invalid description JSON: {}",
+                descriptionSpell->GetFormEditorID(),
+                error.what());
+        }
+        return std::string(fallbackName);
+    }
+
+    /// Maps an STB difficulty enum to the existing localized presence text.
+    [[nodiscard]] static std::string_view DifficultyName(int rawDifficulty) noexcept
+    {
+        switch (static_cast<model::Difficulty>(rawDifficulty)) {
+        case model::Difficulty::kAdventure: return "🟢Приключение";
+        case model::Difficulty::kTactics: return "🟡Тактика";
+        case model::Difficulty::kHeroic: return "🔴Героический";
+        case model::Difficulty::kTrialOfTheGods: return "⚫Испытание богов";
+        case model::Difficulty::kCustom: return "⚪Свой уровень сложности";
+        default: return constants::kUnknownDifficultyText;
+        }
+    }
+
+    /// Reads the selected STB difficulty from the data-storage quest.
+    [[nodiscard]] std::string ReadSelectedDifficulty() const
+    {
+        const auto difficulty =
+            ScriptUtils::GetFirstAliasScriptPropertyOrVariable<int>(
+                runtimeData_.difficultyQuest,
+                constants::kDifficultyScriptName.data(),
+                constants::kDifficultyPropertyName.data());
+        return difficulty ? std::string(DifficultyName(*difficulty))
+                          : std::string(constants::kUnknownDifficultyText);
+    }
+
+    /// Finds the first configured stone spell currently affecting the player.
+    [[nodiscard]] std::string ReadSelectedStone(RE::PlayerCharacter* player) const
+    {
+        if (!player) return std::string(constants::kNoStoneText);
+        const auto selectedStone = std::ranges::find_if(
+            runtimeData_.stones,
+            [player](const auto& stone) {
+                return stone.descriptionSpell && player->HasSpell(stone.descriptionSpell);
+            });
+        return selectedStone != runtimeData_.stones.end()
+            ? selectedStone->name
+            : std::string(constants::kNoStoneText);
+    }
+
+    /// Builds the same worldspace/location/cell display hierarchy used by Discord.
+    [[nodiscard]] static std::string BuildDisplayPosition(RE::PlayerCharacter* player)
+    {
+        if (!player) return {};
+
+        auto* worldspace = player->GetWorldspace();
+        auto* location = player->GetCurrentLocation();
+        auto* cell = player->GetParentCell();
+
+        std::string locationName;
+        for (auto* current = location; current && locationName.empty();
+             current = current->parentLoc) {
+            locationName = text::FromGameString(current->GetName());
+        }
+
+        const std::string worldspaceName =
+            worldspace ? text::FromGameString(worldspace->GetName()) : "";
+        const std::string cellName = cell ? text::FromGameString(cell->GetName()) : "";
+        if (!worldspaceName.empty()) {
+            return !locationName.empty() && locationName != worldspaceName
+                ? std::format("{}: {}", worldspaceName, locationName)
+                : worldspaceName;
+        }
+        return !locationName.empty() ? locationName : cellName;
+    }
+
+    model::StbRuntimeData runtimeData_;
+    std::string lastCombatTargetName_;
+};
+
+}  // namespace game
+
+namespace integration {
+
+/// Owns the Discord Game SDK connection and suppresses duplicate activities.
+class DiscordPresenceClient final {
+public:
+    /// Creates the Discord SDK core when presence is enabled and available.
+    [[nodiscard]] bool Initialize(const model::Config& config)
+    {
+        if (!config.enabled) {
+            SKSE::log::info("Discord presence disabled by configuration.");
+            return false;
+        }
+
+        discord::Result result;
+        try {
+            result = discord::Core::Create(
+                config.applicationId,
+                DiscordCreateFlags_Default,
+                &core_);
+        } catch (...) {
+            SKSE::log::warn(
+                "Discord: discord_game_sdk.dll not found — presence disabled.");
+            core_ = nullptr;
+            return false;
+        }
+        if (result != discord::Result::Ok) {
+            SKSE::log::error(
+                "Discord: failed to initialize (result={}).",
+                static_cast<int>(result));
+            core_ = nullptr;
+            return false;
+        }
+
+        core_->SetLogHook(
+            discord::LogLevel::Warn,
+            [](discord::LogLevel, const char* message) {
+                SKSE::log::warn("Discord: {}", message);
+            });
+        SKSE::log::info(
+            "Discord Game SDK initialized for application {}.",
+            config.applicationId);
+        return true;
+    }
+
+    /// Runs pending Discord SDK callbacks when the SDK is initialized.
+    void RunCallbacks() const
+    {
+        if (core_) core_->RunCallbacks();
+    }
+
+    /// Sends a changed activity after enforcing Discord's UTF-8 field limits.
+    void UpdateActivity(const model::ActivityPayload& payload)
+    {
+        if (!core_) return;
+
+        const std::string detailsText = text::LimitForDiscord(payload.details);
+        const std::string stateText = text::LimitForDiscord(payload.state);
+        const std::string largeHoverText = text::LimitForDiscord(payload.largeText);
+        const std::string smallHoverText = text::LimitForDiscord(payload.smallText);
+        const std::array activityFields{
+            std::string_view(detailsText),
+            std::string_view(stateText),
+            payload.largeImage,
+            std::string_view(largeHoverText),
+            payload.smallImage,
+            std::string_view(smallHoverText),
+        };
+
+        std::size_t signatureSize = activityFields.size();
+        for (const auto field : activityFields) signatureSize += field.size();
+
+        std::string signature;
+        signature.reserve(signatureSize);
+        for (const auto field : activityFields) {
+            signature.append(field);
+            signature.push_back('\0');
+        }
+
+        if (signature == lastActivitySignature_ || signature == pendingActivitySignature_) {
+            return;
+        }
+
+        discord::Activity activity{};
+        activity.SetType(discord::ActivityType::Playing);
+        if (!detailsText.empty()) activity.SetDetails(detailsText.c_str());
+        if (!stateText.empty()) activity.SetState(stateText.c_str());
+        if (!payload.largeImage.empty()) {
+            activity.GetAssets().SetLargeImage(payload.largeImage.data());
+        }
+        if (!largeHoverText.empty()) {
+            activity.GetAssets().SetLargeText(largeHoverText.c_str());
+        }
+        if (!payload.smallImage.empty()) {
+            activity.GetAssets().SetSmallImage(payload.smallImage.data());
+        }
+        if (!smallHoverText.empty()) {
+            activity.GetAssets().SetSmallText(smallHoverText.c_str());
+        }
+
+        pendingActivitySignature_ = signature;
+        core_->ActivityManager().UpdateActivity(
+            activity,
+            [this, signature = std::move(signature)](discord::Result result) {
+                if (result == discord::Result::Ok) {
+                    lastActivitySignature_ = signature;
+                    SKSE::log::info("Presence updated.");
+                } else {
+                    SKSE::log::error(
+                        "Discord: UpdateActivity failed (result={}).",
+                        static_cast<int>(result));
+                }
+                if (pendingActivitySignature_ == signature) {
+                    pendingActivitySignature_.clear();
+                }
+            });
+    }
+
+private:
+    discord::Core* core_ = nullptr;
+    std::string lastActivitySignature_;
+    std::string pendingActivitySignature_;
+};
+
+}  // namespace integration
+
+namespace application {
+
+class PresenceCoordinator;
+
+/// Adapts Skyrim menu events to the application-level presence coordinator.
+class MenuEventSink final : public RE::BSTEventSink<RE::MenuOpenCloseEvent> {
+public:
+    /// Binds the sink to the coordinator that owns its lifecycle.
+    explicit MenuEventSink(PresenceCoordinator& coordinator) noexcept
+        : coordinator_(coordinator)
+    {}
+
+    /// Forwards valid menu events and always allows later sinks to run.
+    RE::BSEventNotifyControl ProcessEvent(
+        const RE::MenuOpenCloseEvent* event,
+        RE::BSTEventSource<RE::MenuOpenCloseEvent>*) override;
+
+private:
+    PresenceCoordinator& coordinator_;
+};
+
+/// Adapts Skyrim combat events to the application-level presence coordinator.
+class CombatEventSink final : public RE::BSTEventSink<RE::TESCombatEvent> {
+public:
+    /// Binds the sink to the coordinator that owns its lifecycle.
+    explicit CombatEventSink(PresenceCoordinator& coordinator) noexcept
+        : coordinator_(coordinator)
+    {}
+
+    /// Forwards valid combat events and always allows later sinks to run.
+    RE::BSEventNotifyControl ProcessEvent(
+        const RE::TESCombatEvent* event,
+        RE::BSTEventSource<RE::TESCombatEvent>*) override;
+
+private:
+    PresenceCoordinator& coordinator_;
+};
+
+/// Coordinates configuration, game data, Discord transport, and Skyrim events.
+class PresenceCoordinator final {
+public:
+    /// Constructs the coordinator and binds both event adapters to it.
+    PresenceCoordinator() noexcept
+        : menuEventSink_(*this), combatEventSink_(*this)
+    {}
+
+    /// Replaces the active configuration with validated file contents or defaults.
+    void LoadConfig()
+    {
+        config_ = configuration::ConfigLoader::Load();
+    }
+
+    /// Initializes integrations, publishes loading state, and registers event sinks.
+    void RegisterGameEventHandlers()
+    {
+        SKSE::log::info("Registering game event handlers...");
+        stbDataProvider_.Initialize();
+        if (discordClient_.Initialize(config_)) StartCallbackThread();
+        SendLoadingPresence();
+
+        if (auto* ui = RE::UI::GetSingleton()) {
+            ui->AddEventSink<RE::MenuOpenCloseEvent>(&menuEventSink_);
+        } else {
+            SKSE::log::error("Failed to get RE::UI singleton.");
+        }
+
+        if (auto* eventSource = RE::ScriptEventSourceHolder::GetSingleton()) {
+            eventSource->AddEventSink<RE::TESCombatEvent>(&combatEventSink_);
+        } else {
+            SKSE::log::error(
+                "Failed to get RE::ScriptEventSourceHolder singleton.");
+        }
+    }
+
+    /// Marks the game ready and immediately publishes the complete player state.
+    void OnGameLoaded()
+    {
+        SKSE::log::info("Game loaded — refreshing STB presence data.");
+        gameLoaded_ = true;
+        loading_ = false;
+        RefreshPresence(model::RefreshReason::kGameLoaded);
+    }
+
+    /// Applies menu transitions to the loading and game-ready state machine.
+    void HandleMenuEvent(const RE::MenuOpenCloseEvent& event)
+    {
+        if (event.menuName == constants::kMainMenuName && event.opening) {
+            gameLoaded_ = false;
+            SetLoading(true);
+        } else if (event.menuName == constants::kLoadingMenuName) {
+            if (event.opening) {
+                SetLoading(true);
+            } else if (gameLoaded_) {
+                SetLoading(false);
+            }
+        }
+    }
+
+    /// Schedules a refresh when combat may have changed for the player.
+    void HandleCombatEvent(const RE::TESCombatEvent& event)
+    {
+        if (!gameLoaded_ || loading_) return;
+
+        const bool involvesPlayer =
+            (event.actor && event.actor->IsPlayerRef()) ||
+            (event.targetActor && event.targetActor->IsPlayerRef());
+        const bool mayEndCombat =
+            event.newState.get() == RE::ACTOR_COMBAT_STATE::kNone && lastCombatState_;
+        if (involvesPlayer || mayEndCombat) {
+            SKSE::GetTaskInterface()->AddTask([this]() {
+                RefreshPresence(model::RefreshReason::kCombat);
+            });
+        }
+    }
+
+private:
+    /// Sends the stable loading activity used before a playable save is ready.
+    void SendLoadingPresence()
+    {
+        discordClient_.UpdateActivity({
+            {},
+            constants::kLoadingText,
+            config_.largeImage,
+            config_.largeText,
+            config_.loadingImage,
+            constants::kLoadingText,
+        });
+    }
+
+    /// Builds and submits one complete activity from the latest player snapshot.
+    void RefreshPresence(model::RefreshReason reason)
+    {
+        if (loading_ || !gameLoaded_) {
+            SendLoadingPresence();
+            return;
+        }
+
+        const model::PlayerSnapshot snapshot = stbDataProvider_.ReadPlayerSnapshot();
+        const std::string deathsText = snapshot.deaths
+            ? std::to_string(*snapshot.deaths)
+            : std::string(constants::kUnknownDeathsText);
+        const std::string detailsText = snapshot.difficulty;
+        const std::string stateText = std::format(
+            "lvl-{} 💀-{} {}",
+            snapshot.level,
+            deathsText,
+            snapshot.stone);
+        const std::string_view smallImage = snapshot.inCombat
+            ? std::string_view(config_.combatImage)
+            : std::string_view{};
+        const std::string_view smallText = snapshot.inCombat
+            ? std::string_view(snapshot.combatText)
+            : std::string_view{};
+        const assets::LocationAssetResolver assetResolver(config_);
+        const auto largeAsset = assetResolver.Resolve(
+            RE::PlayerCharacter::GetSingleton(),
+            snapshot.location);
+
+        lastCombatState_ = snapshot.inCombat;
+        SKSE::log::info(
+            "[{}] level={} deaths={} stone='{}' difficulty='{}' location='{}' "
+            "large='{}' combat='{}'.",
+            model::ToLogLabel(reason),
+            snapshot.level,
+            deathsText,
+            snapshot.stone,
+            snapshot.difficulty,
+            snapshot.location,
+            largeAsset.image,
+            snapshot.combatText);
+        discordClient_.UpdateActivity({
+            detailsText,
+            stateText,
+            largeAsset.image,
+            largeAsset.text,
+            smallImage,
+            smallText,
+        });
+    }
+
+    /// Updates the loading state and publishes the corresponding presence.
+    void SetLoading(bool isLoading)
+    {
+        loading_ = isLoading;
+        if (isLoading) {
+            SendLoadingPresence();
+        } else if (gameLoaded_) {
+            RefreshPresence(model::RefreshReason::kLoadingFinished);
+        }
+    }
+
+    /// Starts the detached Discord callback and one-second polling loop once.
+    void StartCallbackThread()
+    {
+        if (callbackThreadRunning_.exchange(true)) return;
+
+        std::thread([this]() {
+            while (callbackThreadRunning_) {
+                std::this_thread::sleep_for(constants::kDiscordCallbackInterval);
+                SKSE::GetTaskInterface()->AddTask([this]() {
+                    discordClient_.RunCallbacks();
+                    if (++presencePollTicks_ >=
+                        constants::kPresencePollIntervalInCallbackTicks) {
+                        presencePollTicks_ = 0;
+                        if (gameLoaded_ && !loading_) {
+                            RefreshPresence(model::RefreshReason::kPoll);
+                        }
+                    }
+                });
+            }
+        }).detach();
+    }
+
+    model::Config config_;
+    game::StbDataProvider stbDataProvider_;
+    integration::DiscordPresenceClient discordClient_;
+    MenuEventSink menuEventSink_;
+    CombatEventSink combatEventSink_;
+    std::atomic<bool> callbackThreadRunning_{false};
+    std::uint8_t presencePollTicks_ = 0;
+    bool loading_ = true;
+    bool gameLoaded_ = false;
+    bool lastCombatState_ = false;
+};
+
+/// Forwards a menu event to the coordinator when the event pointer is valid.
+RE::BSEventNotifyControl MenuEventSink::ProcessEvent(
+    const RE::MenuOpenCloseEvent* event,
+    RE::BSTEventSource<RE::MenuOpenCloseEvent>*)
+{
+    if (event) coordinator_.HandleMenuEvent(*event);
+    return RE::BSEventNotifyControl::kContinue;
 }
 
+/// Forwards a combat event to the coordinator when the event pointer is valid.
+RE::BSEventNotifyControl CombatEventSink::ProcessEvent(
+    const RE::TESCombatEvent* event,
+    RE::BSTEventSource<RE::TESCombatEvent>*)
+{
+    if (event) coordinator_.HandleCombatEvent(*event);
+    return RE::BSEventNotifyControl::kContinue;
+}
+
+}  // namespace application
+
+application::PresenceCoordinator g_presenceCoordinator;
+
+}  // namespace
+
+/// Loads DragonbornPresence.json into the process-wide presence coordinator.
+void LoadConfig()
+{
+    g_presenceCoordinator.LoadConfig();
+}
+
+/// Initializes Discord, STB data access, and Skyrim event subscriptions.
 void RegisterGameEventHandlers()
 {
-    SKSE::log::info("Registering game event handlers...");
-    InitializeStbData();
-    InitDiscord();
-    SendLoadingPresence();
-
-    if (auto* ui = RE::UI::GetSingleton()) {
-        ui->AddEventSink<RE::MenuOpenCloseEvent>(&g_menuSink);
-    } else {
-        SKSE::log::error("Failed to get RE::UI singleton.");
-    }
-
-    if (auto* events = RE::ScriptEventSourceHolder::GetSingleton()) {
-        events->AddEventSink<RE::TESCombatEvent>(&g_combatSink);
-    } else {
-        SKSE::log::error("Failed to get RE::ScriptEventSourceHolder singleton.");
-    }
+    g_presenceCoordinator.RegisterGameEventHandlers();
 }
 
+/// Publishes the first complete presence after Skyrim finishes loading a save.
 void OnGameLoaded()
 {
-    SKSE::log::info("Game loaded — refreshing STB presence data.");
-    g_gameLoaded = true;
-    g_loading = false;
-    RefreshPresence("game-loaded");
+    g_presenceCoordinator.OnGameLoaded();
 }
 
 }  // namespace DragonbornPresence

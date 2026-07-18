@@ -1,0 +1,42 @@
+name: Build GitHub Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish release archive
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure Release build
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+
+      - name: Build release archive
+        run: cmake --build build --config Release --target DragonbornPresence
+
+      - name: Verify release archive
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "build/DragonbornPresence.zip")) {
+            throw "Release archive was not produced."
+          }
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "${{ github.ref_name }}"
+          "build/DragonbornPresence.zip#DragonbornPresence.zip"
+          --verify-tag
+          --generate-notes
+          --title "DragonbornPresence ${{ github.ref_name }}"
