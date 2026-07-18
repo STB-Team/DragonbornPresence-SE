@@ -267,7 +267,7 @@
 D:\Dev\STB-Discord-Integration\DragonbornPresence-SE
 
 Корень мода MO2:
-D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence SE
+D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence
 
 Runtime:
 SKSE\Plugins\DragonbornPresence.dll
@@ -289,7 +289,7 @@ docs/      — веб-документация и описание Nexus
 
     <section id="config">
       <h2>Рабочий JSON</h2>
-      <p><code>D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence SE\SKSE\Plugins\DragonbornPresence.json</code></p>
+      <p><code>D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence\SKSE\Plugins\DragonbornPresence.json</code></p>
       <pre><code>{
   "schema_version": 1,
   "discord": {
@@ -306,7 +306,7 @@ docs/      — веб-документация и описание Nexus
     "location_images": []
   }
 }</code></pre>
-      <div class="callout warning">Сборка DLL не перезаписывает рабочий JSON в MO2. Изменение JSON применяется только после полного перезапуска Skyrim.</div>
+      <div class="callout warning">После сборки исходный JSON из <code>config</code> копируется в MO2 вместе с DLL. Изменение JSON применяется игрой только после полного перезапуска Skyrim.</div>
     </section>
 
     <section id="locations">
@@ -335,9 +335,9 @@ docs/      — веб-документация и описание Nexus
     <section id="build">
       <h2>Сборка и автокопирование</h2>
       <p>Visual Studio 2026, CMake 4.2+, генератор <code>Visual Studio 18 2026</code>, <code>x64</code>, toolset <code>v145</code>.</p>
-      <pre><code>cmake --preset vs2026 -DDRAGONBORNPRESENCE_DEPLOY_DIR="D:/Stb/[STB] Mod Organizer/mods/DragonbornPresence SE"
+      <pre><code>cmake --preset vs2026
 cmake --build --preset release</code></pre>
-      <p>После сборки DLL и Discord SDK обновляются в <code>&lt;корень мода&gt;\SKSE\Plugins</code>. JSON сохраняется.</p>
+      <p>Пресет развёртывает DLL, Discord SDK и JSON в <code>D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence\SKSE\Plugins</code>.</p>
       <pre><code>ZIP:
 D:\Dev\STB-Discord-Integration\DragonbornPresence-SE\build\vs2026\DragonbornPresence.zip</code></pre>
       <p>Архив содержит корневой каталог <code>SKSE</code> и устанавливается напрямую через MO2 без FOMOD.</p>

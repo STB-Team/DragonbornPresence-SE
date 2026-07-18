@@ -48,10 +48,10 @@
 D:\Dev\STB-Discord-Integration\DragonbornPresence-SE
 
 Корень мода MO2:
-D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence SE
+D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence
 
 Плагины мода:
-D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence SE\SKSE\Plugins
+D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence\SKSE\Plugins
 ```
 
 Файлы runtime:
@@ -77,7 +77,7 @@ SKSE\Plugins\DragonbornPresence.json
 Рабочий файл:
 
 ```text
-D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence SE\SKSE\Plugins\DragonbornPresence.json
+D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence\SKSE\Plugins\DragonbornPresence.json
 ```
 
 Основной блок:
@@ -148,7 +148,7 @@ D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence SE\SKSE\Plugins\DragonbornPre
 Первая настройка:
 
 ```bash
-cmake --preset vs2026 -DDRAGONBORNPRESENCE_DEPLOY_DIR="D:/Stb/[STB] Mod Organizer/mods/DragonbornPresence SE"
+cmake --preset vs2026
 ```
 
 Release:
@@ -166,11 +166,12 @@ cmake --build --preset debug
 После каждой сборки автоматически обновляются:
 
 ```text
-D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence SE\SKSE\Plugins\DragonbornPresence.dll
-D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence SE\SKSE\Plugins\discord_game_sdk.dll
+D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence\SKSE\Plugins\DragonbornPresence.dll
+D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence\SKSE\Plugins\discord_game_sdk.dll
+D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence\SKSE\Plugins\DragonbornPresence.json
 ```
 
-`DragonbornPresence.json` не перезаписывается. Готовый ZIP мода с корневым каталогом `SKSE` устанавливается напрямую через MO2:
+Каталог развертывания уже задан пресетом `vs2026`; при сборке JSON из `config` обновляется вместе с DLL. Готовый ZIP мода с корневым каталогом `SKSE` устанавливается напрямую через MO2:
 
 ```text
 D:\Dev\STB-Discord-Integration\DragonbornPresence-SE\build\vs2026\DragonbornPresence.zip

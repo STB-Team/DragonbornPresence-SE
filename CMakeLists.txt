@@ -182,6 +182,9 @@ if(DRAGONBORNPRESENCE_DEPLOY_DIR)
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${_discord_sdk_dir}/lib/x86_64/discord_game_sdk.dll"
             "${_deploy_plugins_dir}/discord_game_sdk.dll"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_CURRENT_SOURCE_DIR}/config/DragonbornPresence.json"
+            "${_deploy_plugins_dir}/DragonbornPresence.json"
         COMMENT "Deploying DragonbornPresence to ${_deploy_plugins_dir}"
         VERBATIM
     )
