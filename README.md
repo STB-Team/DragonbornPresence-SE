@@ -225,12 +225,22 @@ Workflow `.github/workflows/release.yml` использует runner `windows-20
 | `integration::DiscordPresenceClient` | Discord SDK, timestamp и подавление дубликатов |
 | `application::PresenceCoordinator` | загрузка, бой, события и секундный polling |
 
-Дополнительные файлы:
+Структура репозитория:
 
-- `main.cpp` — точка входа SKSE;
-- `ScriptUtils.h` — чтение сложности из alias-скрипта STB;
-- `AdditionalFunctions.cpp` — преобразование игровых строк;
-- `discord_loader.cpp` — проверка установленного и запущенного Discord и отложенная загрузка Discord SDK из `SKSE/Plugins`.
+```text
+src/       — реализации и точка входа SKSE
+include/   — заголовки и precompiled header
+config/    — исходный DragonbornPresence.json для релизного архива
+docs/      — веб-документация и описание Nexus
+.github/   — workflow сборки GitHub Release
+```
+
+Ключевые файлы:
+
+- `src/main.cpp` — точка входа SKSE;
+- `include/ScriptUtils.h` — чтение сложности из alias-скрипта STB;
+- `src/AdditionalFunctions.cpp` — преобразование игровых строк;
+- `src/discord_loader.cpp` — проверка установленного и запущенного Discord и отложенная загрузка Discord SDK из `SKSE/Plugins`.
 
 ## Ссылки
 
