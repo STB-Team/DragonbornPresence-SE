@@ -276,7 +276,7 @@ SKSE\Plugins\DragonbornPresence.json</code></pre>
       <div class="grid">
         <div class="card"><strong>Игра</strong><p>Текущий Skyrim SE/AE runtime, SKSE64 и Address Library сборки STB.</p></div>
         <div class="card"><strong>STB</strong><p>Текущий <code>STB.esp</code> и его MCM data-storage quest.</p></div>
-        <div class="card"><strong>Discord</strong><p>Application ID <code>1527543892151373937</code> и assets команды.</p></div>
+        <div class="card"><strong>Discord</strong><p>Discord Desktop, Application ID <code>1527543892151373937</code> и assets команды. Перед запуском Presence проверяется обработчик <code>discord://</code>; без установленного клиента <code>discord_game_sdk.dll</code> не загружается.</p></div>
         <div class="card"><strong>Обновление</strong><p>Один снимок игрового состояния в секунду на game thread.</p></div>
       </div>
     </section>
@@ -340,6 +340,7 @@ D:\Dev\STB-Discord-Integration\DragonbornPresence-SE\build\vs2026\DragonbornPres
     <section id="diagnostics">
       <h2>Диагностика</h2>
       <pre><code>%USERPROFILE%\Documents\My Games\Skyrim Special Edition\SKSE\DragonbornPresence.log</code></pre>
+      <p>Если Discord Desktop не установлен или его обработчик <code>discord://</code> ссылается на отсутствующий файл, Presence отключается до загрузки <code>discord_game_sdk.dll</code>.</p>
       <h3>Таймер</h3>
       <pre><code>Discord Game SDK initialized for application ...; session_start=1784380000.
 Presence updated; session_start=1784380000.

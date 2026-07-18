@@ -70,6 +70,8 @@ SKSE\Plugins\DragonbornPresence.json
 - Discord Desktop;
 - Discord Application ID `1527543892151373937` и загруженные STB Art Assets.
 
+Перед инициализацией Presence плагин проверяет зарегистрированный обработчик `discord://` и существование связанного исполняемого файла. Если Discord Desktop не установлен, `discord_game_sdk.dll` не загружается, а остальная инициализация Presence пропускается.
+
 ## Конфигурация
 
 Рабочий файл:
@@ -228,7 +230,7 @@ Workflow `.github/workflows/release.yml` использует runner `windows-20
 - `main.cpp` — точка входа SKSE;
 - `ScriptUtils.h` — чтение сложности из alias-скрипта STB;
 - `AdditionalFunctions.cpp` — преобразование игровых строк;
-- `discord_loader.cpp` — загрузка Discord SDK из `SKSE/Plugins`.
+- `discord_loader.cpp` — проверка установки Discord и отложенная загрузка Discord SDK из `SKSE/Plugins`.
 
 ## Ссылки
 

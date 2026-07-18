@@ -45,6 +45,8 @@ SKSE\Plugins\DragonbornPresence.json[/font]
 [*]Discord Application ID [font=Courier New]1527543892151373937[/font] и assets команды STB
 [/list][/font]
 
+[font=Tahoma]Перед инициализацией Presence проверяется установленный Discord Desktop. Если клиент отсутствует, [font=Courier New]discord_game_sdk.dll[/font] не загружается, а Discord Presence остаётся отключённым.[/font]
+
 [font=Tahoma][size=4][b]— Диагностика —[/b][/size][/font]
 
 [font=Tahoma]Лог: [font=Courier New]%USERPROFILE%\Documents\My Games\Skyrim Special Edition\SKSE\DragonbornPresence.log[/font]

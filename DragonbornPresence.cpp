@@ -1,4 +1,5 @@
 #include "DragonbornPresence.h"
+#include "discord_loader.h"
 #include "AdditionalFunctions.h"
 #include "ScriptUtils.h"
 #include "discord.h"
@@ -689,6 +690,13 @@ public:
     {
         if (!config.enabled) {
             SKSE::log::info("Discord presence disabled by configuration.");
+            return false;
+        }
+
+        if (!DragonbornPresence::detail::IsDiscordInstalled()) {
+            SKSE::log::info(
+                "Discord desktop client is not installed — presence disabled; "
+                "discord_game_sdk.dll was not loaded.");
             return false;
         }
 
