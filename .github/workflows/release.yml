@@ -1,4 +1,4 @@
-name: Build GitHub Release
+name: Сборка GitHub Release
 
 on:
   push:
@@ -10,33 +10,33 @@ permissions:
 
 jobs:
   release:
-    name: Build and publish release archive
-    runs-on: windows-latest
+    name: Сборка и публикация архива
+    runs-on: windows-2025-vs2026
 
     steps:
-      - name: Check out repository
+      - name: Получение исходного кода
         uses: actions/checkout@v4
 
-      - name: Configure Release build
-        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+      - name: Настройка Visual Studio 2026
+        run: cmake --preset vs2026
 
-      - name: Build release archive
-        run: cmake --build build --config Release --target DragonbornPresence
+      - name: Сборка Release-архива
+        run: cmake --build --preset release
 
-      - name: Verify release archive
+      - name: Проверка Release-архива
         shell: pwsh
         run: |
-          if (-not (Test-Path "build/DragonbornPresence.zip")) {
-            throw "Release archive was not produced."
+          if (-not (Test-Path "build/vs2026/DragonbornPresence.zip")) {
+            throw "Release-архив не создан."
           }
 
-      - name: Publish GitHub Release
+      - name: Публикация GitHub Release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: >-
           gh release create "${{ github.ref_name }}"
-          "build/DragonbornPresence.zip#DragonbornPresence.zip"
+          "build/vs2026/DragonbornPresence.zip#DragonbornPresence.zip"
           --verify-tag
           --generate-notes
           --title "DragonbornPresence ${{ github.ref_name }}"

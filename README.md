@@ -1,50 +1,57 @@
 # DragonbornPresence SE
 
-An SKSE plugin for the **Skyrim True Believer** setup that publishes selected STB character data as Discord Rich Presence.
+SKSE-плагин для Discord Rich Presence в сборке Skyrim True Believer. Плагин читает данные персонажа и STB напрямую из игры, выбирает изображение текущей локации и обновляет статус один раз в секунду.
 
-During gameplay Discord shows two stable lines: character level and active standing stone, then death count and selected difficulty. The large image follows the current location; loading and combat use the only small state icons.
+## Что отображается
 
----
+| Поле Discord | Формат | Пример |
+|---|---|---|
+| `details` | выбранная сложность STB | `🟢Приключение` |
+| `state` | `lvl-<уровень> 💀-<смерти> <камень>` | `lvl-14 💀-3 🎭-Атронах` |
+| большая картинка | первое подходящее правило локации | `whiteruncapital` |
+| маленькая картинка | `loading` или `combat` | `combat` |
 
-## Features
+При наведении на боевую иконку отображается `В бою с <имя противника>`. Если цель ещё не определена — `В бою`.
 
-- Fixed first line: `Уровень: <value> • Камень: <value>`
-- Fixed second line: `Смертей: <value> • Сложность: <value>`
-- Level read directly from the player; deaths, difficulty, and standing stone read from STB runtime data
-- 414 ordered location rules with city, settlement, dungeon, and encounter art
-- `loading` small icon while the game is loading
-- `combat` small icon in combat; its hover text shows `В бою с <enemy name>` when Skyrim exposes the current target
-- One-second game-thread polling keeps STB values, combat, and location art current without per-frame work
-- Built-in Russian Presence text; no locale files or language installer
-- Graceful degradation if Discord is not running or an STB value is unavailable
+Плагин не отправляет имя и расу персонажа, задания, содержимое меню, крафт, таймеры или выбранных богов.
 
----
+## Требования
 
-## Requirements
+- Skyrim Special Edition или Anniversary Edition;
+- [SKSE64](https://skse.silverlock.org/) для установленной версии игры;
+- [Address Library for SKSE Plugins](https://www.nexusmods.com/skyrimspecialedition/mods/32444);
+- `STB.esp` и MCM-хранилище Skyrim True Believer;
+- запущенный Discord Desktop с включённым отображением игровой активности.
 
-- Skyrim Special Edition or Anniversary Edition supported by CommonLibSSE-NG
-- [SKSE64](https://skse.silverlock.org/) matching the runtime
-- Address Library for SKSE Plugins
-- Skyrim True Believer data (`STB.esp` and its MCM data-storage quest) for deaths, standing stone, and difficulty
-- Discord Desktop with activity sharing enabled
+## Установка
 
----
+### Через менеджер модов
 
-## Installation
+Установите `DragonbornPresence.zip` как обычный мод. Архив уже содержит структуру `SKSE/Plugins` и FOMOD.
 
-**Mod manager (recommended):** Install the archive normally. The FOMOD installer has no language-selection step.
+### Вручную
 
-**Manual:** Extract the archive and copy `SKSE\` into your Skyrim `Data\` directory.
+Скопируйте каталог `SKSE` из архива в каталог `Data` игры.
 
-Launch the game through SKSE. Discord must be running before or alongside the game — if it is not running the plugin loads normally and presence is simply disabled.
+Итоговые файлы:
 
----
+```text
+Data\SKSE\Plugins\DragonbornPresence.dll
+Data\SKSE\Plugins\discord_game_sdk.dll
+Data\SKSE\Plugins\DragonbornPresence.json
+```
 
-## Discord configuration
+Запускайте игру через SKSE. Если Discord недоступен, плагин продолжит работать без Rich Presence.
 
-`Data\SKSE\Plugins\DragonbornPresence.json` controls the Discord application and image assets. Invalid values are logged and fall back to built-in defaults. The plugin uses Discord Game SDK and does not open an OAuth or authorization window.
+## Конфигурация Discord
 
-A printable Russian guide is available at [`docs/Discord-Presence-Configuration-RU.pdf`](docs/Discord-Presence-Configuration-RU.pdf). The same guide is published as a [GitHub Pages site](https://stb-team.github.io/DragonbornPresence-SE/).
+Файл настроек:
+
+```text
+Data\SKSE\Plugins\DragonbornPresence.json
+```
+
+Минимальная структура:
 
 ```json
 {
@@ -55,155 +62,186 @@ A printable Russian guide is available at [`docs/Discord-Presence-Configuration-
   },
   "assets": {
     "large_image": "stb_logo",
-    "large_text": "The Elder Scrolls V: Skyrim",
+    "large_text": "Skyrim True Believer",
     "small_images": {
       "loading": "loading",
       "combat": "combat"
     },
     "location_images": [
-      { "location": "WhiterunLocation", "image": "whiteruncapital", "text": "Вайтран" },
-      { "worldspace": "DLC2SolstheimWorld", "image": "solstheim", "text": "Солстхейм" },
-      { "match": "STB Dev Room", "image": "stb_room", "text": "STB Dev Room" }
+      {
+        "location": "WhiterunLocation",
+        "image": "whiteruncapital",
+        "text": "Вайтран"
+      }
     ]
   }
 }
 ```
 
-### Fixed Presence contract
+### Основные параметры
 
-The text layout is intentionally not configurable:
-
-| Discord field | Runtime text |
+| Ключ | Назначение |
 |---|---|
-| `details` | `Уровень: <level> • Камень: <standing stone>` |
-| `state` | `Смертей: <deaths> • Сложность: <difficulty>` |
-| large-image hover | Matched location-rule `text`, otherwise `large_text` |
-| combat small-image hover | `В бою с <enemy>`; falls back to `В бою` while the target is unresolved |
-| loading small-image hover | `Загрузка` |
+| `discord.enabled` | включает или отключает Discord Presence |
+| `discord.application_id` | ID приложения Discord Developer Portal |
+| `assets.large_image` | резервная большая картинка |
+| `assets.large_text` | резервная подсказка большой картинки |
+| `assets.small_images.loading` | иконка загрузки |
+| `assets.small_images.combat` | иконка боя |
+| `assets.location_images` | упорядоченные правила картинок локаций |
 
-No selected gods, character name, race, quest, menu, crafting, timer, or other state is sent.
+Некорректные значения записываются в лог и заменяются безопасными значениями по умолчанию.
 
-Discord itself renders `details` and `state` with different colors and may prefix the state/party-status row with a people glyph. Discord Game SDK exposes the text and asset fields, but not client font color or that built-in glyph, so the plugin cannot make both rows white or remove that UI element.
+## Правила локаций
 
-### Asset selection
+Правила проверяются сверху вниз. Используется первое правило, у которого совпали все заданные селекторы.
 
-- `large_image` is the fallback when no location rule matches.
-- `large_text` is the fallback hover text for the large image.
-- `location_images` is evaluated from top to bottom; the first matching rule wins.
-- `worldspace`, `location`, and `cell` match stable Creation Kit/xEdit Editor IDs.
-- `match` searches the displayed location; ASCII comparison is case-insensitive.
-- If a rule has several selectors, all selectors must match.
-- `image` is the Discord Art Asset key; `text` is its hover text.
-- The bundled JSON contains 414 location rules. Adding or changing a location requires only a JSON edit and a full Skyrim restart; it does not require rebuilding the DLL.
-- `small_images` supports only `loading` and `combat`.
+```json
+"location_images": [
+  {
+    "worldspace": "DLC2SolstheimWorld",
+    "image": "solstheim",
+    "text": "Солстхейм"
+  },
+  {
+    "location": "WhiterunLocation",
+    "image": "whiteruncapital",
+    "text": "Вайтран"
+  },
+  {
+    "match": "Нилхейм",
+    "image": "bandit",
+    "text": "Нилхейм"
+  }
+]
+```
 
-### Images to upload
+| Поле | Сопоставление |
+|---|---|
+| `worldspace` | Editor ID игрового мира |
+| `location` | Editor ID текущей локации или её родителя |
+| `cell` | Editor ID текущей ячейки |
+| `match` | подстрока отображаемого названия; ASCII сравнивается без учёта регистра |
+| `image` | обязательный Asset key картинки |
+| `text` | подсказка; пустое значение заменяется `large_text` |
 
-The Discord application referenced by `application_id` must contain:
+В комплекте находятся 414 правил. Для изменения правил достаточно отредактировать JSON и полностью перезапустить Skyrim; пересборка DLL не нужна.
 
-- `stb_logo` or another configured fallback image;
-- every `image` key used by the desired `location_images` rules;
-- `loading` and `combat`.
+## Изображения Discord
 
-File names may differ, but the **Asset key in Discord Developer Portal** must exactly match the JSON value. Square 1024×1024 PNG files are recommended. Discord crops small assets to a circle, so keep important details centered.
+Загрузите изображения в **Discord Developer Portal → Rich Presence → Art Assets**. Asset key должен точно совпадать со значением в JSON.
 
-## Language
+Обязательный минимум:
 
-All Presence state labels are built into the plugin in Russian. The archive does not include language choices or `DragonbornPresenceLocale.json`; changing the game language does not change these labels.
+- `stb_logo`;
+- `loading`;
+- `combat`;
+- ключи используемых правил `location_images`.
 
----
-## Building from Source
+Рекомендуемый формат — квадратный PNG 1024×1024. Discord обрезает маленькие изображения до круга, поэтому важные детали размещайте по центру.
 
-### Requirements
+## Диагностика
 
-- CMake 3.28 or later
-- Visual Studio 2022 with the **Desktop development with C++** workload
-- Internet access for the first CMake configure
+Лог плагина:
 
-### Steps
+```text
+%USERPROFILE%\Documents\My Games\Skyrim Special Edition\SKSE\DragonbornPresence.log
+```
+
+Порядок проверки:
+
+1. Убедитесь, что `application_id` относится к нужному приложению Discord.
+2. Сверьте Asset keys в Developer Portal и JSON с учётом регистра.
+3. Проверьте наличие трёх файлов плагина в `Data\SKSE\Plugins`.
+4. Полностью перезапустите Discord и Skyrim.
+5. Найдите в логе строки `Presence updated`, `large='...'` и сообщения `Config:`.
+
+## Сборка из исходников
+
+### Требования
+
+- Visual Studio 2026 с компонентом **Разработка классических приложений на C++**;
+- CMake 4.2 или новее;
+- доступ в интернет при первой настройке зависимостей.
+
+Проект использует генератор `Visual Studio 18 2026`, платформу `x64` и набор инструментов `v145`.
 
 ```bash
 git clone https://github.com/STB-Team/DragonbornPresence-SE.git
 cd DragonbornPresence-SE
+cmake --preset vs2026
+cmake --build --preset release
 ```
 
-Open `CMakeLists.txt` in CLion, or configure from the command line:
+Готовый архив:
+
+```text
+build\vs2026\DragonbornPresence.zip
+```
+
+Debug-сборка:
 
 ```bash
-cmake -B build -G "Visual Studio 17 2022" -A x64
-cmake --build build --config Release
+cmake --build --preset debug
 ```
 
-On the first configure CMake downloads [CommonLibSSE-NG](https://github.com/CharmedBaryon/CommonLibSSE-NG) v3.7.0, [Discord Game SDK 3.2.1](https://discord.com/developers/docs/game-sdk/sdk-starter-guide), and several header-only libraries — this takes a minute or two. Subsequent builds use the cache and are fast.
-
-The post-build step produces `DragonbornPresence.zip` in the build directory with the full install layout ready to drop into the game.
-
-For local development, configure an optional MO2 deployment directory:
+### Развёртывание в MO2
 
 ```bash
-cmake -S . -B build -DDRAGONBORNPRESENCE_DEPLOY_DIR="D:/path/to/Mod Organizer/mods/DragonbornPresence SE/SKSE/Plugins"
-cmake --build build --config Release
+cmake --preset vs2026 -DDRAGONBORNPRESENCE_DEPLOY_DIR="D:/Mod Organizer/mods/DragonbornPresence SE/SKSE/Plugins"
+cmake --build --preset release
 ```
 
-Each successful build copies `DragonbornPresence.dll` and `discord_game_sdk.dll` to that directory. The user-edited `DragonbornPresence.json` file is intentionally left untouched.
+После сборки DLL и Discord SDK копируются в указанный каталог. Пользовательский `DragonbornPresence.json` не перезаписывается.
 
-### Publishing a GitHub Release
+## Публикация релиза
 
-The repository workflow `.github/workflows/release.yml` builds and publishes
-`DragonbornPresence.zip` whenever a version tag matching `v*` is pushed:
+Workflow `.github/workflows/release.yml` запускается по тегам `v*` на образе `windows-2025-vs2026`.
 
 ```bash
 git tag -a v2.5.0 -m "DragonbornPresence 2.5.0"
 git push origin v2.5.0
 ```
 
-GitHub Actions performs a clean Windows Release build, creates the GitHub
-Release with generated release notes, and attaches the ready-to-install ZIP.
-Track the run on the repository's **Actions** tab; after it succeeds, the
-archive is available under **Releases → Assets**. The tag must be new because
-the workflow intentionally refuses to replace an existing release.
+GitHub Actions собирает проект через Visual Studio 2026, создаёт Release и прикрепляет готовый `DragonbornPresence.zip`. Результат доступен в разделах **Actions** и **Releases** репозитория.
 
----
+## Архитектура
 
-## Architecture
+| Слой | Ответственность |
+|---|---|
+| `model` | конфигурация, снимки состояния, payload и строгие enum-типы |
+| `text` | UTF-8, CP1251, ограничение полей Discord и поиск подстрок |
+| `configuration::ConfigLoader` | чтение и валидация JSON |
+| `assets::LocationAssetResolver` | выбор изображения локации |
+| `game::StbDataProvider` | чтение форм STB и состояния игрока |
+| `integration::DiscordPresenceClient` | Discord Game SDK и подавление дубликатов |
+| `application::PresenceCoordinator` | состояния загрузки, события и периодическое обновление |
 
-Pure C++ SKSE DLL — no plugin-owned `.esp` or Papyrus scripts. The plugin reads data exposed by the installed STB mod. `DragonbornPresence.cpp` keeps the implementation in one translation unit while separating responsibilities into explicit internal layers:
+Дополнительные модули:
 
-- **`model`** owns configuration, snapshots, activity payloads, and strongly typed state enums.
-- **`text`** validates game strings, converts CP1251 to UTF-8, truncates Discord fields safely, and performs ASCII-insensitive matching.
-- **`configuration::ConfigLoader`** parses and validates `DragonbornPresence.json` while preserving defaults for missing or invalid values.
-- **`assets::LocationAssetResolver`** applies the ordered location rules and falls back to `assets.large_image`.
-- **`game::StbDataProvider`** resolves STB forms and reads player level, deaths, selected stone, selected difficulty, location, combat state, and combat target.
-- **`integration::DiscordPresenceClient`** owns the Discord Game SDK connection, enforces field limits, suppresses duplicate payloads, and runs callbacks.
-- **`application::PresenceCoordinator`** coordinates loading state, gameplay refreshes, event sinks, Discord callbacks, and one-second polling.
-- **`MenuEventSink`** and **`CombatEventSink`** adapt Skyrim events without containing presence business logic.
+- `main.cpp` — точка входа SKSE;
+- `ScriptUtils.h` — чтение свойства сложности из alias-скрипта;
+- `AdditionalFunctions.cpp` — преобразование игровых строк;
+- `discord_loader.cpp` — загрузка `discord_game_sdk.dll` из каталога SKSE.
 
-**`main.cpp`** remains the plugin entry point. It loads configuration and forwards SKSE lifecycle messages to the public `DragonbornPresence` interface.
+## Зависимости
 
-**`ScriptUtils.h`** — reads the selected difficulty from `aaMZ_MCMDataStorage` through the quest alias script property/variable.
+| Зависимость | Версия |
+|---|---|
+| CommonLibSSE-NG | 3.7.0 |
+| Discord Game SDK | 3.2.1 |
+| nlohmann/json | 3.11.3 |
+| fmt | 10.2.1 |
+| spdlog | 1.13.0 |
 
-**`AdditionalFunctions.cpp`** — UTF-8 validation and CP1251-to-UTF-8 conversion for Russian game data.
+Зависимости загружаются CMake при первой настройке проекта.
 
-**`discord_loader.cpp`** — delay-load hook resolving `discord_game_sdk.dll` from the SKSE plugin directory.
+## Документация
 
-### Log file
+- [Компактное руководство](https://stb-team.github.io/DragonbornPresence-SE/)
+- [PDF для печати](docs/Discord-Presence-Configuration-RU.pdf)
+- [История изменений](CHANGELOG.md)
 
-`%USERPROFILE%\Documents\My Games\Skyrim Special Edition\SKSE\DragonbornPresence.log`
+## Лицензия
 
----
-
-## Dependencies (bundled or auto-fetched)
-
-| Dependency | Version | How |
-|---|---|---|
-| [CommonLibSSE-NG](https://github.com/CharmedBaryon/CommonLibSSE-NG) | v3.7.0 | CMake FetchContent |
-| [Discord Game SDK](https://discord.com/developers/docs/game-sdk/sdk-starter-guide) | 3.2.1 | CMake download |
-| [nlohmann/json](https://github.com/nlohmann/json) | v3.11.3 | CMake FetchContent |
-| fmt | 10.2.1 | CMake FetchContent |
-| spdlog | v1.13.0 | CMake FetchContent |
-
----
-
-## License
-
-[GPL-3.0](LICENSE)
+[GNU General Public License v3.0](LICENSE)

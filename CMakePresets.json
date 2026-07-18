@@ -1,0 +1,38 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 4,
+    "minor": 2,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "vs2026",
+      "displayName": "Visual Studio 2026 x64",
+      "description": "Настройка проекта для Visual Studio 2026 и набора инструментов v145.",
+      "generator": "Visual Studio 18 2026",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build/vs2026"
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "release",
+      "displayName": "Release",
+      "configurePreset": "vs2026",
+      "configuration": "Release",
+      "targets": [
+        "DragonbornPresence"
+      ]
+    },
+    {
+      "name": "debug",
+      "displayName": "Debug",
+      "configurePreset": "vs2026",
+      "configuration": "Debug",
+      "targets": [
+        "DragonbornPresence"
+      ]
+    }
+  ]
+}

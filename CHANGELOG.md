@@ -1,68 +1,76 @@
-# Changelog
+# История изменений
 
-## Unreleased — 2026-07-17
+## В разработке — 2026-07-18
 
-- Replaced the general Skyrim activity feed with two stable STB Presence lines: level and standing stone, then deaths and selected difficulty.
-- Read STB deaths from `aaMZgv_NowDeath`, difficulty from the `aaMZ_MCMDataStorage` quest alias script, and the active standing stone from its description spell.
-- Removed character, quest, menu, crafting, timer, selected-god, and other state output.
-- Retained all 414 ordered large location-image rules and the `stb_logo` fallback.
-- Reduced small state images to `loading` and `combat`.
-- Added combat-icon hover text with the current enemy name, falling back to `В бою` while Skyrim has no resolved target.
-- Poll the runtime snapshot once per second so STB values and combat hover text update without rebuilding or per-frame work.
-- Updated the English README, Nexus description, and Russian configuration guide for the fixed STB Presence contract and Discord client styling limits.
+- `DragonbornPresence.cpp` разделён на слои конфигурации, игровых данных, выбора ресурсов, Discord-интеграции и координации событий.
+- Добавлены строгие enum-типы, именованные константы и Doxygen-описания внутренних API.
+- Сборка переведена на Visual Studio 2026, генератор CMake `Visual Studio 18 2026` и набор инструментов `v145`.
+- Добавлены CMake-пресеты `vs2026`, `release` и `debug`.
+- GitHub Release теперь автоматически собирается на runner `windows-2025-vs2026` при публикации тега `v*`.
+- Вся пользовательская документация переведена на русский язык и приведена к текущему Presence-контракту.
+- Сайт документации переработан в компактной тёмной теме.
 
 ## 2.5.0 — 2026-07-17
 
-- Added dedicated Presence modes, localized text, and configurable small-image keys for alchemy, smithing, enchanting, cooking, tanning, and smelting.
-- Detect crafting activities from the active crafting submenu, furniture bench metadata, and stable Editor ID hints.
-- Fall back to the generic `crafting` text and image for unsupported stations; an empty activity-specific image key also uses the generic crafting image.
-- Replaced tier-specific location image keys with 42 tierless creature and encounter markers; locations without an encounter marker use the configured large-image fallback.
-- Added dedicated large-image rules for nine Skyrim cities, three castles, Raven Rock, Tel Mithryn, and the Temple of Miraak; added runtime-name fallbacks for ambiguous encounter locations.
-- Removed the language-selection installer and external locale files; all Presence state labels are now built into the plugin in Russian.
-
+- Общая лента активности Skyrim заменена двумя стабильными строками STB Presence: сложность и строка `lvl-<уровень> 💀-<смерти> <камень>`.
+- Смерти читаются из `aaMZgv_NowDeath`, сложность — из alias-скрипта `aaMZ_MCMDataStorage`, активный камень — по его заклинанию описания.
+- Удалена отправка имени и расы персонажа, заданий, меню, крафта, таймера, выбранного бога и других состояний.
+- Сохранены 414 упорядоченных правил больших изображений локаций и резервный ключ `stb_logo`.
+- Маленькие изображения сокращены до состояний `loading` и `combat`.
+- Подсказка боевой иконки показывает имя текущего противника или `В бою`, пока цель не определена.
+- Снимок состояния обновляется раз в секунду без работы в каждом кадре.
+- Обновлены README, описание Nexus и руководство по конфигурации.
 
 ## 2.4.0 — 2026-07-17
 
-- Added configurable large-image overrides for loading, the main menu, character creation, and gameplay.
-- Added ordered location image rules using stable worldspace, location, or cell Editor IDs, with an optional display-name substring matcher.
-- Added Rich Presence states and small-image keys for menus, the map, inventory and magic screens, dialogue, crafting, and waiting.
-- Defined presence priority as combat, UI context, active quest, then exploration.
-- Added localized UI-state text to all 11 bundled languages.
-- Kept Discord Game SDK integration; no OAuth or additional authorization window is required.
+- Добавлены настраиваемые большие изображения для загрузки, главного меню, создания персонажа и игрового процесса.
+- Добавлены упорядоченные правила локаций по Editor ID игрового мира, локации или ячейки и по подстроке отображаемого имени.
+- Добавлены состояния Rich Presence и ключи маленьких изображений для меню, карты, инвентаря, магии, диалога, крафта и ожидания.
+- Приоритет состояний: бой, интерфейс, активное задание, исследование мира.
+- Добавлены локализованные тексты интерфейса для 11 языков.
+- Сохранена интеграция Discord Game SDK без OAuth и дополнительных окон авторизации.
 
 ## 2.3.0 — 2026-07-17
 
-- Added `DragonbornPresence.json` for configuring the Discord application ID, activity fields, timer, separator, and image assets.
-- Added dynamic small images and localized hover text for loading, menus, character editing, exploration, active quests, and combat.
-- Added privacy controls for character details, location, quests, and combat information.
-- Added a visible loading presence instead of retaining stale activity during loading screens.
-- Added safe UTF-8 truncation for Discord's 127-byte text limit.
-- Skip duplicate Discord activity updates when the displayed content has not changed.
-- Include the default configuration in the FOMOD-ready release archive.
-- Added an optional CMake deployment directory for copying rebuilt DLLs directly into an MO2 mod without overwriting user configuration.
+- Добавлен `DragonbornPresence.json` для настройки Discord Application ID и изображений.
+- Добавлены динамические маленькие изображения и локализованные подсказки для загрузки, меню, создания персонажа, исследования, заданий и боя.
+- Добавлены настройки приватности для персонажа, локации, заданий и боя.
+- Во время загрузки отображается отдельный статус вместо устаревшей игровой активности.
+- Добавлено безопасное ограничение UTF-8 строк до 127 байт.
+- Повторяющиеся Discord payload больше не отправляются.
+- Конфигурация включена в FOMOD-архив релиза.
+- Добавлен необязательный каталог развёртывания CMake для MO2 без перезаписи пользовательского JSON.
 
 ## 2.2.0 — 2026-05-20
 
-FOMOD installer included — mod managers will now ask you to pick a language during installation
-Built-in translations for English, Russian, German, French, Spanish, Italian, Polish, Chinese (Simplified), Japanese, Korean, and Portuguese (Brazilian)
-Combat presence now correctly reads as "In combat with Alduin" — the enemy name is placed inside the phrase rather than just appended, so each language can put the name where its grammar expects it
-Added a separate display string for the rare moment when you are in combat but the game has not yet resolved the enemy name ("In combat" instead of nothing)
+- Добавлен установщик FOMOD с выбором языка.
+- Добавлены переводы на английский, русский, немецкий, французский, испанский, итальянский, польский, упрощённый китайский, японский, корейский и португальский языки.
+- Имя противника встроено в локализованную боевую фразу с правильным порядком слов.
+- Добавлен отдельный текст для момента, когда бой уже начался, но цель ещё не определена.
 
 ## 2.1.1 — 2026-05-20
 
-discord_game_sdk.dll moved from the Skyrim root folder into Data\SKSE\Plugins where it belongs — mod managers now track and uninstall it cleanly
-If you have an old discord_game_sdk.dll sitting next to SkyrimSE.exe, you can delete it
-Fixed combat presence sometimes not clearing after combat ended
+- `discord_game_sdk.dll` перенесён из корня Skyrim в `Data\SKSE\Plugins`, поэтому менеджеры модов корректно отслеживают и удаляют файл.
+- Старую копию `discord_game_sdk.dll` рядом с `SkyrimSE.exe` теперь можно удалить.
+- Исправлено зависание боевого статуса после завершения боя.
 
 ## 2.1.0 — 2026-05-15
 
-Combat is now shown in Discord: while fighting, the active quest is replaced by the enemy's name (e.g. Skyrim: Helgen · In combat with Alduin)
-Presence reverts to the quest name as soon as combat ends
+- Добавлено отображение боя в Discord с именем текущего противника.
+- После завершения боя Presence возвращается к обычному игровому состоянию.
 
 ## 2.0.1 — 2026-05-13
 
-Active quest name now appears in Discord alongside your location (e.g. Skyrim: Whiterun · Bleak Falls Barrow)
-Fixed a crash on startup when discord_game_sdk.dll was missing from the installation
-Fixed presence sometimes freezing for several seconds during location transitions
-Fixed a ghost "Loading" screen flash that appeared right after the game launched
-Locale file format changed from .txt to .json — if you had a custom locale file, rename it and wrap the values in standard JSON
+- Активное задание добавлено к отображаемой локации.
+- Исправлен сбой при запуске без `discord_game_sdk.dll`.
+- Исправлены задержки обновления Presence при переходах между локациями.
+- Устранена краткая ложная индикация загрузки после запуска игры.
+- Формат локализации изменён с `.txt` на `.json`.
+
+## 2.0.0
+
+- Плагин полностью переписан на C++ и SKSE.
+- Удалены собственные `.esp` и Papyrus-скрипты.
+- Добавлена поддержка Skyrim SE и AE через Address Library.
+- Архивная библиотека `discord-rpc` заменена Discord Game SDK.
+- Поиск названия локации проходит по иерархии родительских локаций.
