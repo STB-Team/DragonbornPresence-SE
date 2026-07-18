@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Внутренняя документация текущей Discord Presence интеграции Skyrim True Believer.">
-<title>STB DragonbornPresence 3.0.1 — документация</title>
+<title>STB DragonbornPresence 3.0.2 — документация</title>
 <style>
   :root {
     color-scheme: dark;
@@ -189,7 +189,7 @@
 <div class="layout">
   <aside aria-label="Навигация по документации">
     <div class="brand">
-      <strong>STB Presence 3.0.1</strong>
+      <strong>STB Presence 3.0.2</strong>
       <span>Внутренняя документация</span>
     </div>
     <nav>
@@ -210,7 +210,7 @@
   <main>
     <header class="hero">
       <p class="eyebrow">Skyrim True Believer · внутренняя интеграция</p>
-      <h1>DragonbornPresence 3.0.1</h1>
+      <h1>DragonbornPresence 3.0.2</h1>
       <p class="lead">Фиксированный Discord Presence для текущей сборки STB. Сторонние сборки и универсальная конфигурация не поддерживаются.</p>
       <div class="badges">
         <span class="badge">STB.esp</span>
@@ -249,7 +249,7 @@
             <tr><td>сложность</td><td><code>aaMZ_SelectedLevel_OfDifficulty</code> в <code>aaMZ_MCMDataStorage</code></td><td><code>не определена</code></td></tr>
             <tr><td>камень</td><td>первое активное заклинание из 19 описаний STB</td><td><code>не выбран</code></td></tr>
             <tr><td>локация</td><td>worldspace, location и parent cell</td><td>резервный asset</td></tr>
-            <tr><td>противник</td><td>current combat target игрока</td><td><code>В бою</code></td></tr>
+            <tr><td>противник</td><td>имя и уровень current combat target</td><td><code>В бою с &lt;имя&gt; (ур. &lt;уровень&gt;)</code> или <code>В бою</code></td></tr>
           </tbody>
         </table>
       </div>
@@ -322,7 +322,7 @@ SKSE\Plugins\DragonbornPresence.json</code></pre>
           </tbody>
         </table>
       </div>
-      <p>Проверка идёт сверху вниз; первое полное совпадение останавливает поиск. В текущем конфиге 414 правил.</p>
+      <p>Проверка идёт сверху вниз; первое полное совпадение останавливает поиск. В текущем конфиге 438 правил.</p>
     </section>
 
     <section id="build">
@@ -345,17 +345,18 @@ Presence updated; session_start=1784380000.</code></pre>
       <p>Все значения <code>session_start</code> в рамках одного запуска должны совпадать.</p>
       <h3>Локация</h3>
       <pre><code>[poll] level=... deaths=... location='...' large='...' combat='...'</code></pre>
+      <p>Строка снимка записывается только при изменении Presence. Неизменный секундный polling не создаёт повторных записей.</p>
     </section>
 
     <section id="release">
-      <h2>Релиз 3.0.1</h2>
-      <pre><code>git tag -a v3.0.1 -m "DragonbornPresence 3.0.1"
-git push origin v3.0.1</code></pre>
+      <h2>Релиз 3.0.2</h2>
+      <pre><code>git tag -a v3.0.2 -m "DragonbornPresence 3.0.2"
+git push origin v3.0.2</code></pre>
       <p>Workflow на <code>windows-2025-vs2026</code> собирает Release и прикрепляет готовый <code>DragonbornPresence.zip</code>.</p>
       <div class="callout">Для следующего релиза сначала обновить версии в <code>CMakeLists.txt</code> и <code>fomod/info.xml</code>, затем создать новый тег.</div>
     </section>
 
-    <footer>STB DragonbornPresence 3.0.1 · schema_version 1 · GPL-3.0</footer>
+    <footer>STB DragonbornPresence 3.0.2 · schema_version 1 · GPL-3.0</footer>
   </main>
 </div>
 </body>

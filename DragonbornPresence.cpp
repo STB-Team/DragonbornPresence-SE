@@ -110,6 +110,12 @@ struct StbRuntimeData {
     std::vector<StoneRuntimeData> stones;
 };
 
+/// Caches the last resolved combat target while Skyrim temporarily loses its handle.
+struct CombatTargetData {
+    std::string name;
+    std::uint16_t level = 0;
+};
+
 /// Immutable value snapshot used to build one Discord presence update.
 struct PlayerSnapshot {
     int level = 0;
@@ -553,14 +559,23 @@ public:
         snapshot.inCombat = player->IsInCombat();
         if (snapshot.inCombat) {
             if (const auto target = player->GetActorRuntimeData().currentCombatTarget.get()) {
-                const std::string targetName = text::FromGameString(target->GetName());
-                if (!targetName.empty()) lastCombatTargetName_ = targetName;
+                std::string targetName = text::FromGameString(target->GetName());
+                if (!targetName.empty()) {
+                    lastCombatTarget_ = model::CombatTargetData{
+                        std::move(targetName),
+                        target->GetLevel(),
+                    };
+                }
             }
-            snapshot.combatText = lastCombatTargetName_.empty()
-                ? std::string(constants::kCombatText)
-                : std::format("{} с {}", constants::kCombatText, lastCombatTargetName_);
+            snapshot.combatText = lastCombatTarget_
+                ? std::format(
+                      "{} с {} (ур. {})",
+                      constants::kCombatText,
+                      lastCombatTarget_->name,
+                      lastCombatTarget_->level)
+                : std::string(constants::kCombatText);
         } else {
-            lastCombatTargetName_.clear();
+            lastCombatTarget_.reset();
         }
         return snapshot;
     }
@@ -659,7 +674,7 @@ private:
     }
 
     model::StbRuntimeData runtimeData_;
-    std::string lastCombatTargetName_;
+    std::optional<model::CombatTargetData> lastCombatTarget_;
 };
 
 }  // namespace game
@@ -716,10 +731,12 @@ public:
         if (core_) core_->RunCallbacks();
     }
 
-    /// Sends a changed activity after enforcing Discord's UTF-8 field limits.
-    void UpdateActivity(const model::ActivityPayload& payload)
+    /// Submits an activity only when its visible fields changed.
+    ///
+    /// Returns true when a new Discord update was queued.
+    bool UpdateActivity(const model::ActivityPayload& payload)
     {
-        if (!core_) return;
+        if (!core_) return false;
 
         const std::string detailsText = text::LimitForDiscord(payload.details);
         const std::string stateText = text::LimitForDiscord(payload.state);
@@ -745,7 +762,7 @@ public:
         }
 
         if (signature == lastActivitySignature_ || signature == pendingActivitySignature_) {
-            return;
+            return false;
         }
 
         discord::Activity activity{};
@@ -784,6 +801,7 @@ public:
                     pendingActivitySignature_.clear();
                 }
             });
+        return true;
     }
 
 private:
@@ -962,6 +980,16 @@ private:
             snapshot.location);
 
         lastCombatState_ = snapshot.inCombat;
+        const bool activityChanged = discordClient_.UpdateActivity({
+            detailsText,
+            stateText,
+            largeAsset.image,
+            largeAsset.text,
+            smallImage,
+            smallText,
+        });
+        if (!activityChanged) return;
+
         SKSE::log::info(
             "[{}] level={} deaths={} stone='{}' difficulty='{}' location='{}' "
             "large='{}' combat='{}'.",
@@ -973,14 +1001,6 @@ private:
             snapshot.location,
             largeAsset.image,
             snapshot.combatText);
-        discordClient_.UpdateActivity({
-            detailsText,
-            stateText,
-            largeAsset.image,
-            largeAsset.text,
-            smallImage,
-            smallText,
-        });
     }
 
     /// Updates the loading state and publishes the corresponding presence.

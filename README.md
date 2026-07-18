@@ -12,7 +12,7 @@
 | маленькая картинка | только `loading` или `combat` | `combat` |
 | таймер | длительность текущего запуска Skyrim | не сбрасывается при обновлении Presence |
 
-При наведении на боевую иконку отображается `В бою с <имя противника>`. Пока Skyrim не определил цель — `В бою`.
+При наведении на боевую иконку отображается `В бою с <имя противника> (ур. <уровень>)`. Пока Skyrim не определил цель — `В бою`.
 
 Таймер получает один Unix timestamp при загрузке плагина. Смена локации, загрузка, бой и секундное обновление Presence не меняют время начала.
 
@@ -25,7 +25,7 @@
 | сложность | `aaMZ_SelectedLevel_OfDifficulty` в alias-скрипте `aaMZ_MCMDataStorage` |
 | камень | первое активное заклинание из 19 описаний камней STB |
 | локация | worldspace, текущая location и parent cell |
-| противник | текущая combat target игрока |
+| противник | имя и уровень текущей combat target игрока |
 
 Значения сложности:
 
@@ -130,7 +130,7 @@ D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence SE\SKSE\Plugins\DragonbornPre
 | `image` | обязательный Asset key |
 | `text` | подсказка; пустое значение заменяется `large_text` |
 
-В текущем JSON находятся 414 правил. Изменение JSON требует полного перезапуска Skyrim, но не пересборки DLL.
+В текущем JSON находятся 438 правил. Изменение JSON требует полного перезапуска Skyrim, но не пересборки DLL.
 
 ## Сборка Visual Studio 2026
 
@@ -196,11 +196,13 @@ Presence updated; session_start=1784380000.
 [<причина>] level=<...> deaths=<...> location='<...>' large='<asset>' combat='<...>'
 ```
 
-## Релиз 3.0.1
+Подробная строка снимка записывается только при изменении отправляемого Presence; неизменный секундный polling лог не засоряет.
+
+## Релиз 3.0.2
 
 ```bash
-git tag -a v3.0.1 -m "DragonbornPresence 3.0.1"
-git push origin v3.0.1
+git tag -a v3.0.2 -m "DragonbornPresence 3.0.2"
+git push origin v3.0.2
 ```
 
 Workflow `.github/workflows/release.yml` использует runner `windows-2025-vs2026`, собирает Visual Studio 2026 Release и прикрепляет `DragonbornPresence.zip` к GitHub Release.
@@ -214,7 +216,7 @@ Workflow `.github/workflows/release.yml` использует runner `windows-20
 | `model` | конфигурация, снимки состояния и payload |
 | `text` | UTF-8, CP1251 и ограничение Discord-полей |
 | `configuration::ConfigLoader` | чтение и валидация JSON |
-| `assets::LocationAssetResolver` | применение 414 правил локаций |
+| `assets::LocationAssetResolver` | применение 438 правил локаций |
 | `game::StbDataProvider` | формы STB и снимок игрока |
 | `integration::DiscordPresenceClient` | Discord SDK, timestamp и подавление дубликатов |
 | `application::PresenceCoordinator` | загрузка, бой, события и секундный polling |

@@ -1,6 +1,6 @@
 [center][img]https://i.imgur.com/e2etYi1.png[/img]
 
-[font=Tahoma][size=5][b]DRAGONBORN PRESENCE 3.0.1[/b][/size]
+[font=Tahoma][size=5][b]DRAGONBORN PRESENCE 3.0.2[/b][/size]
 [size=3]DISCORD RICH PRESENCE ДЛЯ ТЕКУЩЕЙ СБОРКИ STB[/size][/font][/center]
 
 [font=Tahoma]Внутренняя интеграция Skyrim True Believer. Плагин рассчитан на текущий [font=Courier New]STB.esp[/font], его MCM data-storage quest и Discord Assets команды STB. Сторонние сборки не поддерживаются.[/font]
@@ -12,7 +12,7 @@
 [*][b]state[/b] — [i]lvl-14 💀-3 🎭-Атронах[/i].
 [*][b]Большая картинка[/b] — первое совпавшее правило текущей локации.
 [*][b]Загрузка[/b] — маленький asset [font=Courier New]loading[/font].
-[*][b]Бой[/b] — asset [font=Courier New]combat[/font] и подсказка [i]В бою с <цель>[/i].
+[*][b]Бой[/b] — asset [font=Courier New]combat[/font] и подсказка [i]В бою с <цель> (ур. <уровень>)[/i].
 [*][b]Таймер[/b] — время текущего запуска Skyrim; загрузка и смена локации его не сбрасывают.
 [/list][/font]
 
