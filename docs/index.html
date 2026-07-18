@@ -373,9 +373,9 @@ cmake --build --preset release</code></pre>
     <section id="release">
       <h2>GitHub Release с готовым ZIP</h2>
       <p>Workflow запускается по новому тегу <code>v*</code> на runner <code>windows-2025-vs2026</code>.</p>
-      <pre><code>git tag -a v2.5.0 -m "DragonbornPresence 2.5.0"
-git push origin v2.5.0</code></pre>
-      <p>GitHub Actions собирает Release, создаёт страницу релиза и прикрепляет <code>DragonbornPresence.zip</code>.</p>
+      <pre><code>git tag -a vX.Y.Z -m "DragonbornPresence X.Y.Z"
+git push origin vX.Y.Z</code></pre>
+      <p>Замените <code>vX.Y.Z</code> новым номером версии. GitHub Actions соберёт Release, создаст страницу релиза и прикрепит <code>DragonbornPresence.zip</code>.</p>
       <div class="callout">Workflow запрашивает только <code>contents: write</code>. Разрешение задано непосредственно в YAML и не требует переключения глобального значения по умолчанию.</div>
     </section>
 

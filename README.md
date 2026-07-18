@@ -199,11 +199,13 @@ cmake --build --preset release
 Workflow `.github/workflows/release.yml` запускается по тегам `v*` на образе `windows-2025-vs2026`.
 
 ```bash
-git tag -a v2.5.0 -m "DragonbornPresence 2.5.0"
-git push origin v2.5.0
+git tag -a vX.Y.Z -m "DragonbornPresence X.Y.Z"
+git push origin vX.Y.Z
 ```
 
 GitHub Actions собирает проект через Visual Studio 2026, создаёт Release и прикрепляет готовый `DragonbornPresence.zip`. Результат доступен в разделах **Actions** и **Releases** репозитория.
+
+`vX.Y.Z` нужно заменить новым, ещё не опубликованным номером версии.
 
 ## Архитектура
 
