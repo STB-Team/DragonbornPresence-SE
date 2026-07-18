@@ -1,58 +1,82 @@
-# DragonbornPresence SE
+# DragonbornPresence SE — STB
 
-SKSE-плагин для Discord Rich Presence в сборке Skyrim True Believer. Плагин читает данные персонажа и STB напрямую из игры, выбирает изображение текущей локации и обновляет статус один раз в секунду.
+Внутренний SKSE-плагин команды Skyrim True Believer. Репозиторий обслуживает только текущую сборку STB и не является универсальной интеграцией Discord Rich Presence для сторонних сборок Skyrim.
 
-## Что отображается
+## Текущий контракт Presence
 
-| Поле Discord | Формат | Пример |
+| Поле Discord | Значение | Пример |
 |---|---|---|
 | `details` | выбранная сложность STB | `🟢Приключение` |
 | `state` | `lvl-<уровень> 💀-<смерти> <камень>` | `lvl-14 💀-3 🎭-Атронах` |
-| большая картинка | первое подходящее правило локации | `whiteruncapital` |
-| маленькая картинка | `loading` или `combat` | `combat` |
-| таймер | время текущего запуска Skyrim | не сбрасывается при обновлении Presence |
+| большая картинка | первое совпавшее правило текущей локации | `whiteruncapital` |
+| маленькая картинка | только `loading` или `combat` | `combat` |
+| таймер | длительность текущего запуска Skyrim | не сбрасывается при обновлении Presence |
 
-При наведении на боевую иконку отображается `В бою с <имя противника>`. Если цель ещё не определена — `В бою`. Зелёный таймер начинается при загрузке плагина и продолжает считать время до закрытия Skyrim, независимо от смены локации, загрузки или боя.
+При наведении на боевую иконку отображается `В бою с <имя противника>`. Пока Skyrim не определил цель — `В бою`.
 
-Плагин не отправляет имя и расу персонажа, задания, содержимое меню, крафт или выбранных богов.
+Таймер получает один Unix timestamp при загрузке плагина. Смена локации, загрузка, бой и секундное обновление Presence не меняют время начала.
 
-## Требования
+## Источники данных STB
 
-- Skyrim Special Edition или Anniversary Edition;
-- [SKSE64](https://skse.silverlock.org/) для установленной версии игры;
-- [Address Library for SKSE Plugins](https://www.nexusmods.com/skyrimspecialedition/mods/32444);
-- `STB.esp` и MCM-хранилище Skyrim True Believer;
-- запущенный Discord Desktop с включённым отображением игровой активности.
+| Значение | Источник |
+|---|---|
+| уровень | `RE::PlayerCharacter::GetLevel()` |
+| смерти | Global `aaMZgv_NowDeath` |
+| сложность | `aaMZ_SelectedLevel_OfDifficulty` в alias-скрипте `aaMZ_MCMDataStorage` |
+| камень | первое активное заклинание из 19 описаний камней STB |
+| локация | worldspace, текущая location и parent cell |
+| противник | текущая combat target игрока |
 
-## Установка
+Значения сложности:
 
-### Через менеджер модов
+| Индекс | Presence |
+|---:|---|
+| `0` | `🟢Приключение` |
+| `1` | `🟡Тактика` |
+| `2` | `🔴Героический` |
+| `3` | `⚫Испытание богов` |
+| `4` | `⚪Свой уровень сложности` |
 
-Установите `DragonbornPresence.zip` как обычный мод. Архив уже содержит структуру `SKSE/Plugins` и FOMOD.
+Если форма STB недоступна, используются значения `—`, `не выбран` или `не определена`. Плагин не останавливает Skyrim из-за отсутствующего значения.
 
-### Вручную
-
-Скопируйте каталог `SKSE` из архива в каталог `Data` игры.
-
-Итоговые файлы:
-
-```text
-Data\SKSE\Plugins\DragonbornPresence.dll
-Data\SKSE\Plugins\discord_game_sdk.dll
-Data\SKSE\Plugins\DragonbornPresence.json
-```
-
-Запускайте игру через SKSE. Если Discord недоступен, плагин продолжит работать без Rich Presence.
-
-## Конфигурация Discord
-
-Файл настроек:
+## Рабочее окружение команды
 
 ```text
-Data\SKSE\Plugins\DragonbornPresence.json
+Репозиторий:
+D:\Dev\STB-Discord-Integration\DragonbornPresence-SE
+
+Корень мода MO2:
+D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence SE
+
+Плагины мода:
+D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence SE\SKSE\Plugins
 ```
 
-Минимальная структура:
+Файлы runtime:
+
+```text
+SKSE\Plugins\DragonbornPresence.dll
+SKSE\Plugins\discord_game_sdk.dll
+SKSE\Plugins\DragonbornPresence.json
+```
+
+Обязательные зависимости текущей сборки:
+
+- Skyrim SE/AE и соответствующий SKSE64;
+- Address Library for SKSE Plugins;
+- текущий `STB.esp` с MCM data-storage quest;
+- Discord Desktop;
+- Discord Application ID `1527543892151373937` и загруженные STB Art Assets.
+
+## Конфигурация
+
+Рабочий файл:
+
+```text
+D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence SE\SKSE\Plugins\DragonbornPresence.json
+```
+
+Основной блок:
 
 ```json
 {
@@ -68,32 +92,12 @@ Data\SKSE\Plugins\DragonbornPresence.json
       "loading": "loading",
       "combat": "combat"
     },
-    "location_images": [
-      {
-        "location": "WhiterunLocation",
-        "image": "whiteruncapital",
-        "text": "Вайтран"
-      }
-    ]
+    "location_images": []
   }
 }
 ```
 
-### Основные параметры
-
-| Ключ | Назначение |
-|---|---|
-| `discord.enabled` | включает или отключает Discord Presence |
-| `discord.application_id` | ID приложения Discord Developer Portal |
-| `assets.large_image` | резервная большая картинка |
-| `assets.large_text` | резервная подсказка большой картинки |
-| `assets.small_images.loading` | иконка загрузки |
-| `assets.small_images.combat` | иконка боя |
-| `assets.location_images` | упорядоченные правила картинок локаций |
-
-Некорректные значения записываются в лог и заменяются безопасными значениями по умолчанию.
-
-## Правила локаций
+### Правила локаций
 
 Правила проверяются сверху вниз. Используется первое правило, у которого совпали все заданные селекторы.
 
@@ -117,134 +121,114 @@ Data\SKSE\Plugins\DragonbornPresence.json
 ]
 ```
 
-| Поле | Сопоставление |
+| Поле | Условие |
 |---|---|
 | `worldspace` | Editor ID игрового мира |
-| `location` | Editor ID текущей локации или её родителя |
+| `location` | Editor ID текущей локации или любого родителя |
 | `cell` | Editor ID текущей ячейки |
-| `match` | подстрока отображаемого названия; ASCII сравнивается без учёта регистра |
-| `image` | обязательный Asset key картинки |
+| `match` | подстрока отображаемого имени; ASCII без учёта регистра |
+| `image` | обязательный Asset key |
 | `text` | подсказка; пустое значение заменяется `large_text` |
 
-В комплекте находятся 414 правил. Для изменения правил достаточно отредактировать JSON и полностью перезапустить Skyrim; пересборка DLL не нужна.
+В текущем JSON находятся 414 правил. Изменение JSON требует полного перезапуска Skyrim, но не пересборки DLL.
 
-## Изображения Discord
+## Сборка Visual Studio 2026
 
-Загрузите изображения в **Discord Developer Portal → Rich Presence → Art Assets**. Asset key должен точно совпадать со значением в JSON.
+Требования:
 
-Обязательный минимум:
-
-- `stb_logo`;
-- `loading`;
-- `combat`;
-- ключи используемых правил `location_images`.
-
-Рекомендуемый формат — квадратный PNG 1024×1024. Discord обрезает маленькие изображения до круга, поэтому важные детали размещайте по центру.
-
-## Диагностика
-
-Лог плагина:
-
-```text
-%USERPROFILE%\Documents\My Games\Skyrim Special Edition\SKSE\DragonbornPresence.log
-```
-
-Порядок проверки:
-
-1. Убедитесь, что `application_id` относится к нужному приложению Discord.
-2. Сверьте Asset keys в Developer Portal и JSON с учётом регистра.
-3. Проверьте наличие трёх файлов плагина в `Data\SKSE\Plugins`.
-4. Полностью перезапустите Discord и Skyrim.
-5. Найдите в логе строки `Presence updated`, `large='...'` и сообщения `Config:`.
-
-## Сборка из исходников
-
-### Требования
-
-- Visual Studio 2026 с компонентом **Разработка классических приложений на C++**;
+- Visual Studio 2026 с C++ workload;
 - CMake 4.2 или новее;
-- доступ в интернет при первой настройке зависимостей.
+- генератор `Visual Studio 18 2026`;
+- платформа `x64` и toolset `v145`.
 
-Проект использует генератор `Visual Studio 18 2026`, платформу `x64` и набор инструментов `v145`.
+Первая настройка:
 
 ```bash
-git clone https://github.com/STB-Team/DragonbornPresence-SE.git
-cd DragonbornPresence-SE
-cmake --preset vs2026
+cmake --preset vs2026 -DDRAGONBORNPRESENCE_DEPLOY_DIR="D:/Stb/[STB] Mod Organizer/mods/DragonbornPresence SE"
+```
+
+Release:
+
+```bash
 cmake --build --preset release
 ```
 
-Готовый архив:
-
-```text
-build\vs2026\DragonbornPresence.zip
-```
-
-Debug-сборка:
+Debug:
 
 ```bash
 cmake --build --preset debug
 ```
 
-### Развёртывание в MO2
+После каждой сборки автоматически обновляются:
 
-```bash
-cmake --preset vs2026 -DDRAGONBORNPRESENCE_DEPLOY_DIR="D:/Mod Organizer/mods/DragonbornPresence SE/SKSE/Plugins"
-cmake --build --preset release
+```text
+D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence SE\SKSE\Plugins\DragonbornPresence.dll
+D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence SE\SKSE\Plugins\discord_game_sdk.dll
 ```
 
-После сборки DLL и Discord SDK копируются в указанный каталог. Пользовательский `DragonbornPresence.json` не перезаписывается.
+`DragonbornPresence.json` не перезаписывается. Готовый установочный архив создаётся здесь:
 
-## Публикация релиза
-
-Workflow `.github/workflows/release.yml` запускается по тегам `v*` на образе `windows-2025-vs2026`.
-
-```bash
-git tag -a vX.Y.Z -m "DragonbornPresence X.Y.Z"
-git push origin vX.Y.Z
+```text
+D:\Dev\STB-Discord-Integration\DragonbornPresence-SE\build\vs2026\DragonbornPresence.zip
 ```
 
-GitHub Actions собирает проект через Visual Studio 2026, создаёт Release и прикрепляет готовый `DragonbornPresence.zip`. Результат доступен в разделах **Actions** и **Releases** репозитория.
+## Диагностика
 
-`vX.Y.Z` нужно заменить новым, ещё не опубликованным номером версии.
+Лог:
+
+```text
+%USERPROFILE%\Documents\My Games\Skyrim Special Edition\SKSE\DragonbornPresence.log
+```
+
+Проверка таймера:
+
+```text
+Discord Game SDK initialized for application ...; session_start=1784380000.
+Presence updated; session_start=1784380000.
+Presence updated; session_start=1784380000.
+```
+
+`session_start` должен оставаться одинаковым после загрузки и смены локации.
+
+Проверка локации:
+
+```text
+[<причина>] level=<...> deaths=<...> location='<...>' large='<asset>' combat='<...>'
+```
+
+## Релиз 3.0.1
+
+```bash
+git tag -a v3.0.1 -m "DragonbornPresence 3.0.1"
+git push origin v3.0.1
+```
+
+Workflow `.github/workflows/release.yml` использует runner `windows-2025-vs2026`, собирает Visual Studio 2026 Release и прикрепляет `DragonbornPresence.zip` к GitHub Release.
+
+Для следующего релиза сначала обновляются версии в `CMakeLists.txt` и `fomod/info.xml`, затем создаётся новый тег `vX.Y.Z`.
 
 ## Архитектура
 
 | Слой | Ответственность |
 |---|---|
-| `model` | конфигурация, снимки состояния, payload и строгие enum-типы |
-| `text` | UTF-8, CP1251, ограничение полей Discord и поиск подстрок |
+| `model` | конфигурация, снимки состояния и payload |
+| `text` | UTF-8, CP1251 и ограничение Discord-полей |
 | `configuration::ConfigLoader` | чтение и валидация JSON |
-| `assets::LocationAssetResolver` | выбор изображения локации |
-| `game::StbDataProvider` | чтение форм STB и состояния игрока |
-| `integration::DiscordPresenceClient` | Discord Game SDK и подавление дубликатов |
-| `application::PresenceCoordinator` | состояния загрузки, события и периодическое обновление |
+| `assets::LocationAssetResolver` | применение 414 правил локаций |
+| `game::StbDataProvider` | формы STB и снимок игрока |
+| `integration::DiscordPresenceClient` | Discord SDK, timestamp и подавление дубликатов |
+| `application::PresenceCoordinator` | загрузка, бой, события и секундный polling |
 
-Дополнительные модули:
+Дополнительные файлы:
 
 - `main.cpp` — точка входа SKSE;
-- `ScriptUtils.h` — чтение свойства сложности из alias-скрипта;
+- `ScriptUtils.h` — чтение сложности из alias-скрипта STB;
 - `AdditionalFunctions.cpp` — преобразование игровых строк;
-- `discord_loader.cpp` — загрузка `discord_game_sdk.dll` из каталога SKSE.
+- `discord_loader.cpp` — загрузка Discord SDK из `SKSE/Plugins`.
 
-## Зависимости
+## Ссылки
 
-| Зависимость | Версия |
-|---|---|
-| CommonLibSSE-NG | 3.7.0 |
-| Discord Game SDK | 3.2.1 |
-| nlohmann/json | 3.11.3 |
-| fmt | 10.2.1 |
-| spdlog | 1.13.0 |
-
-Зависимости загружаются CMake при первой настройке проекта.
-
-## Документация
-
-- [Компактное руководство](https://stb-team.github.io/DragonbornPresence-SE/)
-- [PDF для печати](docs/Discord-Presence-Configuration-RU.pdf)
+- [Внутренняя веб-документация](https://stb-team.github.io/DragonbornPresence-SE/)
 - [История изменений](CHANGELOG.md)
 
-## Лицензия
-
-[GNU General Public License v3.0](LICENSE)
+Лицензия: [GPL-3.0](LICENSE).

@@ -704,8 +704,9 @@ public:
                 SKSE::log::warn("Discord: {}", message);
             });
         SKSE::log::info(
-            "Discord Game SDK initialized for application {}.",
-            config.applicationId);
+            "Discord Game SDK initialized for application {}; session_start={}.",
+            config.applicationId,
+            sessionStartTimestamp_);
         return true;
     }
 
@@ -771,7 +772,9 @@ public:
             [this, signature = std::move(signature)](discord::Result result) {
                 if (result == discord::Result::Ok) {
                     lastActivitySignature_ = signature;
-                    SKSE::log::info("Presence updated.");
+                    SKSE::log::info(
+                        "Presence updated; session_start={}.",
+                        sessionStartTimestamp_);
                 } else {
                     SKSE::log::error(
                         "Discord: UpdateActivity failed (result={}).",

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 4.2)
-project(DragonbornPresence VERSION 2.5.0 LANGUAGES CXX)
+project(DragonbornPresence VERSION 3.0.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -149,19 +149,21 @@ add_custom_command(TARGET DragonbornPresence POST_BUILD
 )
 
 set(DRAGONBORNPRESENCE_DEPLOY_DIR "" CACHE PATH
-    "Optional MO2 mod SKSE/Plugins directory for post-build deployment")
+    "Optional MO2 mod root directory for post-build deployment")
 
 if(DRAGONBORNPRESENCE_DEPLOY_DIR)
+    set(_deploy_plugins_dir
+        "${DRAGONBORNPRESENCE_DEPLOY_DIR}/SKSE/Plugins")
     add_custom_command(TARGET DragonbornPresence POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory
-            "${DRAGONBORNPRESENCE_DEPLOY_DIR}"
+            "${_deploy_plugins_dir}"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "$<TARGET_FILE:DragonbornPresence>"
-            "${DRAGONBORNPRESENCE_DEPLOY_DIR}/DragonbornPresence.dll"
+            "${_deploy_plugins_dir}/DragonbornPresence.dll"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${_discord_sdk_dir}/lib/x86_64/discord_game_sdk.dll"
-            "${DRAGONBORNPRESENCE_DEPLOY_DIR}/discord_game_sdk.dll"
-        COMMENT "Deploying DragonbornPresence to ${DRAGONBORNPRESENCE_DEPLOY_DIR}"
+            "${_deploy_plugins_dir}/discord_game_sdk.dll"
+        COMMENT "Deploying DragonbornPresence to ${_deploy_plugins_dir}"
         VERBATIM
     )
 endif()

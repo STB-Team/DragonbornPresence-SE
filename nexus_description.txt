@@ -1,75 +1,52 @@
 [center][img]https://i.imgur.com/e2etYi1.png[/img]
 
-[font=Tahoma][size=5][b]DRAGONBORN PRESENCE[/b][/size]
-[size=3]DISCORD RICH PRESENCE ДЛЯ SKYRIM SE / AE[/size][/font][/center]
+[font=Tahoma][size=5][b]DRAGONBORN PRESENCE 3.0.1[/b][/size]
+[size=3]DISCORD RICH PRESENCE ДЛЯ ТЕКУЩЕЙ СБОРКИ STB[/size][/font][/center]
 
-[font=Tahoma]SKSE-плагин публикует в Discord компактный снимок персонажа Skyrim True Believer: выбранную сложность, уровень, число смертей и активный камень. Большая картинка зависит от текущей локации; загрузка и бой используют отдельные маленькие иконки.[/font]
+[font=Tahoma]Внутренняя интеграция Skyrim True Believer. Плагин рассчитан на текущий [font=Courier New]STB.esp[/font], его MCM data-storage quest и Discord Assets команды STB. Сторонние сборки не поддерживаются.[/font]
 
-[font=Tahoma][url=https://www.nexusmods.com/skyrim/mods/97371]Версия для Legendary Edition[/url]   [url=https://github.com/STB-Team/DragonbornPresence-SE]Исходный код[/url]   [url=https://stb-team.github.io/DragonbornPresence-SE/]Документация[/url][/font]
-
-[font=Tahoma][size=4][b]— Что отображается —[/b][/size][/font]
+[font=Tahoma][size=4][b]— Presence-контракт —[/b][/size][/font]
 
 [font=Tahoma][list]
-[*][b]Сложность[/b] — например, [i]🟢Приключение[/i].
-[*][b]Персонаж[/b] — [i]lvl-14 💀-3 🎭-Атронах[/i].
-[*][b]Локация[/b] — 414 упорядоченных правил выбирают изображения городов, поселений, подземелий и встреч.
-[*][b]Бой[/b] — иконка [font=Courier New]combat[/font] с подсказкой [i]В бою с <имя противника>[/i].
-[*][b]Загрузка[/b] — иконка [font=Courier New]loading[/font] вместо устаревшего игрового статуса.
-[*][b]Таймер[/b] — показывает длительность текущего запуска Skyrim и не сбрасывается при смене локации, загрузке или бое.
-[*][b]Обновление[/b] — состояние STB, бой и локация проверяются раз в секунду без работы в каждом кадре.
+[*][b]details[/b] — выбранная сложность STB, например [i]🟢Приключение[/i].
+[*][b]state[/b] — [i]lvl-14 💀-3 🎭-Атронах[/i].
+[*][b]Большая картинка[/b] — первое совпавшее правило текущей локации.
+[*][b]Загрузка[/b] — маленький asset [font=Courier New]loading[/font].
+[*][b]Бой[/b] — asset [font=Courier New]combat[/font] и подсказка [i]В бою с <цель>[/i].
+[*][b]Таймер[/b] — время текущего запуска Skyrim; загрузка и смена локации его не сбрасывают.
 [/list][/font]
 
-[font=Tahoma][size=4][b]— Установка —[/b][/size][/font]
-
-[font=Tahoma][b]Менеджер модов:[/b] установите ZIP как обычный мод. Архив содержит готовую структуру SKSE и FOMOD.
-
-[b]Вручную:[/b] скопируйте каталог [font=Courier New]SKSE\[/font] из архива в каталог [font=Courier New]Data\[/font] игры.
-
-Итоговые файлы:
-[font=Courier New]Data\SKSE\Plugins\DragonbornPresence.dll
-Data\SKSE\Plugins\discord_game_sdk.dll
-Data\SKSE\Plugins\DragonbornPresence.json[/font]
-
-Собственного .esp и Papyrus-скриптов нет. Запускайте игру через SKSE.[/font]
-
-[font=Tahoma][size=4][b]— Обновление старой версии —[/b][/size][/font]
-
-[font=Tahoma]Если [font=Courier New]discord_game_sdk.dll[/font] лежит рядом с [font=Courier New]SkyrimSE.exe[/font], удалите его. Актуальная версия библиотеки находится в [font=Courier New]Data\SKSE\Plugins\[/font]. Пользовательский [font=Courier New]DragonbornPresence.json[/font] перед обновлением рекомендуется сохранить.[/font]
-
-[font=Tahoma][size=4][b]— Настройка Discord —[/b][/size][/font]
-
-[font=Tahoma][list=1]
-[*]Создайте или откройте приложение в Discord Developer Portal.
-[*]Загрузите изображения в Rich Presence → Art Assets.
-[*]Скопируйте Application ID в [font=Courier New]DragonbornPresence.json[/font].
-[*]Убедитесь, что Asset keys совпадают со значениями JSON с учётом регистра.
-[*]Полностью перезапустите Discord и Skyrim.
-[/list]
-
-Минимальные Asset keys: [font=Courier New]stb_logo[/font], [font=Courier New]loading[/font], [font=Courier New]combat[/font]. Подробные правила локаций описаны в [url=https://stb-team.github.io/DragonbornPresence-SE/]документации[/url].[/font]
-
-[font=Tahoma][size=4][b]— Требования —[/b][/size][/font]
+[font=Tahoma][size=4][b]— Источники STB —[/b][/size][/font]
 
 [font=Tahoma][list]
-[*]Skyrim Special Edition или Anniversary Edition
-[*]SKSE64 для установленной версии игры
-[*][url=https://www.nexusmods.com/skyrimspecialedition/mods/32444]Address Library for SKSE Plugins[/url]
-[*]Skyrim True Believer и [font=Courier New]STB.esp[/font]
+[*]Смерти: Global [font=Courier New]aaMZgv_NowDeath[/font].
+[*]Сложность: [font=Courier New]aaMZ_SelectedLevel_OfDifficulty[/font] в [font=Courier New]aaMZ_MCMDataStorage[/font].
+[*]Камень: активное заклинание одного из 19 описаний камней STB.
+[*]Локация: worldspace, location и parent cell игрока.
+[/list][/font]
+
+[font=Tahoma][size=4][b]— Runtime-файлы —[/b][/size][/font]
+
+[font=Tahoma][font=Courier New]SKSE\Plugins\DragonbornPresence.dll
+SKSE\Plugins\discord_game_sdk.dll
+SKSE\Plugins\DragonbornPresence.json[/font]
+
+Плагин не добавляет собственный .esp или Papyrus-скрипты. Рабочий JSON при пересборке DLL не перезаписывается.[/font]
+
+[font=Tahoma][size=4][b]— Требования текущей сборки —[/b][/size][/font]
+
+[font=Tahoma][list]
+[*]Текущий Skyrim runtime сборки STB
+[*]Соответствующие SKSE64 и Address Library
+[*]Текущий [font=Courier New]STB.esp[/font]
 [*]Discord Desktop
+[*]Discord Application ID [font=Courier New]1527543892151373937[/font] и assets команды STB
 [/list][/font]
 
-[font=Tahoma][size=4][b]— Совместимость и диагностика —[/b][/size][/font]
+[font=Tahoma][size=4][b]— Диагностика —[/b][/size][/font]
 
-[font=Tahoma]Плагин написан на C++, не добавляет собственный .esp и не занимает место в порядке загрузки. Если отдельные данные STB недоступны, Presence использует безопасный резервный текст.
+[font=Tahoma]Лог: [font=Courier New]%USERPROFILE%\Documents\My Games\Skyrim Special Edition\SKSE\DragonbornPresence.log[/font]
 
-Лог: [font=Courier New]%USERPROFILE%\Documents\My Games\Skyrim Special Edition\SKSE\DragonbornPresence.log[/font][/font]
+Для таймера все строки [font=Courier New]Presence updated; session_start=...[/font] в рамках одного запуска должны содержать одинаковое значение.[/font]
 
-[font=Tahoma][size=4][b]— Благодарности —[/b][/size][/font]
-
-[font=Tahoma][list]
-[*]SKSE Team
-[*]CommonLibSSE-NG
-[*]Discord Game SDK
-[/list][/font]
-
-[font=Tahoma][size=2][url=https://github.com/STB-Team/DragonbornPresence-SE]GitHub[/url] · [url=https://stb-team.github.io/DragonbornPresence-SE/]Документация[/url] · Лицензия GPL-3.0[/size][/font]
+[font=Tahoma][size=2][url=https://github.com/STB-Team/DragonbornPresence-SE]GitHub STB-Team[/url] · [url=https://stb-team.github.io/DragonbornPresence-SE/]Внутренняя документация[/url] · GPL-3.0[/size][/font]

@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Краткая документация DragonbornPresence SE: установка, настройка Discord, JSON, сборка и выпуск релизов.">
-<title>DragonbornPresence SE — документация</title>
+<meta name="description" content="Внутренняя документация текущей Discord Presence интеграции Skyrim True Believer.">
+<title>STB DragonbornPresence 3.0.1 — документация</title>
 <style>
   :root {
     color-scheme: dark;
@@ -189,90 +189,100 @@
 <div class="layout">
   <aside aria-label="Навигация по документации">
     <div class="brand">
-      <strong>DragonbornPresence SE</strong>
-      <span>Краткая документация</span>
+      <strong>STB Presence 3.0.1</strong>
+      <span>Внутренняя документация</span>
     </div>
     <nav>
-      <a href="#overview">Обзор</a>
-      <a href="#install">Установка</a>
-      <a href="#discord">Discord</a>
+      <a href="#contract">Контракт</a>
+      <a href="#sources">Данные STB</a>
+      <a href="#environment">Окружение</a>
       <a href="#config">JSON</a>
       <a href="#locations">Локации</a>
-      <a href="#runtime">Поведение</a>
-      <a href="#diagnostics">Диагностика</a>
       <a href="#build">Сборка</a>
+      <a href="#diagnostics">Диагностика</a>
       <a href="#release">Релиз</a>
     </nav>
     <div class="aside-links">
-      <a href="https://github.com/STB-Team/DragonbornPresence-SE">GitHub</a>
-      <a href="Discord-Presence-Configuration-RU.pdf">PDF для печати</a>
+      <a href="https://github.com/STB-Team/DragonbornPresence-SE">GitHub STB-Team</a>
     </div>
   </aside>
 
   <main>
     <header class="hero">
-      <p class="eyebrow">SKSE · Discord Rich Presence</p>
-      <h1>DragonbornPresence SE</h1>
-      <p class="lead">Настройка плагина, Discord Assets, правил локаций, сборки Visual Studio 2026 и автоматического GitHub Release.</p>
+      <p class="eyebrow">Skyrim True Believer · внутренняя интеграция</p>
+      <h1>DragonbornPresence 3.0.1</h1>
+      <p class="lead">Фиксированный Discord Presence для текущей сборки STB. Сторонние сборки и универсальная конфигурация не поддерживаются.</p>
       <div class="badges">
-        <span class="badge">Skyrim SE / AE</span>
+        <span class="badge">STB.esp</span>
         <span class="badge">C++23</span>
         <span class="badge">Visual Studio 2026</span>
-        <span class="badge">CMake 4.2+</span>
+        <span class="badge">v145 · x64</span>
         <span class="badge">Discord Game SDK 3.2.1</span>
       </div>
     </header>
 
-    <section id="overview">
-      <h2>Что отображается</h2>
+    <section id="contract">
+      <h2>Текущий Presence-контракт</h2>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Поле</th><th>Формат</th><th>Пример</th></tr></thead>
+          <thead><tr><th>Поле</th><th>Значение</th><th>Пример</th></tr></thead>
           <tbody>
             <tr><td><code>details</code></td><td>сложность STB</td><td><code>🟢Приключение</code></td></tr>
             <tr><td><code>state</code></td><td><code>lvl-&lt;уровень&gt; 💀-&lt;смерти&gt; &lt;камень&gt;</code></td><td><code>lvl-14 💀-3 🎭-Атронах</code></td></tr>
-            <tr><td>большая картинка</td><td>первое совпавшее правило локации</td><td><code>whiteruncapital</code></td></tr>
-            <tr><td>маленькая картинка</td><td><code>loading</code> или <code>combat</code></td><td><code>combat</code></td></tr>
-            <tr><td>таймер</td><td>время текущего запуска Skyrim</td><td>не сбрасывается при обновлении</td></tr>
+            <tr><td>большой asset</td><td>первое правило текущей локации</td><td><code>whiteruncapital</code></td></tr>
+            <tr><td>маленький asset</td><td>только <code>loading</code> или <code>combat</code></td><td><code>combat</code></td></tr>
+            <tr><td>таймер</td><td>время текущего запуска Skyrim</td><td>один timestamp на всю сессию</td></tr>
           </tbody>
         </table>
       </div>
-      <div class="callout success"><strong>Обновление:</strong> данные STB, бой и локация читаются на игровом потоке один раз в секунду.</div>
-      <p class="muted">Имя и раса персонажа, задания, меню, крафт и выбранные боги не отправляются.</p>
+      <div class="callout success"><strong>Инвариант таймера:</strong> timestamp создаётся при загрузке плагина и не меняется при загрузке, смене локации, бое или polling.</div>
     </section>
 
-    <section id="install">
-      <h2>Установка</h2>
-      <div class="grid">
-        <div class="card"><strong>Менеджер модов</strong><p>Установите Release ZIP как обычный мод. В архиве уже есть FOMOD и структура SKSE.</p></div>
-        <div class="card"><strong>Вручную</strong><p>Скопируйте каталог <code>SKSE</code> из архива в каталог <code>Data</code> игры.</p></div>
+    <section id="sources">
+      <h2>Источники данных STB</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Значение</th><th>Источник</th><th>Fallback</th></tr></thead>
+          <tbody>
+            <tr><td>уровень</td><td><code>PlayerCharacter::GetLevel()</code></td><td><code>0</code></td></tr>
+            <tr><td>смерти</td><td>Global <code>aaMZgv_NowDeath</code></td><td><code>—</code></td></tr>
+            <tr><td>сложность</td><td><code>aaMZ_SelectedLevel_OfDifficulty</code> в <code>aaMZ_MCMDataStorage</code></td><td><code>не определена</code></td></tr>
+            <tr><td>камень</td><td>первое активное заклинание из 19 описаний STB</td><td><code>не выбран</code></td></tr>
+            <tr><td>локация</td><td>worldspace, location и parent cell</td><td>резервный asset</td></tr>
+            <tr><td>противник</td><td>current combat target игрока</td><td><code>В бою</code></td></tr>
+          </tbody>
+        </table>
       </div>
-      <pre><code>Data\SKSE\Plugins\DragonbornPresence.dll
-Data\SKSE\Plugins\discord_game_sdk.dll
-Data\SKSE\Plugins\DragonbornPresence.json</code></pre>
-      <h3>Требования</h3>
-      <ul>
-        <li>Skyrim SE или AE, соответствующий SKSE64 и Address Library;</li>
-        <li>Skyrim True Believer с <code>STB.esp</code>;</li>
-        <li>Discord Desktop с включённой игровой активностью.</li>
-      </ul>
+      <pre><code>0 → 🟢Приключение
+1 → 🟡Тактика
+2 → 🔴Героический
+3 → ⚫Испытание богов
+4 → ⚪Свой уровень сложности</code></pre>
     </section>
 
-    <section id="discord">
-      <h2>Настройка Discord</h2>
-      <ol class="steps">
-        <li>Создайте приложение в <a href="https://discord.com/developers/applications">Discord Developer Portal</a>.</li>
-        <li>Скопируйте Application ID в <code>discord.application_id</code>.</li>
-        <li>Откройте <strong>Rich Presence → Art Assets</strong> и загрузите квадратные PNG.</li>
-        <li>Добавьте ключи <code>stb_logo</code>, <code>loading</code>, <code>combat</code> и ключи используемых локаций.</li>
-        <li>Полностью перезапустите Discord и Skyrim.</li>
-      </ol>
-      <div class="callout warning">Asset key чувствителен к регистру и должен точно совпадать со строкой в JSON. Имя PNG-файла значения не имеет.</div>
+    <section id="environment">
+      <h2>Рабочее окружение команды</h2>
+      <pre><code>Репозиторий:
+D:\Dev\STB-Discord-Integration\DragonbornPresence-SE
+
+Корень мода MO2:
+D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence SE
+
+Runtime:
+SKSE\Plugins\DragonbornPresence.dll
+SKSE\Plugins\discord_game_sdk.dll
+SKSE\Plugins\DragonbornPresence.json</code></pre>
+      <div class="grid">
+        <div class="card"><strong>Игра</strong><p>Текущий Skyrim SE/AE runtime, SKSE64 и Address Library сборки STB.</p></div>
+        <div class="card"><strong>STB</strong><p>Текущий <code>STB.esp</code> и его MCM data-storage quest.</p></div>
+        <div class="card"><strong>Discord</strong><p>Application ID <code>1527543892151373937</code> и assets команды.</p></div>
+        <div class="card"><strong>Обновление</strong><p>Один снимок игрового состояния в секунду на game thread.</p></div>
+      </div>
     </section>
 
     <section id="config">
-      <h2>Конфигурация JSON</h2>
-      <p>Рабочий файл: <code>Data\SKSE\Plugins\DragonbornPresence.json</code>.</p>
+      <h2>Рабочий JSON</h2>
+      <p><code>D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence SE\SKSE\Plugins\DragonbornPresence.json</code></p>
       <pre><code>{
   "schema_version": 1,
   "discord": {
@@ -286,33 +296,14 @@ Data\SKSE\Plugins\DragonbornPresence.json</code></pre>
       "loading": "loading",
       "combat": "combat"
     },
-    "location_images": [
-      {
-        "location": "WhiterunLocation",
-        "image": "whiteruncapital",
-        "text": "Вайтран"
-      }
-    ]
+    "location_images": []
   }
 }</code></pre>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Ключ</th><th>Назначение</th></tr></thead>
-          <tbody>
-            <tr><td><code>discord.enabled</code></td><td>включает или отключает Presence</td></tr>
-            <tr><td><code>discord.application_id</code></td><td>ID приложения Discord</td></tr>
-            <tr><td><code>assets.large_image</code></td><td>резервная большая картинка</td></tr>
-            <tr><td><code>assets.large_text</code></td><td>резервная подсказка картинки</td></tr>
-            <tr><td><code>assets.small_images.loading</code></td><td>иконка загрузки</td></tr>
-            <tr><td><code>assets.small_images.combat</code></td><td>иконка боя</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <div class="callout warning">Сборка DLL не перезаписывает рабочий JSON в MO2. Изменение JSON применяется только после полного перезапуска Skyrim.</div>
     </section>
 
     <section id="locations">
       <h2>Правила локаций</h2>
-      <p>Правила проверяются сверху вниз. Первое полное совпадение выбирает картинку и подсказку.</p>
       <pre><code>"location_images": [
   { "worldspace": "DLC2SolstheimWorld", "image": "solstheim", "text": "Солстхейм" },
   { "location": "WhiterunLocation", "image": "whiteruncapital", "text": "Вайтран" },
@@ -323,65 +314,48 @@ Data\SKSE\Plugins\DragonbornPresence.json</code></pre>
           <thead><tr><th>Поле</th><th>Условие</th></tr></thead>
           <tbody>
             <tr><td><code>worldspace</code></td><td>Editor ID игрового мира</td></tr>
-            <tr><td><code>location</code></td><td>Editor ID текущей локации или её родителя</td></tr>
+            <tr><td><code>location</code></td><td>Editor ID локации или любого родителя</td></tr>
             <tr><td><code>cell</code></td><td>Editor ID текущей ячейки</td></tr>
-            <tr><td><code>match</code></td><td>подстрока отображаемого названия</td></tr>
+            <tr><td><code>match</code></td><td>подстрока имени; ASCII без учёта регистра</td></tr>
             <tr><td><code>image</code></td><td>обязательный Asset key</td></tr>
-            <tr><td><code>text</code></td><td>подсказка; пустая заменяется <code>large_text</code></td></tr>
+            <tr><td><code>text</code></td><td>подсказка или fallback <code>large_text</code></td></tr>
           </tbody>
         </table>
       </div>
-      <p>Если селекторов несколько, должны совпасть все. Если правил нет — используется <code>large_image</code>. В комплекте находятся 414 правил.</p>
+      <p>Проверка идёт сверху вниз; первое полное совпадение останавливает поиск. В текущем конфиге 414 правил.</p>
     </section>
 
-    <section id="runtime">
-      <h2>Поведение во время игры</h2>
-      <div class="grid">
-        <div class="card"><strong>Загрузка</strong><p>Статус <code>Загрузка</code>, большая резервная картинка и маленькая иконка <code>loading</code>.</p></div>
-        <div class="card"><strong>Бой</strong><p>Иконка <code>combat</code>; подсказка <code>В бою с &lt;цель&gt;</code> или <code>В бою</code>.</p></div>
-        <div class="card"><strong>Обычная игра</strong><p>Маленькая иконка отсутствует. Большая картинка следует правилам локации.</p></div>
-        <div class="card"><strong>Discord недоступен</strong><p>Плагин продолжает работать; ошибка записывается в лог без остановки Skyrim.</p></div>
-      </div>
-      <div class="callout success"><strong>Таймер сессии:</strong> начинается при загрузке плагина и использует один timestamp до закрытия Skyrim. Смена локации, загрузка и бой его не сбрасывают.</div>
-      <p class="muted">Каждое текстовое поле ограничивается 127 байтами по границе UTF-8. Одинаковые payload повторно не отправляются.</p>
+    <section id="build">
+      <h2>Сборка и автокопирование</h2>
+      <p>Visual Studio 2026, CMake 4.2+, генератор <code>Visual Studio 18 2026</code>, <code>x64</code>, toolset <code>v145</code>.</p>
+      <pre><code>cmake --preset vs2026 -DDRAGONBORNPRESENCE_DEPLOY_DIR="D:/Stb/[STB] Mod Organizer/mods/DragonbornPresence SE"
+cmake --build --preset release</code></pre>
+      <p>После сборки DLL и Discord SDK обновляются в <code>&lt;корень мода&gt;\SKSE\Plugins</code>. JSON сохраняется.</p>
+      <pre><code>ZIP:
+D:\Dev\STB-Discord-Integration\DragonbornPresence-SE\build\vs2026\DragonbornPresence.zip</code></pre>
     </section>
 
     <section id="diagnostics">
       <h2>Диагностика</h2>
       <pre><code>%USERPROFILE%\Documents\My Games\Skyrim Special Edition\SKSE\DragonbornPresence.log</code></pre>
-      <ol class="steps">
-        <li>Проверьте наличие DLL, Discord SDK и JSON в <code>Data\SKSE\Plugins</code>.</li>
-        <li>Сверьте Application ID и Asset keys с Discord Developer Portal.</li>
-        <li>Найдите в логе сообщения <code>Config:</code>, <code>Presence updated</code> и <code>large='...'</code>.</li>
-        <li>После изменения JSON или Assets полностью перезапустите Discord и Skyrim.</li>
-      </ol>
-    </section>
-
-    <section id="build">
-      <h2>Сборка Visual Studio 2026</h2>
-      <p>Нужны Visual Studio 2026 с компонентом разработки C++ и CMake 4.2 или новее. Используются генератор <code>Visual Studio 18 2026</code>, архитектура <code>x64</code> и toolset <code>v145</code>.</p>
-      <pre><code>git clone https://github.com/STB-Team/DragonbornPresence-SE.git
-cd DragonbornPresence-SE
-cmake --preset vs2026
-cmake --build --preset release</code></pre>
-      <p>Архив: <code>build\vs2026\DragonbornPresence.zip</code>.</p>
-      <h3>Debug</h3>
-      <pre><code>cmake --build --preset debug</code></pre>
-      <h3>Автокопирование в MO2</h3>
-      <pre><code>cmake --preset vs2026 -DDRAGONBORNPRESENCE_DEPLOY_DIR="D:/Mod Organizer/mods/DragonbornPresence SE/SKSE/Plugins"
-cmake --build --preset release</code></pre>
+      <h3>Таймер</h3>
+      <pre><code>Discord Game SDK initialized for application ...; session_start=1784380000.
+Presence updated; session_start=1784380000.
+Presence updated; session_start=1784380000.</code></pre>
+      <p>Все значения <code>session_start</code> в рамках одного запуска должны совпадать.</p>
+      <h3>Локация</h3>
+      <pre><code>[poll] level=... deaths=... location='...' large='...' combat='...'</code></pre>
     </section>
 
     <section id="release">
-      <h2>GitHub Release с готовым ZIP</h2>
-      <p>Workflow запускается по новому тегу <code>v*</code> на runner <code>windows-2025-vs2026</code>.</p>
-      <pre><code>git tag -a vX.Y.Z -m "DragonbornPresence X.Y.Z"
-git push origin vX.Y.Z</code></pre>
-      <p>Замените <code>vX.Y.Z</code> новым номером версии. GitHub Actions соберёт Release, создаст страницу релиза и прикрепит <code>DragonbornPresence.zip</code>.</p>
-      <div class="callout">Workflow запрашивает только <code>contents: write</code>. Разрешение задано непосредственно в YAML и не требует переключения глобального значения по умолчанию.</div>
+      <h2>Релиз 3.0.1</h2>
+      <pre><code>git tag -a v3.0.1 -m "DragonbornPresence 3.0.1"
+git push origin v3.0.1</code></pre>
+      <p>Workflow на <code>windows-2025-vs2026</code> собирает Release и прикрепляет готовый <code>DragonbornPresence.zip</code>.</p>
+      <div class="callout">Для следующего релиза сначала обновить версии в <code>CMakeLists.txt</code> и <code>fomod/info.xml</code>, затем создать новый тег.</div>
     </section>
 
-    <footer>DragonbornPresence SE · конфигурация schema_version 1 · лицензия GPL-3.0</footer>
+    <footer>STB DragonbornPresence 3.0.1 · schema_version 1 · GPL-3.0</footer>
   </main>
 </div>
 </body>
