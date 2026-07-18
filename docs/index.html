@@ -233,11 +233,12 @@
             <tr><td><code>state</code></td><td><code>lvl-&lt;уровень&gt; 💀-&lt;смерти&gt; &lt;камень&gt;</code></td><td><code>lvl-14 💀-3 🎭-Атронах</code></td></tr>
             <tr><td>большая картинка</td><td>первое совпавшее правило локации</td><td><code>whiteruncapital</code></td></tr>
             <tr><td>маленькая картинка</td><td><code>loading</code> или <code>combat</code></td><td><code>combat</code></td></tr>
+            <tr><td>таймер</td><td>время текущего запуска Skyrim</td><td>не сбрасывается при обновлении</td></tr>
           </tbody>
         </table>
       </div>
       <div class="callout success"><strong>Обновление:</strong> данные STB, бой и локация читаются на игровом потоке один раз в секунду.</div>
-      <p class="muted">Имя и раса персонажа, задания, меню, крафт, таймеры и выбранные боги не отправляются.</p>
+      <p class="muted">Имя и раса персонажа, задания, меню, крафт и выбранные боги не отправляются.</p>
     </section>
 
     <section id="install">
@@ -341,6 +342,7 @@ Data\SKSE\Plugins\DragonbornPresence.json</code></pre>
         <div class="card"><strong>Обычная игра</strong><p>Маленькая иконка отсутствует. Большая картинка следует правилам локации.</p></div>
         <div class="card"><strong>Discord недоступен</strong><p>Плагин продолжает работать; ошибка записывается в лог без остановки Skyrim.</p></div>
       </div>
+      <div class="callout success"><strong>Таймер сессии:</strong> начинается при загрузке плагина и использует один timestamp до закрытия Skyrim. Смена локации, загрузка и бой его не сбрасывают.</div>
       <p class="muted">Каждое текстовое поле ограничивается 127 байтами по границе UTF-8. Одинаковые payload повторно не отправляются.</p>
     </section>
 

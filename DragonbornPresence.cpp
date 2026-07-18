@@ -697,6 +697,7 @@ public:
             return false;
         }
 
+
         core_->SetLogHook(
             discord::LogLevel::Warn,
             [](discord::LogLevel, const char* message) {
@@ -748,6 +749,7 @@ public:
 
         discord::Activity activity{};
         activity.SetType(discord::ActivityType::Playing);
+        activity.GetTimestamps().SetStart(sessionStartTimestamp_);
         if (!detailsText.empty()) activity.SetDetails(detailsText.c_str());
         if (!stateText.empty()) activity.SetState(stateText.c_str());
         if (!payload.largeImage.empty()) {
@@ -782,7 +784,16 @@ public:
     }
 
 private:
+    /// Returns the current Unix time in seconds for Discord elapsed-time display.
+    [[nodiscard]] static discord::Timestamp CurrentUnixTimestamp() noexcept
+    {
+        return std::chrono::duration_cast<std::chrono::seconds>(
+                   std::chrono::system_clock::now().time_since_epoch())
+            .count();
+    }
+
     discord::Core* core_ = nullptr;
+    const discord::Timestamp sessionStartTimestamp_ = CurrentUnixTimestamp();
     std::string lastActivitySignature_;
     std::string pendingActivitySignature_;
 };
