@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Внутренняя документация текущей Discord Presence интеграции Skyrim True Believer.">
-<title>STB DragonbornPresence 3.0.3 — документация</title>
+<title>STB DragonbornPresence 3.1.4 — документация</title>
 <style>
   :root {
     color-scheme: dark;
@@ -189,7 +189,7 @@
 <div class="layout">
   <aside aria-label="Навигация по документации">
     <div class="brand">
-      <strong>STB Presence 3.0.3</strong>
+      <strong>STB Presence 3.1.4</strong>
       <span>Внутренняя документация</span>
     </div>
     <nav>
@@ -210,7 +210,7 @@
   <main>
     <header class="hero">
       <p class="eyebrow">Skyrim True Believer · внутренняя интеграция</p>
-      <h1>DragonbornPresence 3.0.3</h1>
+      <h1>DragonbornPresence 3.1.4</h1>
       <p class="lead">Фиксированный Discord Presence для текущей сборки STB. Сторонние сборки и универсальная конфигурация не поддерживаются.</p>
       <div class="badges">
         <span class="badge">STB.esp</span>
@@ -276,7 +276,7 @@ SKSE\Plugins\DragonbornPresence.json</code></pre>
       <div class="grid">
         <div class="card"><strong>Игра</strong><p>Текущий Skyrim SE/AE runtime, SKSE64 и Address Library сборки STB.</p></div>
         <div class="card"><strong>STB</strong><p>Текущий <code>STB.esp</code> и его MCM data-storage quest.</p></div>
-        <div class="card"><strong>Discord</strong><p>Discord Desktop, Application ID <code>1527543892151373937</code> и assets команды. Перед запуском Presence проверяется обработчик <code>discord://</code>; без установленного клиента <code>discord_game_sdk.dll</code> не загружается.</p></div>
+        <div class="card"><strong>Discord</strong><p>Установленный и уже запущенный Discord Desktop, Application ID <code>1527543892151373937</code> и assets команды. Без активного процесса инициализация плагина прекращается до загрузки <code>discord_game_sdk.dll</code>; Discord автоматически не запускается.</p></div>
         <div class="card"><strong>Обновление</strong><p>Один снимок игрового состояния в секунду на game thread.</p></div>
       </div>
     </section>
@@ -340,7 +340,7 @@ D:\Dev\STB-Discord-Integration\DragonbornPresence-SE\build\vs2026\DragonbornPres
     <section id="diagnostics">
       <h2>Диагностика</h2>
       <pre><code>%USERPROFILE%\Documents\My Games\Skyrim Special Edition\SKSE\DragonbornPresence.log</code></pre>
-      <p>Если Discord Desktop не установлен или его обработчик <code>discord://</code> ссылается на отсутствующий файл, Presence отключается до загрузки <code>discord_game_sdk.dll</code>.</p>
+      <p>Перед инициализацией проверяются обработчик <code>discord://</code>, исполняемый файл и соответствующий процесс. Если Discord Desktop не установлен или не запущен, точка входа SKSE возвращает отказ до инициализации плагина. Если клиент завершится позже либо SDK вернёт ошибку, callback-loop и вся дальнейшая работа Presence немедленно прекращаются без повторных вызовов SDK.</p>
       <h3>Таймер</h3>
       <pre><code>Discord Game SDK initialized for application ...; session_start=1784380000.
 Presence updated; session_start=1784380000.
@@ -352,14 +352,14 @@ Presence updated; session_start=1784380000.</code></pre>
     </section>
 
     <section id="release">
-      <h2>Релиз 3.0.3</h2>
-      <pre><code>git tag -a v3.0.3 -m "DragonbornPresence 3.0.3"
-git push origin v3.0.3</code></pre>
+      <h2>Релиз 3.1.4</h2>
+      <pre><code>git tag -a v3.1.4 -m "DragonbornPresence 3.1.4"
+git push origin v3.1.4</code></pre>
       <p>Workflow на <code>windows-2025-vs2026</code> собирает Release и прикрепляет готовый <code>DragonbornPresence.zip</code>.</p>
       <div class="callout">Для следующего релиза сначала обновить версию в <code>CMakeLists.txt</code>, затем создать новый тег.</div>
     </section>
 
-    <footer>STB DragonbornPresence 3.0.3 · адаптация Frem · schema_version 1 · GPL-3.0</footer>
+    <footer>STB DragonbornPresence 3.1.4 · адаптация Frem · schema_version 1 · GPL-3.0</footer>
   </main>
 </div>
 </body>

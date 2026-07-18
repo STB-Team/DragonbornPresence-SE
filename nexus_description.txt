@@ -1,6 +1,6 @@
 [center][img]https://i.imgur.com/e2etYi1.png[/img]
 
-[font=Tahoma][size=5][b]DRAGONBORN PRESENCE 3.0.3[/b][/size]
+[font=Tahoma][size=5][b]DRAGONBORN PRESENCE 3.1.4[/b][/size]
 [size=3]DISCORD RICH PRESENCE ДЛЯ ТЕКУЩЕЙ СБОРКИ STB[/size][/font][/center]
 
 [font=Tahoma]Внутренняя интеграция Skyrim True Believer. Плагин рассчитан на текущий [font=Courier New]STB.esp[/font], его MCM data-storage quest и Discord Assets команды STB. Сторонние сборки не поддерживаются.[/font]
@@ -41,11 +41,11 @@ SKSE\Plugins\DragonbornPresence.json[/font]
 [*]Текущий Skyrim runtime сборки STB
 [*]Соответствующие SKSE64 и Address Library
 [*]Текущий [font=Courier New]STB.esp[/font]
-[*]Discord Desktop
+[*]Установленный и запущенный Discord Desktop
 [*]Discord Application ID [font=Courier New]1527543892151373937[/font] и assets команды STB
 [/list][/font]
 
-[font=Tahoma]Перед инициализацией Presence проверяется установленный Discord Desktop. Если клиент отсутствует, [font=Courier New]discord_game_sdk.dll[/font] не загружается, а Discord Presence остаётся отключённым.[/font]
+[font=Tahoma]Перед инициализацией проверяются обработчик [font=Courier New]discord://[/font], исполняемый файл и запущенный процесс Discord Desktop. Если клиент не установлен или не запущен, плагин отказывается от инициализации, [font=Courier New]discord_game_sdk.dll[/font] не загружается и Discord автоматически не запускается. Завершение клиента или ошибка SDK немедленно останавливают дальнейшую работу Presence.[/font]
 
 [font=Tahoma][size=4][b]— Диагностика —[/b][/size][/font]
 

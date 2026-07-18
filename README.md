@@ -67,10 +67,10 @@ SKSE\Plugins\DragonbornPresence.json
 - Skyrim SE/AE и соответствующий SKSE64;
 - Address Library for SKSE Plugins;
 - текущий `STB.esp` с MCM data-storage quest;
-- Discord Desktop;
+- запущенный Discord Desktop;
 - Discord Application ID `1527543892151373937` и загруженные STB Art Assets.
 
-Перед инициализацией Presence плагин проверяет зарегистрированный обработчик `discord://` и существование связанного исполняемого файла. Если Discord Desktop не установлен, `discord_game_sdk.dll` не загружается, а остальная инициализация Presence пропускается.
+Перед инициализацией плагин проверяет обработчик `discord://`, связанный исполняемый файл и соответствующий запущенный процесс. Если Discord Desktop не установлен или не запущен, точка входа SKSE возвращает отказ до инициализации плагина: `discord_game_sdk.dll` не загружается, Discord автоматически не запускается. Если клиент завершится позже либо Discord SDK вернёт ошибку, callback-loop и вся дальнейшая работа Presence немедленно прекращаются без повторных обращений к SDK.
 
 ## Конфигурация
 
@@ -202,11 +202,11 @@ Presence updated; session_start=1784380000.
 
 Подробная строка снимка записывается только при изменении отправляемого Presence; неизменный секундный polling лог не засоряет.
 
-## Релиз 3.0.3
+## Релиз 3.1.4
 
 ```bash
-git tag -a v3.0.3 -m "DragonbornPresence 3.0.3"
-git push origin v3.0.3
+git tag -a v3.1.4 -m "DragonbornPresence 3.1.4"
+git push origin v3.1.4
 ```
 
 Workflow `.github/workflows/release.yml` использует runner `windows-2025-vs2026`, собирает Visual Studio 2026 Release и прикрепляет `DragonbornPresence.zip` к GitHub Release.
@@ -230,7 +230,7 @@ Workflow `.github/workflows/release.yml` использует runner `windows-20
 - `main.cpp` — точка входа SKSE;
 - `ScriptUtils.h` — чтение сложности из alias-скрипта STB;
 - `AdditionalFunctions.cpp` — преобразование игровых строк;
-- `discord_loader.cpp` — проверка установки Discord и отложенная загрузка Discord SDK из `SKSE/Plugins`.
+- `discord_loader.cpp` — проверка установленного и запущенного Discord и отложенная загрузка Discord SDK из `SKSE/Plugins`.
 
 ## Ссылки
 

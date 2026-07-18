@@ -1,5 +1,6 @@
 #include <Windows.h>
 #include <delayimp.h>
+#include <TlHelp32.h>
 
 #include "discord_loader.h"
 
@@ -39,7 +40,7 @@ namespace {
 
 namespace DragonbornPresence::detail {
 
-bool IsDiscordInstalled() noexcept
+bool IsDiscordRunning() noexcept
 {
     constexpr wchar_t kDiscordProtocolCommand[] =
         L"discord\\shell\\open\\command";
@@ -69,7 +70,27 @@ bool IsDiscordInstalled() noexcept
         if (readStatus != ERROR_SUCCESS) return false;
 
         const auto* executablePath = ExtractExecutablePath(command.data());
-        return executablePath && IsExistingFile(executablePath);
+        if (!executablePath || !IsExistingFile(executablePath)) return false;
+
+        const auto* executableName = std::wcsrchr(executablePath, L'\\');
+        executableName = executableName ? executableName + 1 : executablePath;
+
+        const HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if (snapshot == INVALID_HANDLE_VALUE) return false;
+
+        PROCESSENTRY32W process{};
+        process.dwSize = sizeof(process);
+        bool found = false;
+        if (Process32FirstW(snapshot, &process)) {
+            do {
+                if (_wcsicmp(process.szExeFile, executableName) == 0) {
+                    found = true;
+                    break;
+                }
+            } while (Process32NextW(snapshot, &process));
+        }
+        CloseHandle(snapshot);
+        return found;
     } catch (...) {
         return false;
     }

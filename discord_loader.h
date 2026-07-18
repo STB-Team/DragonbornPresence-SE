@@ -2,6 +2,6 @@
 
 namespace DragonbornPresence::detail {
 
-[[nodiscard]] bool IsDiscordInstalled() noexcept;
+[[nodiscard]] bool IsDiscordRunning() noexcept;
 
 }  // namespace DragonbornPresence::detail

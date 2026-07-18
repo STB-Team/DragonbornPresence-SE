@@ -693,9 +693,9 @@ public:
             return false;
         }
 
-        if (!DragonbornPresence::detail::IsDiscordInstalled()) {
+        if (!DragonbornPresence::detail::IsDiscordRunning()) {
             SKSE::log::info(
-                "Discord desktop client is not installed — presence disabled; "
+                "Discord desktop client is not running — presence disabled; "
                 "discord_game_sdk.dll was not loaded.");
             return false;
         }
@@ -704,7 +704,7 @@ public:
         try {
             result = discord::Core::Create(
                 config.applicationId,
-                DiscordCreateFlags_Default,
+                DiscordCreateFlags_NoRequireDiscord,
                 &core_);
         } catch (...) {
             SKSE::log::warn(
@@ -720,12 +720,16 @@ public:
             return false;
         }
 
-
-        core_->SetLogHook(
-            discord::LogLevel::Warn,
-            [](discord::LogLevel, const char* message) {
-                SKSE::log::warn("Discord: {}", message);
-            });
+        try {
+            core_->SetLogHook(
+                discord::LogLevel::Warn,
+                [](discord::LogLevel, const char* message) {
+                    SKSE::log::warn("Discord: {}", message);
+                });
+        } catch (...) {
+            Disable("failed to install the SDK log hook");
+            return false;
+        }
         SKSE::log::info(
             "Discord Game SDK initialized for application {}; session_start={}.",
             config.applicationId,
@@ -733,10 +737,35 @@ public:
         return true;
     }
 
-    /// Runs pending Discord SDK callbacks when the SDK is initialized.
-    void RunCallbacks() const
+    /// Runs pending callbacks and disables the integration on any transport failure.
+    [[nodiscard]] bool RunCallbacks()
     {
-        if (core_) core_->RunCallbacks();
+        if (!IsActive()) return false;
+        if (!DragonbornPresence::detail::IsDiscordRunning()) {
+            Disable("desktop client stopped");
+            return false;
+        }
+
+        discord::Result result;
+        try {
+            result = core_->RunCallbacks();
+        } catch (...) {
+            Disable("callback processing raised an exception");
+            return false;
+        }
+        if (result != discord::Result::Ok || !transportHealthy_) {
+            SKSE::log::error(
+                "Discord: callback processing failed (result={}).",
+                static_cast<int>(result));
+            Disable("callback transport failed");
+            return false;
+        }
+        return true;
+    }
+
+    [[nodiscard]] bool IsActive() const noexcept
+    {
+        return core_ && transportHealthy_;
     }
 
     /// Submits an activity only when its visible fields changed.
@@ -744,7 +773,11 @@ public:
     /// Returns true when a new Discord update was queued.
     bool UpdateActivity(const model::ActivityPayload& payload)
     {
-        if (!core_) return false;
+        if (!IsActive()) return false;
+        if (!DragonbornPresence::detail::IsDiscordRunning()) {
+            Disable("desktop client stopped before an activity update");
+            return false;
+        }
 
         const std::string detailsText = text::LimitForDiscord(payload.details);
         const std::string stateText = text::LimitForDiscord(payload.state);
@@ -791,28 +824,46 @@ public:
             activity.GetAssets().SetSmallText(smallHoverText.c_str());
         }
 
-        pendingActivitySignature_ = signature;
-        core_->ActivityManager().UpdateActivity(
-            activity,
-            [this, signature = std::move(signature)](discord::Result result) {
-                if (result == discord::Result::Ok) {
-                    lastActivitySignature_ = signature;
-                    SKSE::log::info(
-                        "Presence updated; session_start={}.",
-                        sessionStartTimestamp_);
-                } else {
-                    SKSE::log::error(
-                        "Discord: UpdateActivity failed (result={}).",
-                        static_cast<int>(result));
-                }
-                if (pendingActivitySignature_ == signature) {
-                    pendingActivitySignature_.clear();
-                }
-            });
-        return true;
+        try {
+            pendingActivitySignature_ = signature;
+            core_->ActivityManager().UpdateActivity(
+                activity,
+                [this, signature = std::move(signature)](discord::Result result) {
+                    if (result == discord::Result::Ok) {
+                        lastActivitySignature_ = signature;
+                        SKSE::log::info(
+                            "Presence updated; session_start={}.",
+                            sessionStartTimestamp_);
+                    } else {
+                        transportHealthy_ = false;
+                        SKSE::log::error(
+                            "Discord: UpdateActivity failed (result={}).",
+                            static_cast<int>(result));
+                    }
+                    if (pendingActivitySignature_ == signature) {
+                        pendingActivitySignature_.clear();
+                    }
+                });
+            return true;
+        } catch (...) {
+            Disable("activity update raised an exception");
+            return false;
+        }
     }
 
 private:
+    /// Permanently disconnects this client without calling into a failed SDK again.
+    void Disable(std::string_view reason) noexcept
+    {
+        core_ = nullptr;
+        transportHealthy_ = false;
+        pendingActivitySignature_.clear();
+        try {
+            SKSE::log::error("Discord: {}; plugin work stopped.", reason);
+        } catch (...) {
+        }
+    }
+
     /// Returns the current Unix time in seconds for Discord elapsed-time display.
     [[nodiscard]] static discord::Timestamp CurrentUnixTimestamp() noexcept
     {
@@ -822,6 +873,7 @@ private:
     }
 
     discord::Core* core_ = nullptr;
+    bool transportHealthy_ = true;
     const discord::Timestamp sessionStartTimestamp_ = CurrentUnixTimestamp();
     std::string lastActivitySignature_;
     std::string pendingActivitySignature_;
@@ -885,9 +937,15 @@ public:
     void RegisterGameEventHandlers()
     {
         SKSE::log::info("Registering game event handlers...");
+        if (!discordClient_.Initialize(config_)) {
+            Stop();
+            return;
+        }
+
+        active_ = true;
         stbDataProvider_.Initialize();
-        if (discordClient_.Initialize(config_)) StartCallbackThread();
         SendLoadingPresence();
+        if (!active_) return;
 
         if (auto* ui = RE::UI::GetSingleton()) {
             ui->AddEventSink<RE::MenuOpenCloseEvent>(&menuEventSink_);
@@ -901,11 +959,13 @@ public:
             SKSE::log::error(
                 "Failed to get RE::ScriptEventSourceHolder singleton.");
         }
+        StartCallbackThread();
     }
 
     /// Marks the game ready and immediately publishes the complete player state.
     void OnGameLoaded()
     {
+        if (!active_) return;
         SKSE::log::info("Game loaded — refreshing STB presence data.");
         gameLoaded_ = true;
         loading_ = false;
@@ -915,6 +975,7 @@ public:
     /// Applies menu transitions to the loading and game-ready state machine.
     void HandleMenuEvent(const RE::MenuOpenCloseEvent& event)
     {
+        if (!active_) return;
         if (event.menuName == constants::kMainMenuName && event.opening) {
             gameLoaded_ = false;
             SetLoading(true);
@@ -930,7 +991,7 @@ public:
     /// Schedules a refresh when combat may have changed for the player.
     void HandleCombatEvent(const RE::TESCombatEvent& event)
     {
-        if (!gameLoaded_ || loading_) return;
+        if (!active_ || !gameLoaded_ || loading_) return;
 
         const bool involvesPlayer =
             (event.actor && event.actor->IsPlayerRef()) ||
@@ -945,6 +1006,13 @@ public:
     }
 
 private:
+    /// Stops all future Presence work after a Discord failure.
+    void Stop() noexcept
+    {
+        active_ = false;
+        callbackThreadRunning_ = false;
+    }
+
     /// Sends the stable loading activity used before a playable save is ready.
     void SendLoadingPresence()
     {
@@ -956,11 +1024,13 @@ private:
             config_.loadingImage,
             constants::kLoadingText,
         });
+        if (!discordClient_.IsActive()) Stop();
     }
 
     /// Builds and submits one complete activity from the latest player snapshot.
     void RefreshPresence(model::RefreshReason reason)
     {
+        if (!active_) return;
         if (loading_ || !gameLoaded_) {
             SendLoadingPresence();
             return;
@@ -996,6 +1066,10 @@ private:
             smallImage,
             smallText,
         });
+        if (!discordClient_.IsActive()) {
+            Stop();
+            return;
+        }
         if (!activityChanged) return;
 
         SKSE::log::info(
@@ -1031,7 +1105,11 @@ private:
             while (callbackThreadRunning_) {
                 std::this_thread::sleep_for(constants::kDiscordCallbackInterval);
                 SKSE::GetTaskInterface()->AddTask([this]() {
-                    discordClient_.RunCallbacks();
+                    if (!active_) return;
+                    if (!discordClient_.RunCallbacks()) {
+                        Stop();
+                        return;
+                    }
                     if (++presencePollTicks_ >=
                         constants::kPresencePollIntervalInCallbackTicks) {
                         presencePollTicks_ = 0;
@@ -1050,6 +1128,7 @@ private:
     MenuEventSink menuEventSink_;
     CombatEventSink combatEventSink_;
     std::atomic<bool> callbackThreadRunning_{false};
+    bool active_ = false;
     std::uint8_t presencePollTicks_ = 0;
     bool loading_ = true;
     bool gameLoaded_ = false;

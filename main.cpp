@@ -2,6 +2,7 @@
 #include <spdlog/sinks/basic_file_sink.h>
 #include <Windows.h>
 #include "DragonbornPresence.h"
+#include "discord_loader.h"
 
 extern "C" IMAGE_DOS_HEADER __ImageBase;
 
@@ -23,6 +24,12 @@ namespace {
 }
 
 SKSEPluginLoad(const SKSE::LoadInterface* skse) {
+    if (!DragonbornPresence::detail::IsDiscordRunning()) {
+        OutputDebugStringW(
+            L"DragonbornPresence: Discord is not running; plugin initialization aborted.\n");
+        return false;
+    }
+
     SKSE::Init(skse);
     InitializeLogging();
     const auto* plugin = SKSE::PluginDeclaration::GetSingleton();
