@@ -1,9 +1,11 @@
 [center][img]https://i.imgur.com/e2etYi1.png[/img]
 
-[font=Tahoma][size=5][b]DRAGONBORN PRESENCE 3.0.2[/b][/size]
+[font=Tahoma][size=5][b]DRAGONBORN PRESENCE 3.0.3[/b][/size]
 [size=3]DISCORD RICH PRESENCE ДЛЯ ТЕКУЩЕЙ СБОРКИ STB[/size][/font][/center]
 
 [font=Tahoma]Внутренняя интеграция Skyrim True Believer. Плагин рассчитан на текущий [font=Courier New]STB.esp[/font], его MCM data-storage quest и Discord Assets команды STB. Сторонние сборки не поддерживаются.[/font]
+
+[font=Tahoma][b]Автор оригинала:[/b] Fozar · [b]Адаптация для STB:[/b] Frem[/font]
 
 [font=Tahoma][size=4][b]— Presence-контракт —[/b][/size][/font]
 

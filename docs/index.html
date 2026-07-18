@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Внутренняя документация текущей Discord Presence интеграции Skyrim True Believer.">
-<title>STB DragonbornPresence 3.0.2 — документация</title>
+<title>STB DragonbornPresence 3.0.3 — документация</title>
 <style>
   :root {
     color-scheme: dark;
@@ -189,7 +189,7 @@
 <div class="layout">
   <aside aria-label="Навигация по документации">
     <div class="brand">
-      <strong>STB Presence 3.0.2</strong>
+      <strong>STB Presence 3.0.3</strong>
       <span>Внутренняя документация</span>
     </div>
     <nav>
@@ -210,7 +210,7 @@
   <main>
     <header class="hero">
       <p class="eyebrow">Skyrim True Believer · внутренняя интеграция</p>
-      <h1>DragonbornPresence 3.0.2</h1>
+      <h1>DragonbornPresence 3.0.3</h1>
       <p class="lead">Фиксированный Discord Presence для текущей сборки STB. Сторонние сборки и универсальная конфигурация не поддерживаются.</p>
       <div class="badges">
         <span class="badge">STB.esp</span>
@@ -218,6 +218,7 @@
         <span class="badge">Visual Studio 2026</span>
         <span class="badge">v145 · x64</span>
         <span class="badge">Discord Game SDK 3.2.1</span>
+        <span class="badge">Адаптация STB: Frem</span>
       </div>
     </header>
 
@@ -333,6 +334,7 @@ cmake --build --preset release</code></pre>
       <p>После сборки DLL и Discord SDK обновляются в <code>&lt;корень мода&gt;\SKSE\Plugins</code>. JSON сохраняется.</p>
       <pre><code>ZIP:
 D:\Dev\STB-Discord-Integration\DragonbornPresence-SE\build\vs2026\DragonbornPresence.zip</code></pre>
+      <p>Архив содержит корневой каталог <code>SKSE</code> и устанавливается напрямую через MO2 без FOMOD.</p>
     </section>
 
     <section id="diagnostics">
@@ -349,14 +351,14 @@ Presence updated; session_start=1784380000.</code></pre>
     </section>
 
     <section id="release">
-      <h2>Релиз 3.0.2</h2>
-      <pre><code>git tag -a v3.0.2 -m "DragonbornPresence 3.0.2"
-git push origin v3.0.2</code></pre>
+      <h2>Релиз 3.0.3</h2>
+      <pre><code>git tag -a v3.0.3 -m "DragonbornPresence 3.0.3"
+git push origin v3.0.3</code></pre>
       <p>Workflow на <code>windows-2025-vs2026</code> собирает Release и прикрепляет готовый <code>DragonbornPresence.zip</code>.</p>
-      <div class="callout">Для следующего релиза сначала обновить версии в <code>CMakeLists.txt</code> и <code>fomod/info.xml</code>, затем создать новый тег.</div>
+      <div class="callout">Для следующего релиза сначала обновить версию в <code>CMakeLists.txt</code>, затем создать новый тег.</div>
     </section>
 
-    <footer>STB DragonbornPresence 3.0.2 · schema_version 1 · GPL-3.0</footer>
+    <footer>STB DragonbornPresence 3.0.3 · адаптация Frem · schema_version 1 · GPL-3.0</footer>
   </main>
 </div>
 </body>

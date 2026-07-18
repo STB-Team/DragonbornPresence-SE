@@ -2,6 +2,8 @@
 
 Внутренний SKSE-плагин команды Skyrim True Believer. Репозиторий обслуживает только текущую сборку STB и не является универсальной интеграцией Discord Rich Presence для сторонних сборок Skyrim.
 
+**Автор оригинала:** Fozar · **Адаптация для STB:** Frem
+
 ## Текущий контракт Presence
 
 | Поле Discord | Значение | Пример |
@@ -166,7 +168,7 @@ D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence SE\SKSE\Plugins\DragonbornPre
 D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence SE\SKSE\Plugins\discord_game_sdk.dll
 ```
 
-`DragonbornPresence.json` не перезаписывается. Готовый установочный архив создаётся здесь:
+`DragonbornPresence.json` не перезаписывается. Готовый ZIP мода с корневым каталогом `SKSE` устанавливается напрямую через MO2:
 
 ```text
 D:\Dev\STB-Discord-Integration\DragonbornPresence-SE\build\vs2026\DragonbornPresence.zip
@@ -198,16 +200,16 @@ Presence updated; session_start=1784380000.
 
 Подробная строка снимка записывается только при изменении отправляемого Presence; неизменный секундный polling лог не засоряет.
 
-## Релиз 3.0.2
+## Релиз 3.0.3
 
 ```bash
-git tag -a v3.0.2 -m "DragonbornPresence 3.0.2"
-git push origin v3.0.2
+git tag -a v3.0.3 -m "DragonbornPresence 3.0.3"
+git push origin v3.0.3
 ```
 
 Workflow `.github/workflows/release.yml` использует runner `windows-2025-vs2026`, собирает Visual Studio 2026 Release и прикрепляет `DragonbornPresence.zip` к GitHub Release.
 
-Для следующего релиза сначала обновляются версии в `CMakeLists.txt` и `fomod/info.xml`, затем создаётся новый тег `vX.Y.Z`.
+Для следующего релиза сначала обновляется версия в `CMakeLists.txt`, затем создаётся новый тег `vX.Y.Z`.
 
 ## Архитектура
 

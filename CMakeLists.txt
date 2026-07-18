@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 4.2)
-project(DragonbornPresence VERSION 3.0.2 LANGUAGES CXX)
+project(DragonbornPresence VERSION 3.0.3 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -100,6 +100,7 @@ add_commonlibsse_plugin(DragonbornPresence
         AdditionalFunctions.cpp
         discord_loader.cpp
     NAME "DragonbornPresence"
+    AUTHOR "Fozar / Frem (STB adaptation)"
     VERSION "${PROJECT_VERSION}"
     USE_ADDRESS_LIBRARY
 )
@@ -125,8 +126,6 @@ configure_file(
     COPYONLY
 )
 
-# Copy the FOMOD metadata into the package (configure time)
-file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/fomod" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/_package")
 
 add_custom_command(TARGET DragonbornPresence POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -143,7 +142,6 @@ add_custom_command(TARGET DragonbornPresence POST_BUILD
         -- "SKSE/Plugins/DragonbornPresence.dll"
            "SKSE/Plugins/discord_game_sdk.dll"
            "SKSE/Plugins/DragonbornPresence.json"
-           "fomod"
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_package"
     COMMENT "Packaging DragonbornPresence.zip"
 )
