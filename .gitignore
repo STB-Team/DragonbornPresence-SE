@@ -3,6 +3,9 @@ build/
 CMakeCache.txt
 CMakeFiles/
 
+# Visual Studio
+.vs/
+
 # Windows
 *.stackdump
 Thumbs.db
