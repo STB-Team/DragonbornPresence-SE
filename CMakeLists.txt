@@ -143,7 +143,11 @@ if(MSVC)
     # Keep optimized Release code while emitting full symbols for crash diagnosis.
     set_property(TARGET DragonbornPresence
         PROPERTY MSVC_DEBUG_INFORMATION_FORMAT ProgramDatabase)
-    target_link_options(DragonbornPresence PRIVATE /DEBUG:FULL)
+    target_link_options(DragonbornPresence PRIVATE                                                                     
+       /DEBUG:FULL
+       /OPT:REF
+       /OPT:ICF
+   )  
 endif()
 
 set(_pkg_plugins "${CMAKE_CURRENT_BINARY_DIR}/_package/SKSE/Plugins")
