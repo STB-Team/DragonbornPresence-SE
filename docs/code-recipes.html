@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="ru">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Практические рецепты расширения DragonbornPresence с объяснением слоёв, C++ конструкций, рисков и проверки в Skyrim."><title>Примеры изменений — код DragonbornPresence</title><link rel="stylesheet" href="site.css"></head>
+<body class="code-page"><div class="layout">
+<aside aria-label="Навигация по разбору кода"><div class="brand"><strong>Полный разбор кода</strong><span>7 из 7 · практика</span></div><nav><a href="architecture.html">Обзор</a><a href="code-entry.html">1. Точка входа</a><a href="code-foundation.html">2. Модели и JSON</a><a href="code-game.html">3. Skyrim и Papyrus</a><a href="code-discord.html">4. Discord и Windows</a><a href="code-application.html">5. Координатор</a><a href="code-build.html">6. Сборка</a><a href="code-recipes.html">7. Примеры</a><span class="nav-title">Рецепты</span><a href="#workflow">Правильный цикл</a><a href="#json-location">Локация</a><a href="#state-format">Формат state</a><a href="#loading-text">Параметр JSON</a><a href="#difficulty">Сложность</a><a href="#stone">Камень</a><a href="#polling">Частота</a><a href="#small-state">Новое состояние</a><a href="#selector">Новый selector</a><a href="#logging">Debug-лог</a><a href="#schema">Schema version</a><a href="#extraction">Новый слой</a><a href="#avoid">Опасные идеи</a></nav></aside>
+<main><header class="hero"><p class="breadcrumbs"><a href="index.html">Документация</a> / <a href="architecture.html">Код</a> / Практика</p><p class="eyebrow">Изменение → причина → проверка</p><h1>Что можно добавить в плагин</h1><p class="lead">Практические изменения от одного JSON record до сквозного нового состояния. Каждый рецепт показывает правильный слой, необходимые файлы, конструкции языка, риски и доказательство работы.</p><div class="badges"><span class="badge">12 рецептов</span><span class="badge">C++23</span><span class="badge">JSON</span><span class="badge">проверка в игре</span></div><details class="mobile-toc"><summary>Оглавление и главы</summary><nav><a href="code-build.html">Предыдущая</a><a href="architecture.html">Обзор</a><a href="#json-location">Локация</a><a href="#state-format">State</a><a href="#loading-text">JSON-поле</a><a href="#small-state">Small asset</a><a href="#selector">Selector</a><a href="#avoid">Не делать</a></nav></details></header>
+
+<section id="workflow"><h2>1. Безопасный цикл изменения</h2><ol class="steps"><li><strong>Назовите observable result.</strong> Например: «в интерьере X Discord показывает asset Y».</li><li><strong>Найдите владельца решения.</strong> Game provider сообщает факты; coordinator выбирает отображение; client отправляет.</li><li><strong>Измените минимальное число слоёв.</strong> JSON-локация не требует C++.</li><li><strong>Соберите Release с PDB.</strong> Используйте текущий preset.</li><li><strong>Полностью перезапустите Skyrim.</strong> DLL и config не hot-reload.</li><li><strong>Пройдите изменённый путь.</strong> Не ограничивайтесь успешной компиляцией.</li><li><strong>Проверьте log и Discord.</strong> Snapshot доказывает queued payload; <code>Presence updated</code> — успешный callback.</li></ol><div class="callout warning"><strong>Перед любым C++ изменением:</strong> сохраните текущий рабочий ZIP. Ошибка нативной DLL потенциально влияет на весь процесс Skyrim.</div></section>
+
+<section id="json-location"><h2>2. Добавить изображение локации без C++</h2><p><span class="file-badge">config/DragonbornPresence.json</span></p><pre><code>{
+  "cell": "MySpecialInteriorCell",
+  "image": "my_special_asset",
+  "text": "Особое место"
+}</code></pre><h3>Куда вставлять</h3><p>Выше общего правила, которое также совпадает. Resolver прекращает поиск на первом match.</p><h3>Почему только JSON</h3><p>Model, parser и resolver уже поддерживают <code>cell</code>. Новый record — данные существующего алгоритма.</p><h3>Проверка</h3><ol><li>Asset key существует в Discord Application.</li><li>Собрать, чтобы config скопировался в MO2, либо вручную изменить runtime JSON.</li><li>Перезапустить Skyrim и войти в cell.</li><li>Log: <code>large='my_special_asset'</code>.</li></ol></section>
+
+<section id="state-format"><h2>3. Изменить формат <code>state</code></h2><p><span class="file-badge">src/DragonbornPresence.cpp</span> <span class="file-badge">PresenceCoordinator::RefreshPresence</span></p><pre><code>const std::string stateText = std::format(
+    "Ур. {} | Смерти: {} | {}",
+    snapshot.level,
+    deathsText,
+    snapshot.stone);</code></pre><p>Форматирование остаётся в coordinator, потому что это presentation policy. Provider не должен знать строку Discord, client не должен знать meaning level/deaths.</p><h3>Конструкция</h3><p><code>std::format</code> проверяет число placeholders и types на уровне format API. Result владеет буфером до завершения <code>UpdateActivity</code>.</p><h3>Проверка</h3><p>Открыть save, увидеть точную строку, проверить кириллицу и очень длинное имя камня: client обязан обрезать по UTF-8 boundary.</p></section>
+
+<section id="loading-text"><h2>4. Добавить настраиваемый loading text</h2><p><span class="file-badge">model::Config</span><span class="file-badge">ConfigLoader</span><span class="file-badge">SendLoadingPresence</span><span class="file-badge">config JSON</span></p>
+<h3>Шаг 1: default</h3><pre><code>struct Config {
+    // ...
+    std::string loadingText = "Загрузка";
+};</code></pre><h3>Шаг 2: JSON</h3><pre><code>"discord": {
+  "enabled": true,
+  "application_id": "...",
+  "loading_text": "Пробуждение Драконорождённого"
+}</code></pre><h3>Шаг 3: parser</h3><pre><code>ReadString(
+    *discordConfig,
+    "loading_text",
+    config.loadingText,
+    "discord");</code></pre><h3>Шаг 4: использование</h3><pre><code>config_.loadingText, // state
+// ...
+config_.loadingText  // small hover</code></pre><p>Default обязателен: старый JSON должен продолжить работать. <code>std::string</code> нужен, потому что значение приходит из runtime JSON.</p><h3>Проверка ошибок</h3><p>Проверить отсутствующее поле, правильную string и неверный number. Последний должен дать warning и оставить default.</p></section>
+
+<section id="difficulty"><h2>5. Добавить шестой режим сложности</h2><p><span class="file-badge">model::Difficulty</span><span class="file-badge">DifficultyName</span></p><pre><code>enum class Difficulty : int {
+    // 0–4...
+    kSurvivalChallenge = 5,
+};
+
+case model::Difficulty::kSurvivalChallenge:
+    return "Выживание";</code></pre><p>Это корректно только если Papyrus/STB реально записывает 5. C++ enum сам не создаёт новую сложность в MCM.</p><h3>Проверка</h3><p>Выбрать режим через реальный STB UI. Snapshot log должен показать <code>difficulty='Выживание'</code>, Discord details — то же значение. Значение 6 должно всё ещё давать <code>не определена</code>.</p></section>
+
+<section id="stone"><h2>6. Добавить новый камень</h2><p><span class="file-badge">kStoneDefinitions</span></p><pre><code>StoneDefinition{
+    "aaMy_NewDoomstoneDescription",
+    "Новый камень"
+},</code></pre><p>Provider автоматически:</p><ol><li>увеличит <code>std::array</code> deduction size;</li><li>найдёт spell на DataLoaded;</li><li>попытается разобрать <code>description.name</code>;</li><li>добавит spell в <code>HasSpell</code> search;</li><li>использует fallback при проблеме description.</li></ol><h3>Порядок</h3><p>Если одновременно активны два stone spells, выигрывает первый definition. Поставьте новый элемент в сознательную позицию.</p><h3>Проверка</h3><p>Init log denominator увеличился; numerator тоже увеличился, если Editor ID правильный. Затем получить spell и проверить state.</p></section>
+
+<section id="polling"><h2>7. Изменить частоту snapshot без замедления callbacks</h2><p><span class="file-badge">constants</span></p><pre><code>constexpr std::uint8_t kPresencePollIntervalInCallbackTicks = 2;</code></pre><p>При callback interval 500 мс snapshot будет раз в 1 секунду, но Discord <code>RunCallbacks</code> останется раз в 500 мс. Это лучше, чем менять базовый interval: timeout callback и warning delay сохраняют исходную временную семантику.</p><h3>Tradeoff</h3><p>Меньше game reads, но location/combat update может задержаться до секунды. Combat events всё равно только ставят flag и ждут poll.</p><h3>Проверка</h3><p>Сменить локацию и измерить по log/Discord. Убедиться, что UpdateActivity callback не получает ложный 10-секундный timeout.</p></section>
+
+<section id="small-state"><h2>8. Добавить small asset для скрытности</h2><p>Это сквозной пример. Точные Skyrim API скрытности зависят от выбранного observable состояния; сначала подтвердите подходящий CommonLib getter для текущей версии.</p><h3>Модель и config</h3><pre><code>struct Config {
+    std::string stealthImage = "stealth";
+};
+struct PlayerSnapshot {
+    bool sneaking = false;
+};</code></pre><h3>Parser</h3><p>Добавить <code>assets.small_images.stealth</code> через существующий <code>ReadString</code>.</p><h3>Provider</h3><p>В <code>ReadPlayerSnapshot</code> записать фактическое состояние игрока в <code>sneaking</code>. Provider сообщает факт, не Asset key.</p><h3>Precedence в coordinator</h3><pre><code>std::string_view smallImage;
+std::string_view smallText;
+if (snapshot.inCombat) {
+    smallImage = config_.combatImage;
+    smallText = snapshot.combatText;
+} else if (snapshot.sneaking) {
+    smallImage = config_.stealthImage;
+    smallText = "Скрывается";
+}</code></pre><p>Явный <code>if/else if</code> документирует решение: combat сильнее stealth. Не вычисляйте precedence внутри Discord client.</p><h3>Внешняя зависимость</h3><p>Asset <code>stealth</code> должен быть загружен в Discord Application; JSON не создаёт asset.</p></section>
+
+<section id="selector"><h2>9. Добавить selector по plugin имени текущей cell</h2><p>Пример показывает изменение алгоритма, а не только данных.</p><ol><li>Добавить <code>std::string plugin</code> в <code>LocationImageRule</code>.</li><li>Прочитать optional string в <code>ReadLocationImageRules</code>.</li><li>Учесть поле в <code>hasSelector</code>.</li><li>В <code>RuleMatches</code> определить owning file текущей cell через подтверждённый CommonLib API.</li><li>Сравнить имя точно и вернуть false при несовпадении.</li><li>Документировать JSON schema.</li></ol><pre><code>{
+  "plugin": "MyLocations.esp",
+  "cell": "MyInterior",
+  "image": "my_asset"
+}</code></pre><div class="callout warning"><strong>Почему здесь нет выдуманного getter:</strong> API владения form файлом нужно проверить в используемой CommonLibSSE-NG 3.7.0. Не угадывайте method name; compile success и runtime form inspection обязательны.</div></section>
+
+<section id="logging"><h2>10. Добавить включаемый debug log</h2><p>Не пишите info на каждом 500-мс poll. Добавьте config bool:</p><pre><code>struct Config {
+    bool verboseLogging = false;
+};</code></pre><p>Прочитайте через <code>ReadBool</code>. В интересующем блоке:</p><pre><code>if (config_.verboseLogging) {
+    SKSE::log::info(
+        "Polling unchanged player state: level={} location='{}'.",
+        snapshot.level,
+        snapshot.location);
+}</code></pre><p>Лучше расширить logger level и использовать debug, но текущий logger настроен на info, поэтому debug сообщения иначе отбрасываются. Если меняете level, убедитесь, что release default остаётся info.</p><h3>Проверка</h3><p>false → файл не растёт на idle. true → ожидаемая строка примерно дважды в секунду. После диагностики вернуть false.</p></section>
+
+<section id="schema"><h2>11. Сделать <code>schema_version</code> реальной проверкой</h2><p>Сейчас loader игнорирует это поле. Для строгой версии:</p><pre><code>constexpr int kSupportedSchemaVersion = 1;
+const auto version = root.find("schema_version");
+if (version == root.end() || !version-&gt;is_number_integer() ||
+    version-&gt;get&lt;int&gt;() != kSupportedSchemaVersion) {
+    SKSE::log::error("Unsupported config schema version.");
+    return {};
+}</code></pre><h3>Решение policy</h3><p>Нужно заранее выбрать: отсутствующая версия считается legacy schema 1 или ошибкой. Строгий вариант сломает старые пользовательские JSON. Для внутреннего STB repository чистый cutover допустим, если shipped/runtime configs обновляются одновременно.</p><h3>Проверка</h3><p>Версия 1 работает; 2 и string <code>"1"</code> дают ожидаемый error и defaults.</p></section>
+
+<section id="extraction"><h2>12. Вынести форматирование Presence в чистую функцию</h2><p>Если полей станет больше, можно отделить pure formatting от coordinator:</p><pre><code>struct FormattedPresence {
+    std::string details;
+    std::string state;
+};
+
+[[nodiscard]] FormattedPresence FormatPresence(
+    const model::PlayerSnapshot&amp; snapshot)
+{
+    const std::string deaths = snapshot.deaths
+        ? std::to_string(*snapshot.deaths)
+        : std::string(constants::kUnknownDeathsText);
+    return {
+        snapshot.difficulty,
+        std::format("lvl-{} 💀-{} {}",
+                    snapshot.level, deaths, snapshot.stone)
+    };
+}</code></pre><p>Это оправдано, если formatting растёт или получает несколько consumers. Для текущих двух строк существующий inline-код проще; не создавайте abstraction только ради количества файлов.</p><h3>Преимущество</h3><p>Pure function не обращается к Skyrim/Discord, поэтому её легче проверить обычными inputs. Но тест должен защищать observable contract, а не повторять implementation.</p></section>
+
+<section id="details-location"><h2>Дополнительный пример: показывать локацию в <code>details</code></h2><p><span class="file-badge">PresenceCoordinator::RefreshPresence</span></p><pre><code>const std::string detailsText = snapshot.location.empty()
+    ? snapshot.difficulty
+    : snapshot.location;</code></pre><p>Это минимальное presentation-изменение: provider уже отдаёт location, client уже ограничивает UTF-8 длину. Ternary сохраняет difficulty как fallback для пустой позиции.</p><h3>Tradeoff</h3><p>Discord имеет только ограниченный набор полей. После изменения выбранная сложность исчезнет из <code>details</code>; прежде чем переносить её в <code>state</code>, проверьте общий лимит и читаемость строки на телефоне.</p><h3>Проверка</h3><p>Проверить exterior, именованный interior и cell без display name. При переходе snapshot log должен показать новую location, затем Discord callback должен подтвердить update.</p></section>
+
+<section id="avoid"><h2>13. Идеи, которые выглядят удобно, но опасны</h2><div class="table-wrap"><table><thead><tr><th>Идея</th><th>Проблема</th><th>Безопаснее</th></tr></thead><tbody>
+<tr><td>Автоматически запускать Discord.</td><td>Меняет системное состояние пользователя и текущий контракт.</td><td>Ясная ошибка и ручной запуск.</td></tr>
+<tr><td>Бесконечно retry SDK.</td><td>Неизвестное transport state, спам, зависания.</td><td>Fail closed до перезапуска.</td></tr>
+<tr><td>Читать player из scheduler thread.</td><td>Нарушение thread affinity Skyrim.</td><td>SKSE TaskInterface.</td></tr>
+<tr><td>Queue task на каждый combat event.</td><td>Burst и неограниченная очередь.</td><td>Atomic coalescing flag.</td></tr>
+<tr><td>Хранить Actor* combat target.</td><td>Pointer может пережить объект.</td><td>Копировать name/level.</td></tr>
+<tr><td>Hot reload config без синхронизации.</td><td>Resolver string_views и callback state могут стать invalid.</td><td>Спроектировать atomic/main-thread cutover всего Config.</td></tr>
+<tr><td>Сократить строку по символам C++ <code>char</code>.</td><td><code>char</code> — byte, UTF-8 станет битым.</td><td><code>LimitForDiscord</code>.</td></tr>
+<tr><td>Добавить универсальный event framework.</td><td>Абстракция больше текущей задачи.</td><td>Один явный sink на реальный event type.</td></tr>
+</tbody></table></div></section>
+
+<section id="checklist"><h2>14. Чек-лист готового изменения</h2><ul class="checklist"><li>Новый field имеет безопасный default.</li><li>Неверный внешний input не заменяет default.</li><li>Ownership каждой строки/pointer понятен.</li><li>Skyrim calls остаются game-thread.</li><li>Новый callback имеет catch boundary.</li><li>Очередь работы остаётся bounded.</li><li>Timestamp не пересоздаётся.</li><li>Duplicate suppression учитывает все новые Discord fields.</li><li>Добавленный Asset key существует в Discord.</li><li>Shipped JSON и MO2 runtime JSON синхронизированы.</li><li>Release DLL и PDB собраны вместе.</li><li>Изменённый путь реально пройден в Skyrim.</li><li>Log содержит ожидаемый queued snapshot и успешный callback.</li></ul></section>
+
+<nav class="page-nav" aria-label="Переход между главами"><a href="code-build.html"><small>Назад</small>Сборка и релиз</a><a href="architecture.html"><small>Завершить</small>Вернуться к обзору</a></nav><footer>Полный разбор DragonbornPresence 3.1.5 · глава 7 из 7</footer>
+</main></div></body></html>

@@ -7,7 +7,7 @@
 <title>Как устроен код — STB DragonbornPresence 3.1.5</title>
 <link rel="stylesheet" href="site.css">
 </head>
-<body>
+<body class="code-page">
 <div class="layout">
   <aside aria-label="Навигация по учебнику">
     <div class="brand">
@@ -20,6 +20,8 @@
       <a href="#purpose">Назначение страницы</a>
       <a href="#vocabulary">Базовые понятия</a>
       <a href="#map">Карта репозитория</a>
+      <a href="#full-reference">Полный разбор по главам</a>
+      <a href="#coverage-map">Карта всех блоков</a>
       <span class="nav-title">Архитектура</span>
       <a href="#architecture">Слои и зависимости</a>
       <a href="#lifecycle">Жизненный цикл</a>
@@ -61,7 +63,74 @@
         <span class="badge">Discord Game SDK 3.2.1</span>
         <span class="badge">Для начинающего разработчика</span>
       </div>
+      <details class="mobile-toc">
+        <summary>Полный разбор по файлам</summary>
+        <nav>
+          <a href="code-entry.html">1. Точка входа</a>
+          <a href="code-foundation.html">2. Модели и JSON</a>
+          <a href="code-game.html">3. Skyrim и Papyrus</a>
+          <a href="code-discord.html">4. Discord и Windows</a>
+          <a href="code-application.html">5. Координатор</a>
+          <a href="code-build.html">6. Сборка</a>
+          <a href="code-recipes.html">7. Примеры</a>
+        </nav>
+      </details>
     </header>
+
+    <section id="full-reference" class="guide-banner">
+      <h2>Полный разбор реального кода</h2>
+      <p>Обзор ниже объясняет архитектуру целиком. Для последовательного чтения с телефона код дополнительно разделён на семь небольших глав. В них разобраны все функции, методы, поля, важные выражения и конструкции C++ текущего проекта.</p>
+      <div class="chapter-list">
+        <a class="chapter-card" href="code-entry.html"><strong>1. Точка входа и заголовки</strong><span>main.cpp, SKSEPluginLoad, logger, messages, публичный API и базовый синтаксис.</span></a>
+        <a class="chapter-card" href="code-foundation.html"><strong>2. Константы, модели, строки и JSON</strong><span>constants, structs, UTF-8, ConfigLoader и выбор location asset.</span></a>
+        <a class="chapter-card" href="code-game.html"><strong>3. Skyrim и Papyrus</strong><span>Forms, PlayerSnapshot, камни, сложность, позиции и шаблоны ScriptUtils.</span></a>
+        <a class="chapter-card" href="code-discord.html"><strong>4. Discord и Windows</strong><span>Registry, процессы, delay-load DLL, Core, callbacks, signatures и ошибки.</span></a>
+        <a class="chapter-card" href="code-application.html"><strong>5. Координатор, события и потоки</strong><span>State machine, event sinks, polling, atomics, jthread и границы исключений.</span></a>
+        <a class="chapter-card" href="code-build.html"><strong>6. Сборка и релиз</strong><span>CMake, зависимости, PDB, ZIP, MO2, presets, JSON и GitHub Actions.</span></a>
+        <a class="chapter-card" href="code-recipes.html"><strong>7. Практические изменения</strong><span>Двенадцать расширений с точками изменения, рисками и проверкой в Skyrim.</span></a>
+      </div>
+    </section>
+
+    <section id="coverage-map">
+      <h2>Карта полноты: где разобран каждый блок</h2>
+      <p>Список ниже повторяет структуру исходников. Если встретили имя функции в коде, по этой карте можно сразу перейти к её объяснению.</p>
+      <details>
+        <summary><code>src/main.cpp</code> и маленькие заголовки</summary>
+        <div>
+          <p><a href="code-entry.html#translation-unit">includes, __ImageBase, anonymous namespace</a>; <a href="code-entry.html#logging">InitializeLogging</a>; <a href="code-entry.html#entry-failure">LogEntryPointFailure</a>; <a href="code-entry.html#messages">OnSkseMessage</a>; <a href="code-entry.html#plugin-load">SKSEPluginLoad</a>; <a href="code-entry.html#public-header">DragonbornPresence.h</a>; <a href="code-entry.html#small-headers">AdditionalFunctions.h, discord_loader.h, pch.h</a>.</p>
+        </div>
+      </details>
+      <details>
+        <summary><code>DragonbornPresence.cpp</code>: фундамент</summary>
+        <div>
+          <p><a href="code-foundation.html#constants">constants</a>; <a href="code-foundation.html#stones">StoneDefinition и kStoneDefinitions</a>; <a href="code-foundation.html#models">все структуры model, RefreshReason, Difficulty, ToLogLabel</a>; <a href="code-foundation.html#text">FromGameString, LimitForDiscord, ContainsAsciiInsensitive</a>; <a href="code-foundation.html#config">ConfigLoader и все private readers</a>; <a href="code-foundation.html#resolver">LocationAssetResolver, Resolve, EditorIdEquals, RuleMatches</a>; <a href="code-foundation.html#additional">Cp1251ToUtf8 и IsValidUtf8</a>.</p>
+        </div>
+      </details>
+      <details>
+        <summary><code>DragonbornPresence.cpp</code>: Skyrim и <code>ScriptUtils.h</code></summary>
+        <div>
+          <p><a href="code-game.html#initialize">StbDataProvider::Initialize</a>; <a href="code-game.html#snapshot">ReadPlayerSnapshot</a>; <a href="code-game.html#stone-name">ParseStoneName</a>; <a href="code-game.html#difficulty">DifficultyName и ReadSelectedDifficulty</a>; <a href="code-game.html#stone">ReadSelectedStone</a>; <a href="code-game.html#position">BuildDisplayPosition</a>; <a href="code-game.html#script-utils">все четыре шаблона ScriptUtils</a>.</p>
+        </div>
+      </details>
+      <details>
+        <summary><code>discord_loader.cpp</code> и Discord client</summary>
+        <div>
+          <p><a href="code-discord.html#win-errors">SetFailureReason, WindowsErrorDetails, DescribeWindowsError, SetWindowsFailureReason</a>; <a href="code-discord.html#paths">ExtractExecutablePath, IsExistingFile, BuildPluginSiblingPath</a>; <a href="code-discord.html#running">IsDiscordRunning</a>; <a href="code-discord.html#dll">LoadDiscordSdk</a>; <a href="code-discord.html#delay">DiscordDelayHook и __pfnDliNotifyHook2</a>; <a href="code-discord.html#results">DescribeResult и LogSdkMessage</a>; <a href="code-discord.html#client-init">Initialize</a>; <a href="code-discord.html#callbacks">RunCallbacks и IsActive</a>; <a href="code-discord.html#update">UpdateActivity</a>; <a href="code-discord.html#shutdown">Shutdown, logging, Disable и timestamp</a>.</p>
+        </div>
+      </details>
+      <details>
+        <summary><code>DragonbornPresence.cpp</code>: application</summary>
+        <div>
+          <p><a href="code-application.html#sinks">MenuEventSink и CombatEventSink</a>; <a href="code-application.html#owner">constructor coordinator</a>; <a href="code-application.html#exceptions">HandleException, HandleUnknownException, Stop</a>; <a href="code-application.html#registration">LoadConfig и RegisterGameEventHandlers</a>; <a href="code-application.html#state-machine">OnGameLoaded, HandleMenuEvent, HandleCombatEvent, SetLoading</a>; <a href="code-application.html#refresh">SendLoadingPresence и RefreshPresence</a>; <a href="code-application.html#scheduler">StartCallbackThread и HandleBackgroundException</a>; <a href="code-application.html#fields">все поля</a>; <a href="code-application.html#sink-bodies">обе ProcessEvent</a>; <a href="code-application.html#wrappers">глобальный coordinator и три публичные обёртки</a>.</p>
+        </div>
+      </details>
+      <details>
+        <summary>Сборочная и релизная инфраструктура</summary>
+        <div>
+          <p><a href="code-build.html#project">project и C++ standard</a>; <a href="code-build.html#deps">все FetchContent dependencies</a>; <a href="code-build.html#sdk">Discord SDK download и wrapper target</a>; <a href="code-build.html#target">SKSE target, headers, resources, PCH</a>; <a href="code-build.html#link">линковка и flags</a>; <a href="code-build.html#symbols">Release PDB</a>; <a href="code-build.html#package">packaging и MO2 deploy</a>; <a href="code-build.html#presets">все presets</a>; <a href="code-build.html#json">runtime JSON</a>; <a href="code-build.html#workflow">весь release workflow</a>.</p>
+        </div>
+      </details>
+    </section>
 
     <section id="purpose">
       <h2>1. Что объясняет этот раздел</h2>
@@ -125,7 +194,7 @@
           </tbody>
         </table>
       </div>
-      <p class="source-link">Исходники: <a href="https://github.com/STB-Team/DragonbornPresence-SE/tree/main/src">src/</a> · <a href="https://github.com/STB-Team/DragonbornPresence-SE/tree/main/include">include/</a> · <a href="https://github.com/STB-Team/DragonbornPresence-SE/blob/main/CMakeLists.txt">CMakeLists.txt</a></p>
+      <p class="source-link">Исходники: <a href="https://github.com/STB-Team/DragonbornPresence-SE/tree/master/src">src/</a> · <a href="https://github.com/STB-Team/DragonbornPresence-SE/tree/master/include">include/</a> · <a href="https://github.com/STB-Team/DragonbornPresence-SE/blob/master/CMakeLists.txt">CMakeLists.txt</a></p>
     </section>
 
     <section id="architecture">
@@ -168,7 +237,7 @@ integration::DiscordPresenceClient
       <ol class="steps">
         <li><strong>Windows/SKSE загружает DLL.</strong> Вызывается <code>SKSEPluginLoad(skse)</code>.</li>
         <li><strong>SKSE инициализируется.</strong> <code>SKSE::Init(skse)</code> подготавливает интерфейсы CommonLib.</li>
-        <li><strong>Создаётся лог.</strong> <code>InitializeLogging()</code> открывает <code>DragonbornPresence.log</code> в режиме append.</li>
+        <li><strong>Создаётся лог.</strong> <code>InitializeLogging()</code> открывает <code>DragonbornPresence.log</code> с очисткой предыдущего содержимого для нового запуска.</li>
         <li><strong>Discord проверяется заранее.</strong> Код проверяет регистрацию <code>discord://</code>, путь к EXE и наличие соответствующего процесса.</li>
         <li><strong>Читается JSON.</strong> <code>LoadConfig()</code> сохраняет валидированную конфигурацию в глобальном координаторе.</li>
         <li><strong>Регистрируется Messaging listener.</strong> Теперь SKSE может сообщать о стадиях загрузки.</li>
@@ -273,7 +342,7 @@ AddTask(lambda) -----------------------> callbackTaskPending_ = false
         <li>Просит <code>SKSE::log::log_directory()</code> вернуть стандартный каталог SKSE logs.</li>
         <li>Если каталог недоступен, через <code>GetModuleFileNameW</code> берёт каталог DLL; последний fallback — current working directory.</li>
         <li>Добавляет имя <code>DragonbornPresence.log</code>.</li>
-        <li>Создаёт многопоточный <code>basic_file_sink_mt</code> в append-режиме.</li>
+        <li>Создаёт многопоточный <code>basic_file_sink_mt</code>; аргумент <code>true</code> включает truncate, поэтому каждый запуск начинает новый лог.</li>
         <li>Устанавливает уровень <code>info</code> и flush на каждом сообщении уровня info или выше.</li>
         <li>Делает logger глобальным для <code>SKSE::log</code>.</li>
       </ol>

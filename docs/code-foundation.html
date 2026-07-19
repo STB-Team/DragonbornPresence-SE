@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Полный разбор constants, model, text, ConfigLoader, LocationAssetResolver и строковых функций DragonbornPresence.">
+<title>Модели, строки и JSON — код DragonbornPresence</title>
+<link rel="stylesheet" href="site.css">
+</head>
+<body class="code-page">
+<div class="layout">
+  <aside aria-label="Навигация по разбору кода">
+    <div class="brand"><strong>Полный разбор кода</strong><span>2 из 7 · фундамент</span></div>
+    <nav>
+      <a href="architecture.html">Обзор архитектуры</a><a href="code-entry.html">1. Точка входа</a><a href="code-foundation.html">2. Модели и JSON</a><a href="code-game.html">3. Skyrim и Papyrus</a><a href="code-discord.html">4. Discord и Windows</a><a href="code-application.html">5. Координатор</a><a href="code-build.html">6. Сборка и релиз</a><a href="code-recipes.html">7. Примеры</a>
+      <span class="nav-title">Эта страница</span>
+      <a href="#constants">Константы</a><a href="#stones">Камни</a><a href="#models">Модели</a><a href="#text">namespace text</a><a href="#additional">AdditionalFunctions</a><a href="#config">ConfigLoader</a><a href="#rules">Правила локаций</a><a href="#resolver">Asset resolver</a><a href="#constructs">Конструкции C++</a>
+    </nav>
+  </aside>
+  <main>
+    <header class="hero">
+      <p class="breadcrumbs"><a href="index.html">Документация</a> / <a href="architecture.html">Код</a> / Модели и JSON</p>
+      <p class="eyebrow">DragonbornPresence.cpp · строки 29–507</p>
+      <h1>Константы, модели, строки и конфигурация</h1>
+      <p class="lead">Фундамент системы: какие данные существуют, кто владеет строками, как внешний JSON превращается в безопасный объект и почему правило локации выбирается строго сверху вниз.</p>
+      <div class="badges"><span class="badge">constants</span><span class="badge">model</span><span class="badge">text</span><span class="badge">configuration</span><span class="badge">assets</span></div>
+      <details class="mobile-toc"><summary>Оглавление и другие главы</summary><nav><a href="code-entry.html">Предыдущая</a><a href="code-game.html">Следующая</a><a href="#constants">Константы</a><a href="#models">Модели</a><a href="#text">UTF-8</a><a href="#config">JSON loader</a><a href="#resolver">Локации</a><a href="#constructs">C++</a></nav></details>
+    </header>
+
+    <section id="coverage">
+      <h2>Покрытие реального кода</h2>
+      <p><span class="coverage-ok">Полностью разобраны:</span> 20 runtime-констант, 19 определений камней, 9 структур, 2 enum, 4 текстовые функции, 6 методов <code>ConfigLoader</code> и 4 блока <code>LocationAssetResolver</code>.</p>
+      <p><a href="https://github.com/STB-Team/DragonbornPresence-SE/blob/master/src/DragonbornPresence.cpp#L29-L507">Открыть строки 29–507</a> · <a href="https://github.com/STB-Team/DragonbornPresence-SE/blob/master/src/AdditionalFunctions.cpp">AdditionalFunctions.cpp</a></p>
+    </section>
+
+    <section id="constants">
+      <h2>1. <code>namespace constants</code>, строки 29–52</h2>
+      <p>Эти значения компилируются в DLL. Они не читаются из JSON и одинаковы для текущей сборки. <code>constexpr</code> делает объект доступным для compile-time вычислений и запрещает runtime-изменение.</p>
+      <div class="table-wrap"><table><thead><tr><th>Константа</th><th>Значение</th><th>Использование</th></tr></thead><tbody>
+        <tr><td><code>kDefaultApplicationId</code></td><td><code>1527543892151373937</code></td><td>Fallback, если JSON не содержит валидный Discord Application ID.</td></tr>
+        <tr><td><code>kConfigPath</code></td><td><code>Data\SKSE\Plugins\DragonbornPresence.json</code></td><td>Путь от working directory Skyrim.</td></tr>
+        <tr><td><code>kDiscordCallbackInterval</code></td><td>500 мс</td><td>Сон scheduler и единица вычисления предупреждений/таймаута.</td></tr>
+        <tr><td><code>kPresencePollIntervalInCallbackTicks</code></td><td>1</td><td>Snapshot читается на каждом callback tick.</td></tr>
+        <tr><td><code>kPendingTaskWarningTicks</code></td><td>1</td><td>Первое предупреждение после одного пропущенного tick.</td></tr>
+        <tr><td><code>kPendingTaskWarningRepeatTicks</code></td><td>10</td><td>Повтор предупреждения каждые 5 секунд.</td></tr>
+        <tr><td><code>kActivityCallbackTimeoutTicks</code></td><td>20</td><td>20 × 500 мс = 10 секунд ожидания UpdateActivity callback.</td></tr>
+        <tr><td><code>kDiscordTextMaxBytes</code></td><td>127</td><td>Максимум байт текста перед отправкой.</td></tr>
+        <tr><td><code>kDifficultyQuestFormId</code></td><td><code>0x1417C4</code></td><td>Локальный Form ID quest сложности.</td></tr>
+        <tr><td><code>kStbPluginName</code></td><td><code>STB.esp</code></td><td>Файл, внутри которого lookup разрешает Form ID.</td></tr>
+        <tr><td><code>kDifficultyScriptName</code></td><td><code>aamz_mcmdatastorage</code></td><td>Точное имя Papyrus type.</td></tr>
+        <tr><td><code>kDifficultyPropertyName</code></td><td><code>aaMZ_SelectedLevel_OfDifficulty</code></td><td>Property/variable выбранной сложности.</td></tr>
+        <tr><td><code>kDeathsGlobalEditorId</code></td><td><code>aaMZgv_NowDeath</code></td><td>Lookup global смертей.</td></tr>
+        <tr><td><code>kMainMenuName</code></td><td><code>Main Menu</code></td><td>Сброс gameLoaded при возврате в меню.</td></tr>
+        <tr><td><code>kLoadingMenuName</code></td><td><code>Loading Menu</code></td><td>Переключение loading state.</td></tr>
+        <tr><td><code>kLoadingText</code></td><td><code>Загрузка</code></td><td>State и hover text loading Activity.</td></tr>
+        <tr><td><code>kUnknownDeathsText</code></td><td><code>—</code></td><td>Global не найден.</td></tr>
+        <tr><td><code>kUnknownDifficultyText</code></td><td><code>не определена</code></td><td>Papyrus value отсутствует/неизвестен.</td></tr>
+        <tr><td><code>kNoStoneText</code></td><td><code>не выбран</code></td><td>Ни один stone spell не активен.</td></tr>
+        <tr><td><code>kCombatText</code></td><td><code>В бою</code></td><td>Базовый combat hover text.</td></tr>
+      </tbody></table></div>
+      <div class="callout"><strong>Константа не равна инварианту.</strong> Значение 500 мс — константа сборки. Правило «не больше одной queued task» — инвариант, который поддерживается изменяемым atomic-флагом.</div>
+    </section>
+
+    <section id="stones">
+      <h2>2. <code>StoneDefinition</code> и таблица 19 камней</h2>
+      <pre><code>struct StoneDefinition {
+    std::string_view descriptionSpellEditorId;
+    std::string_view fallbackName;
+};
+
+constexpr std::array kStoneDefinitions{ /* 19 записей */ };</code></pre>
+      <p>Оба <code>string_view</code> смотрят на string literals со static storage duration, поэтому views действительны весь запуск. <code>std::array</code> имеет размер, известный компилятору; class template argument deduction выводит тип элемента и размер из initializer.</p>
+      <div class="table-wrap"><table><thead><tr><th>Spell Editor ID</th><th>Fallback</th></tr></thead><tbody>
+        <tr><td><code>aaMZs_DoomstoneWarriorDesc</code></td><td>Воин</td></tr><tr><td><code>aaMZs_DoomstoneSteedDesc</code></td><td>Конь</td></tr><tr><td><code>aaMZs_DoomstoneAtronachDesc</code></td><td>Атронах</td></tr><tr><td><code>aaMZs_DoomstoneApprenticeDesc</code></td><td>Ученик</td></tr><tr><td><code>aaMZs_DoomstoneLordDesc</code></td><td>Лорд</td></tr><tr><td><code>aaMZs_DoomstoneThiefDesc</code></td><td>Вор</td></tr><tr><td><code>aaMZs_DoomstoneMageDesc</code></td><td>Маг</td></tr><tr><td><code>aaMZs_DoomstoneRitualDesc</code></td><td>Ритуал</td></tr><tr><td><code>aaMZs_DoomstoneSnakeDesc</code></td><td>Змей</td></tr><tr><td><code>aaMZs_DoomstoneLadyDesc</code></td><td>Леди</td></tr><tr><td><code>aaMZs_DoomstoneLoverDesc</code></td><td>Любовник</td></tr><tr><td><code>aaMZs_DoomstoneShadowDesc</code></td><td>Тень</td></tr><tr><td><code>aaMZs_DoomstoneTowerDesc</code></td><td>Башня</td></tr><tr><td><code>aaMZs_DoomstoneBeastDesc</code></td><td>Зверь</td></tr><tr><td><code>aaMZs_DoomstoneWindDesc</code></td><td>Ветер</td></tr><tr><td><code>aaMZs_DoomstoneWaterDesc</code></td><td>Вода</td></tr><tr><td><code>aaMZs_DoomstoneTreeDesc</code></td><td>Дерево</td></tr><tr><td><code>aaMZs_DoomstoneSunDesc</code></td><td>Солнце</td></tr><tr><td><code>aaMZs_DoomstoneEarthDesc</code></td><td>Земля</td></tr>
+      </tbody></table></div>
+      <p>Emoji в реальной таблице являются частью fallback-строк. Здесь названия сокращены визуально; точные literals смотрите в source link. Runtime сначала пытается взять локализованное <code>name</code> из JSON description spell.</p>
+    </section>
+
+    <section id="models">
+      <h2>3. Все структуры <code>namespace model</code></h2>
+      <h3><code>LocationImageRule</code></h3>
+      <p>Шесть владеющих <code>std::string</code>: четыре selectors и два результата. Строки владеют JSON-данными после уничтожения parse tree. Пустой selector означает «условие не задано».</p>
+      <h3><code>Config</code></h3>
+      <div class="table-wrap"><table><thead><tr><th>Поле</th><th>Default</th><th>Владение/смысл</th></tr></thead><tbody>
+        <tr><td><code>enabled</code></td><td>true</td><td>Разрешает SDK initialization.</td></tr><tr><td><code>applicationId</code></td><td>STB ID</td><td><code>discord::ClientId</code> — SDK integer alias.</td></tr><tr><td><code>largeImage</code></td><td><code>stb_logo</code></td><td>Fallback Asset key.</td></tr><tr><td><code>largeText</code></td><td><code>Skyrim True Believer</code></td><td>Fallback hover text.</td></tr><tr><td><code>loadingImage</code></td><td><code>loading</code></td><td>Small asset загрузки.</td></tr><tr><td><code>combatImage</code></td><td><code>combat</code></td><td>Small asset боя.</td></tr><tr><td><code>locationImageRules</code></td><td>пустой vector</td><td>Порядок элементов является приоритетом.</td></tr>
+      </tbody></table></div>
+      <h3><code>StoneRuntimeData</code> и <code>StbRuntimeData</code></h3>
+      <p><code>StoneRuntimeData</code> связывает невладеющий Skyrim pointer <code>SpellItem*</code> с владеющим готовым именем. <code>StbRuntimeData</code> кэширует два form pointers и vector камней. Плагин не удаляет Skyrim forms: владельцем остаётся игра.</p>
+      <h3><code>CombatTargetData</code></h3>
+      <p>Копирует имя и 16-bit level, не хранит actor pointer. Это важно: actor handle может стать недействительным, а простые значения безопасно переживают краткий разрыв target.</p>
+      <h3><code>PlayerSnapshot</code></h3>
+      <p>Value object одного чтения. <code>optional&lt;int&gt; deaths</code> различает настоящий ноль и отсутствие global. Строки принадлежат snapshot. <code>inCombat=false</code> задаёт безопасный default.</p>
+      <h3><code>LargeAssetSelection</code></h3>
+      <p>Два views на строки долгоживущего <code>Config</code>. Класс resolver хранит reference на config, а selection используется сразу в том же refresh. Если config заменить при живом selection, views стали бы invalid; текущий lifecycle не делает reload во время runtime.</p>
+      <h3><code>ActivityPayload</code></h3>
+      <p>Шесть views: details, state, large image/text, small image/text. Payload не владеет памятью и предназначен только для немедленного вызова client. Это экономит копии между coordinator и transport.</p>
+      <h3><code>RefreshReason</code> и <code>ToLogLabel</code></h3>
+      <pre><code>enum class RefreshReason { kGameLoaded, kLoadingFinished, kCombat, kPoll };</code></pre>
+      <p><code>enum class</code> не смешивается неявно с int и требует квалификации. <code>ToLogLabel</code> — <code>constexpr noexcept</code> switch. Последний <code>return "unknown"</code> страхует невозможное/повреждённое значение.</p>
+      <h3><code>Difficulty : int</code></h3>
+      <p>Underlying type явно int, потому что Papyrus reader возвращает int. Значения 0–4 закреплены за контрактом STB. <code>static_cast&lt;Difficulty&gt;</code> не валидирует число, поэтому <code>default</code> в следующем switch обязателен.</p>
+    </section>
+
+    <section id="text">
+      <h2>4. <code>namespace text</code></h2>
+      <h3><code>FromGameString</code>, строки 185–189</h3>
+      <pre><code>if (!value || *value == '\0') return {};
+return IsValidUtf8(value) ? std::string(value) : Cp1251ToUtf8(value);</code></pre>
+      <p>Первая часть проверяет pointer до dereference благодаря short-circuit <code>||</code>. <code>return {}</code> value-initializes пустой <code>std::string</code>. Ternary оставляет валидный UTF-8 неизменным, иначе предполагает CP1251.</p>
+      <h3><code>LimitForDiscord</code>, строки 192–202</h3>
+      <ol>
+        <li>До 127 байт возвращается обычная копия.</li>
+        <li><code>validSize</code> начинает с byte offset 127.</li>
+        <li>Маска <code>(byte &amp; 0xC0) == 0x80</code> распознаёт continuation byte UTF-8.</li>
+        <li>Индекс движется назад до leading byte.</li>
+        <li><code>substr(0, validSize)</code> копируется во владеющую строку.</li>
+      </ol>
+      <p>Проверка читает <code>value[validSize]</code>; она выполняется только когда исходная строка длиннее 127, поэтому индекс 127 существует.</p>
+      <h3><code>ContainsAsciiInsensitive</code>, строки 205–230</h3>
+      <p>Пустой pattern всегда найден. Pattern длиннее value — никогда. Lambda <code>foldAscii</code> преобразует только A–Z. Внешний цикл выбирает offset, внутренний сравнивает все bytes. Complexity в худшем случае $O(nm)$; для коротких location names и rules это приемлемо.</p>
+      <div class="callout warning">Кириллица сравнивается byte-for-byte и чувствительна к регистру. Название функции честно говорит <code>AsciiInsensitive</code>, а не Unicode-insensitive.</div>
+    </section>
+
+    <section id="additional">
+      <h2>5. <code>AdditionalFunctions.cpp</code>, все 52 строки</h2>
+      <h3><code>Cp1251ToUtf8</code></h3>
+      <div class="table-wrap"><table class="line-notes"><thead><tr><th>Строки</th><th>Разбор</th></tr></thead><tbody>
+        <tr><td>4–5</td><td>Null/empty guard. <code>*str</code> читается только после <code>!str</code> благодаря short circuit.</td></tr>
+        <tr><td>7–8</td><td>Первый <code>MultiByteToWideChar</code> с null output узнаёт требуемый размер UTF-16 вместе с terminator.</td></tr>
+        <tr><td>10–11</td><td>Создаётся <code>wstring</code> точного размера и заполняется. Ошибка возвращает пустую строку.</td></tr>
+        <tr><td>13–15</td><td>Размер UTF-8 вычисляется по <code>wlen - 1</code>, чтобы не включить null terminator в content.</td></tr>
+        <tr><td>17–19</td><td>Создаётся <code>std::string</code> точного размера, WinAPI записывает байты, string возвращается по value.</td></tr>
+      </tbody></table></div>
+      <p>Современный compiler применяет return value optimization/move, поэтому возвращение string не означает обязательную полную копию buffer.</p>
+      <h3><code>IsValidUtf8</code></h3>
+      <div class="table-wrap"><table class="line-notes"><thead><tr><th>Блок</th><th>Разбор</th></tr></thead><tbody>
+        <tr><td>22–24</td><td><code>reinterpret_cast</code> рассматривает chars как unsigned bytes, чтобы bit shifts не зависели от signed char.</td></tr>
+        <tr><td>26–34</td><td>Leading byte определяет code point prefix и длину 1–4. Другой prefix invalid.</td></tr>
+        <tr><td>36–41</td><td>Каждый continuation byte обязан иметь mask <code>10xxxxxx</code>; payload добавляется через shift на 6.</td></tr>
+        <tr><td>43–49</td><td>Отклоняются значения вне Unicode, surrogates и overlong encodings.</td></tr>
+        <tr><td>51</td><td>true только после полного прохода без раннего отказа.</td></tr>
+      </tbody></table></div>
+      <p><code>uint32_t cp</code> достаточно для максимального Unicode <code>0x10FFFF</code>. <code>int num</code> хранит маленькую длину, не размер buffer.</p>
+    </section>
+
+    <section id="config">
+      <h2>6. <code>ConfigLoader</code>, строки 236–434</h2>
+      <h3><code>Load()</code>, строки 240–284</h3>
+      <div class="table-wrap"><table class="line-notes"><thead><tr><th>Строки</th><th>Что и почему</th></tr></thead><tbody>
+        <tr><td>242</td><td><code>model::Config config;</code> сразу создаёт все safe defaults.</td></tr>
+        <tr><td>243–247</td><td><code>ifstream</code> открывает config. Stream в boolean context false при ошибке.</td></tr>
+        <tr><td>249–254</td><td>Parse внутри try. Корень обязан быть object; array/string root отвергается.</td></tr>
+        <tr><td>256–259</td><td>C++17 if-initializer ограничивает pointer областью if и одновременно проверяет его.</td></tr>
+        <tr><td>260–277</td><td>Assets и вложенный small_images читаются теми же typed helpers.</td></tr>
+        <tr><td>278</td><td>Info означает завершённый parse, даже если отдельные поля получили warning.</td></tr>
+        <tr><td>279–282</td><td>JSON exception логируется; <code>return {}</code> создаёт новый default Config.</td></tr>
+        <tr><td>283</td><td>Возвращается частично настроенный, но валидный config.</td></tr>
+      </tbody></table></div>
+      <h3><code>FindObject()</code>, строки 288–300</h3>
+      <p><code>parent.find(key)</code> не создаёт отсутствующий элемент. Iterator сравнивается с <code>end()</code>. <code>&amp;*value</code> получает pointer на JSON value внутри parse tree; pointer используется только пока root живёт внутри <code>Load()</code>.</p>
+      <h3><code>ReadBool()</code> и <code>ReadString()</code></h3>
+      <p>Оба принимают target по non-const reference. Target меняется только после проверки типа. Отсутствующий key молча оставляет default; присутствующий неверный type пишет warning. Это различает нормальную необязательность и ошибку пользователя.</p>
+      <h3><code>ReadApplicationId()</code></h3>
+      <ul>
+        <li>Integer принимается только если положительный.</li>
+        <li>String копируется в <code>encodedId</code>, затем <code>from_chars</code> заполняет <code>parsedId</code>.</li>
+        <li>Structured binding <code>const auto [end, error]</code> раскладывает result.</li>
+        <li>Нужны одновременно: нет error, end достиг конца строки, ID &gt; 0.</li>
+        <li>Строка <code>"123x"</code> отвергается, хотя числовой prefix parseable.</li>
+      </ul>
+      <h3><code>ReadLocationImageRules()</code></h3>
+      <p>Array валидируется до цикла. <code>reserve</code> не меняет size, только capacity. Индекс нужен для точного warning path. Каждый элемент обязан быть object.</p>
+      <pre><code>const auto readOptionalString = [&amp;](const char* key, std::string&amp; target) {
+    // захватывает value, ruleIndex и isValid по reference
+};</code></pre>
+      <p>Lambda устраняет шесть одинаковых блоков. Capture <code>[&amp;]</code> безопасен, потому что lambda не сохраняется и вызывается только внутри текущей iteration. Неверный тип ставит общий <code>isValid=false</code>.</p>
+      <p><code>hasSelector</code> требует хотя бы одно условие. <code>image</code> обязательно. <code>text</code> необязателен. Валидное правило перемещается в vector. Только в самом конце весь vector перемещается в config.</p>
+      <div class="callout"><strong>schema_version:</strong> поле существует в shipped JSON, но ни одна строка <code>ConfigLoader</code> его не читает. Сейчас это человеческая метка, не runtime validation.</div>
+    </section>
+
+    <section id="rules">
+      <h2>7. Семантика JSON-правил</h2>
+      <pre><code>{
+  "worldspace": "...",  // optional exact Editor ID
+  "location": "...",    // optional current/parent Location Editor ID
+  "cell": "...",        // optional parent Cell Editor ID
+  "match": "...",       // optional substring display name
+  "image": "...",       // required Asset key
+  "text": "..."         // optional hover text
+}</code></pre>
+      <p>Если указаны несколько selectors, действует логическое AND. Array order — priority. Loader не проверяет существование Editor IDs и Discord assets: C++ не имеет authoritative registry всех будущих runtime forms/assets.</p>
+      <p>В shipped JSON 438 entries. Это данные одного алгоритма, а не 438 разных веток C++. Документировать каждую запись как код бессмысленно; каждая имеет одинаковую схему и различается только значениями.</p>
+    </section>
+
+    <section id="resolver">
+      <h2>8. <code>LocationAssetResolver</code>, строки 438–507</h2>
+      <h3>Конструктор</h3>
+      <pre><code>explicit LocationAssetResolver(const model::Config&amp; config) noexcept
+    : config_(config) {}</code></pre>
+      <p><code>explicit</code> запрещает неявно превращать Config в resolver. Member initializer list инициализирует reference; reference нельзя оставить пустым и назначить позже.</p>
+      <h3><code>Resolve()</code></h3>
+      <p>При существующем player range-for перебирает const references на rules. Первое <code>RuleMatches=true</code> немедленно возвращается. Ternary выбирает rule text или config fallback. Без совпадения возвращается общий asset.</p>
+      <h3><code>EditorIdEquals()</code></h3>
+      <ul>
+        <li>Пустой expected означает «selector не ограничивает правило» → true.</li>
+        <li>Null form при непустом expected → false.</li>
+        <li><code>GetFormEditorID()</code> также может вернуть null.</li>
+        <li><code>expected == editorId</code> сравнивает содержимое через <code>string_view</code>, не адреса pointers.</li>
+      </ul>
+      <h3><code>RuleMatches()</code></h3>
+      <p>Каждый непустой selector может немедленно вернуть false. Location обходит linked parent chain:</p>
+      <pre><code>for (auto* location = player-&gt;GetCurrentLocation(); location;
+     location = location-&gt;parentLoc) {
+    if (EditorIdEquals(location, rule.location)) { found = true; break; }
+}</code></pre>
+      <p>Цикл завершится на null parent. После structural selectors последним проверяется display-name <code>match</code>. Short-circuit <code>rule.match.empty() || ...</code> не запускает поиск для пустого pattern.</p>
+    </section>
+
+    <section id="constructs">
+      <h2>9. Конструкции C++ этой главы</h2>
+      <div class="table-wrap"><table><thead><tr><th>Конструкция</th><th>Значение в коде</th></tr></thead><tbody>
+        <tr><td><code>constexpr</code></td><td>Объект/функция может использоваться при compile time и не меняется runtime.</td></tr><tr><td><code>std::array</code></td><td>Fixed-size contiguous container; размер часть типа.</td></tr><tr><td><code>std::vector</code></td><td>Dynamic contiguous array с ownership элементов.</td></tr><tr><td><code>std::optional</code></td><td>Явное наличие/отсутствие значения.</td></tr><tr><td><code>std::string_view</code></td><td>Pointer + length без ownership; следить за lifetime.</td></tr><tr><td><code>enum class</code></td><td>Scoped strongly typed перечисление.</td></tr><tr><td><code>static_cast</code></td><td>Проверяемое компилятором явное преобразование между связанными типами.</td></tr><tr><td><code>if (init; condition)</code></td><td>Initializer и проверка с ограниченной областью переменной.</td></tr><tr><td><code>structured binding</code></td><td>Разложение tuple-like результата на имена.</td></tr><tr><td><code>reserve</code></td><td>Меняет capacity, не создавая элементов.</td></tr><tr><td><code>std::move</code></td><td>Разрешает перенос буфера string/vector вместо копирования.</td></tr><tr><td><code>explicit</code></td><td>Запрещает нежелательную неявную конверсию через конструктор.</td></tr><tr><td><code>final</code></td><td>Класс нельзя наследовать; здесь классы — законченные implementation units.</td></tr>
+      </tbody></table></div>
+    </section>
+
+    <nav class="page-nav" aria-label="Переход между главами"><a href="code-entry.html"><small>Назад</small>Точка входа</a><a href="code-game.html"><small>Далее</small>Skyrim и Papyrus</a></nav>
+    <footer>Полный разбор DragonbornPresence 3.1.5 · глава 2 из 7</footer>
+  </main>
+</div>
+</body>
+</html>

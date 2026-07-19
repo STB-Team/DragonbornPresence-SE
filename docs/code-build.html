@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ru">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Поблочный разбор CMakeLists, CMakePresets, JSON и GitHub Release workflow DragonbornPresence."><title>Сборка и релиз — код DragonbornPresence</title><link rel="stylesheet" href="site.css"></head>
+<body class="code-page"><div class="layout">
+<aside aria-label="Навигация по разбору кода"><div class="brand"><strong>Полный разбор кода</strong><span>6 из 7 · build system</span></div><nav><a href="architecture.html">Обзор</a><a href="code-entry.html">1. Точка входа</a><a href="code-foundation.html">2. Модели и JSON</a><a href="code-game.html">3. Skyrim и Papyrus</a><a href="code-discord.html">4. Discord и Windows</a><a href="code-application.html">5. Координатор</a><a href="code-build.html">6. Сборка</a><a href="code-recipes.html">7. Примеры</a><span class="nav-title">Эта страница</span><a href="#project">Project</a><a href="#deps">Зависимости</a><a href="#sdk">Discord SDK</a><a href="#target">Plugin target</a><a href="#link">Линковка</a><a href="#symbols">PDB</a><a href="#package">ZIP и MO2</a><a href="#presets">Presets</a><a href="#json">Runtime JSON</a><a href="#workflow">GitHub workflow</a></nav></aside>
+<main><header class="hero"><p class="breadcrumbs"><a href="index.html">Документация</a> / <a href="architecture.html">Код</a> / Сборка</p><p class="eyebrow">CMakeLists.txt · CMakePresets.json · release.yml · config</p><h1>Как исходники превращаются в мод</h1><p class="lead">Каждый блок build system: получение библиотек, создание SKSE target, delay-load, Release symbols, ZIP, автоматическая установка в MO2 и публикация по Git tag.</p><div class="badges"><span class="badge">CMake 4.2</span><span class="badge">Visual Studio 2026</span><span class="badge">v145 x64</span><span class="badge">GitHub Actions</span></div><details class="mobile-toc"><summary>Оглавление и другие главы</summary><nav><a href="code-application.html">Предыдущая</a><a href="code-recipes.html">Следующая</a><a href="#deps">Dependencies</a><a href="#target">DLL target</a><a href="#package">Packaging</a><a href="#presets">Presets</a><a href="#json">JSON</a><a href="#workflow">Release</a></nav></details></header>
+
+<section id="coverage"><h2>Покрытие</h2><p><span class="coverage-ok">Разобраны все блоки:</span> 209 строк CMakeLists, 41 строка presets, 42 строки release workflow, корневая схема и semantics 438 однотипных location records.</p><p><a href="https://github.com/STB-Team/DragonbornPresence-SE/blob/master/CMakeLists.txt">CMakeLists.txt</a> · <a href="https://github.com/STB-Team/DragonbornPresence-SE/blob/master/CMakePresets.json">CMakePresets.json</a> · <a href="https://github.com/STB-Team/DragonbornPresence-SE/blob/master/.github/workflows/release.yml">release.yml</a></p></section>
+
+<section id="project"><h2>1. Строки 1–11: требования проекта</h2><pre><code>cmake_minimum_required(VERSION 4.2)
+project(DragonbornPresence VERSION 3.1.5 LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+include(FetchContent)
+set(CMAKE_SKIP_INSTALL_RULES TRUE)</code></pre><ul><li>Минимальная версия проверяется до остальных commands.</li><li><code>project</code> задаёт имя target namespace, версию и включает C++ toolchain.</li><li>Standard 23 нужен, в частности, для <code>optional::transform</code>.</li><li><code>REQUIRED ON</code> запрещает compiler тихо откатиться на старый standard.</li><li><code>FetchContent</code> загружает dependencies на configure stage.</li><li>Plugin не имеет <code>cmake --install</code>; skip защищает от install export rules транзитивных проектов.</li></ul></section>
+
+<section id="deps"><h2>2. Строки 13–64: зависимости</h2>
+<h3>fmt 10.2.1</h3><p><code>FetchContent_Declare</code> фиксирует Git repository/tag, shallow clone и <code>OVERRIDE_FIND_PACKAGE</code>. Последнее перехватывает <code>find_package(fmt)</code> внутри CommonLib, чтобы использовалась та же загруженная версия.</p>
+<h3>spdlog 1.13.0</h3><p><code>SPDLOG_FMT_EXTERNAL ON CACHE BOOL "" FORCE</code> заставляет spdlog линковаться с внешним fmt вместо bundled copy. Это исключает две несовместимые копии formatter.</p>
+<h3>rapidcsv 8.83</h3><p><code>DOWNLOAD_ONLY YES</code>: library header-only, build target не нужен. Cache path устанавливается до CommonLib <code>find_path</code>. В собственных текущих <code>src</code> rapidcsv не вызывается, но dependency discovery CommonLib ожидает путь.</p>
+<h3>nlohmann/json 3.11.3</h3><p>Header-only parser конфигурации и spell descriptions. <code>FetchContent_MakeAvailable</code> создаёт target <code>nlohmann_json::nlohmann_json</code>.</p>
+<h3>CommonLibSSE-NG 3.7.0</h3><p>Tests выключаются cache variable. После загрузки вручную включается <code>CommonLibSSE.cmake</code>, потому что helper <code>add_commonlibsse_plugin</code> определён там.</p>
+<div class="callout warning"><strong>Фиксированные tags:</strong> обновление dependency — отдельное изменение контракта. Нельзя просто заменить tag без полной сборки и запуска Skyrim.</div></section>
+
+<section id="sdk"><h2>3. Строки 66–94: Discord Game SDK</h2>
+<h3>Условная загрузка</h3><p>Build-local directory <code>_discord_game_sdk</code>. Если <code>cpp/discord.h</code> уже есть, download пропускается. Иначе <code>file(DOWNLOAD)</code> получает официальный ZIP 3.2.1 и возвращает status list.</p>
+<h3>Проверка status</h3><p><code>list(GET ... 0 _discord_dl_err)</code> берёт numeric error code. Ненулевой code вызывает <code>message(FATAL_ERROR)</code> с manual fallback path; configure прекращается.</p>
+<h3>Извлечение</h3><p><code>file(ARCHIVE_EXTRACT)</code> распаковывает SDK, временный ZIP удаляется.</p>
+<h3>C++ wrapper target</h3><pre><code>file(GLOB DISCORD_SDK_CPP ".../cpp/*.cpp")
+add_library(discord_cpp STATIC ${DISCORD_SDK_CPP})
+target_include_directories(discord_cpp PUBLIC ".../cpp")
+target_link_libraries(discord_cpp PUBLIC ".../discord_game_sdk.dll.lib")</code></pre><p>Wrapper sources компилируются в static library. Import library <code>.dll.lib</code> содержит linker stubs для runtime DLL. Wrapper принудительно C++17, как ожидает SDK; основной plugin остаётся C++23.</p></section>
+
+<section id="target"><h2>4. Строки 96–137: состав SKSE plugin target</h2>
+<h3>Списки</h3><p><code>DRAGONBORNPRESENCE_SOURCES</code> содержит четыре <code>.cpp</code>; HEADERS — пять <code>.h</code>; RESOURCES — shipped JSON. Явный список лучше glob для собственного кода: добавление файла требует осознанного изменения build.</p>
+<h3><code>add_commonlibsse_plugin</code></h3><ul><li>Target и DLL name <code>DragonbornPresence</code>.</li><li>AUTHOR попадает в plugin metadata.</li><li>VERSION берётся из <code>PROJECT_VERSION</code>, заданной один раз.</li><li><code>USE_ADDRESS_LIBRARY</code> включает runtime address resolution для разных Skyrim versions.</li></ul>
+<h3><code>source_group</code></h3><p>Только организация файлов в Visual Studio Solution Explorer. На binary не влияет.</p>
+<h3>Include directories</h3><p><code>PRIVATE</code> означает, что пути нужны при компиляции этого target, но не публикуются downstream targets.</p>
+<h3>Precompiled header</h3><p><code>target_precompile_headers</code> компилирует <code>include/pch.h</code> и автоматически подключает его в translation units согласно механизму CMake/MSVC.</p></section>
+
+<section id="link"><h2>5. Строки 138–140: линковка и compiler flags</h2><pre><code>target_link_libraries(DragonbornPresence PRIVATE
+    discord_cpp delayimp nlohmann_json::nlohmann_json)
+target_link_options(DragonbornPresence PRIVATE
+    /DELAYLOAD:discord_game_sdk.dll)
+target_compile_options(DragonbornPresence PRIVATE /utf-8)</code></pre><ul><li><code>discord_cpp</code> — wrapper.</li><li><code>delayimp</code> — MSVC runtime helper для delay loading.</li><li><code>nlohmann_json</code> — include/interface target.</li><li><code>/DELAYLOAD</code> не загружает SDK вместе с plugin DLL.</li><li><code>/utf-8</code> задаёт execution/source charset, необходимый русским literals и emoji.</li></ul></section>
+
+<section id="symbols"><h2>6. Строки 142–151: оптимизированный Release с PDB</h2><p>Блок исполняется только для MSVC:</p><ul><li><code>MSVC_DEBUG_INFORMATION_FORMAT ProgramDatabase</code> просит compiler генерировать symbol information.</li><li><code>/DEBUG:FULL</code> создаёт полный PDB linker.</li><li><code>/OPT:REF</code> удаляет неиспользуемые COMDAT/functions/data.</li><li><code>/OPT:ICF</code> объединяет идентичные COMDAT blocks.</li></ul><p>PDB не означает Debug configuration. Release optimization остаётся. Символы позволяют crash analyzer сопоставить address с именем/строкой, хотя optimizer может inline/reorder code.</p></section>
+
+<section id="package"><h2>7. Строки 153–209: staging, ZIP и MO2 deploy</h2>
+<h3>Staging path</h3><p><code>_package/SKSE/Plugins</code> создаётся на configure. <code>configure_file(... COPYONLY)</code> копирует JSON без подстановки переменных.</p>
+<h3>POST_BUILD command</h3><p>После успешного target build:</p><ol><li>SDK DLL копируется рядом с built plugin.</li><li>Plugin DLL, target PDB и SDK DLL копируются в staging.</li><li>JSON уже находится в staging.</li><li><code>cmake -E tar cf --format=zip</code> создаёт ZIP с четырьмя путями <code>SKSE/Plugins/*</code>.</li></ol>
+<p>Generator expressions <code>$&lt;TARGET_FILE:...&gt;</code> и <code>$&lt;TARGET_PDB_FILE:...&gt;</code> вычисляются для активной configuration и не hard-code Release path.</p>
+<h3>Optional deploy</h3><p>Cache path <code>DRAGONBORNPRESENCE_DEPLOY_DIR</code> по умолчанию пуст. Если задан, второй POST_BUILD создаёт <code>SKSE/Plugins</code> в mod root и копирует DLL/PDB/SDK/JSON. <code>copy_if_different</code> избегает лишней записи одинаковых файлов. <code>VERBATIM</code> защищает аргументы с пробелами/скобками.</p>
+<div class="callout warning"><strong>Практический эффект:</strong> локальная сборка перезаписывает JSON в MO2 исходной версией из <code>config/</code>. Runtime-правки только в папке MO2 потеряются при следующем build.</div></section>
+
+<section id="presets"><h2>8. <code>CMakePresets.json</code>, все 41 строка</h2>
+<h3>Schema</h3><p><code>version: 6</code> — версия формата presets, не версия plugin. <code>cmakeMinimumRequired</code> дублирует executable requirement для preset consumer.</p>
+<h3>Configure preset <code>vs2026</code></h3><ul><li>Generator: <code>Visual Studio 18 2026</code>.</li><li>Architecture: x64, обязательна SkyrimSE и Discord x86_64 SDK.</li><li>Binary directory: <code>build/vs2026</code>.</li><li>Cache deploy dir: локальный мод MO2.</li></ul>
+<h3>Build presets</h3><p><code>release</code> и <code>debug</code> используют один configure preset, выбирают configuration и target. Multi-config Visual Studio generator хранит обе configurations в одном build tree.</p><pre><code>cmake --preset vs2026
+cmake --build --preset release</code></pre></section>
+
+<section id="json"><h2>9. <code>config/DragonbornPresence.json</code></h2>
+<pre><code>{
+  "schema_version": 1,
+  "discord": {
+    "enabled": true,
+    "application_id": "1527543892151373937"
+  },
+  "assets": {
+    "large_image": "stb_logo",
+    "large_text": "Skyrim True Believer",
+    "small_images": { "loading": "loading", "combat": "combat" },
+    "location_images": [ /* 438 ordered records */ ]
+  }
+}</code></pre>
+<p>Loader semantics подробно разобраны в <a href="code-foundation.html#config">главе 2</a>. Build system считает JSON resource/data, не компилирует его в DLL. Изменение применяется после полного перезапуска Skyrim, потому что config читается один раз в <code>SKSEPluginLoad</code>.</p>
+<p>438 location records — экземпляры одной схемы. Их порядок является runtime priority. Indentation в текущем файле местами различается, но JSON whitespace не влияет на parser.</p></section>
+
+<section id="workflow"><h2>10. <code>.github/workflows/release.yml</code>, все 42 строки</h2>
+<h3>Trigger и permissions</h3><pre><code>on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write</code></pre><p>Обычный push branch не создаёт release. Любой tag с prefix <code>v</code> запускает workflow. Write permission нужна для GitHub Release asset.</p>
+<h3>Job</h3><p>Один job <code>release</code> на <code>windows-2025-vs2026</code>. Steps выполняются последовательно:</p><ol><li><code>actions/checkout@v4</code> получает tagged source.</li><li><code>cmake --preset vs2026</code> configure.</li><li><code>cmake --build --preset release</code> build + package.</li><li>PowerShell <code>Test-Path</code> явно проверяет ZIP, иначе <code>throw</code>.</li><li><code>gh release create</code> проверяет tag, генерирует notes, задаёт title и прикрепляет ZIP.</li></ol>
+<h3>Expressions и folded scalar</h3><p><code>${{ github.ref_name }}</code> — имя tag. <code>${{ github.token }}</code> — временный token run. YAML <code>&gt;-</code> складывает много строк команды в одну, удаляя финальный newline.</p>
+<div class="callout"><strong>GitHub Pages:</strong> данный workflow публикует Releases, не Pages. Pages использует статические файлы каталога <code>docs/</code> согласно настройке репозитория.</div></section>
+
+<section id="artifacts"><h2>11. Что получается на выходе</h2><div class="table-wrap"><table><thead><tr><th>Файл</th><th>Откуда</th><th>Runtime роль</th></tr></thead><tbody><tr><td><code>DragonbornPresence.dll</code></td><td>Основной target</td><td>SKSE plugin code.</td></tr><tr><td><code>DragonbornPresence.pdb</code></td><td>MSVC linker</td><td>Symbols для crash diagnosis.</td></tr><tr><td><code>discord_game_sdk.dll</code></td><td>SDK 3.2.1 archive</td><td>Нативный Discord runtime.</td></tr><tr><td><code>DragonbornPresence.json</code></td><td><code>config/</code></td><td>Runtime configuration/data.</td></tr><tr><td><code>DragonbornPresence.zip</code></td><td>POST_BUILD staging</td><td>MO2-installable archive с корнем SKSE.</td></tr></tbody></table></div></section>
+
+<nav class="page-nav" aria-label="Переход между главами"><a href="code-application.html"><small>Назад</small>Координатор</a><a href="code-recipes.html"><small>Далее</small>Практические изменения</a></nav><footer>Полный разбор DragonbornPresence 3.1.5 · глава 6 из 7</footer>
+</main></div></body></html>

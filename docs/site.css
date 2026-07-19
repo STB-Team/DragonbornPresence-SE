@@ -168,6 +168,65 @@ summary { cursor: pointer; padding: 10px 12px; font-weight: 650; }
 details > div { padding: 0 12px 12px; }
 .kbd { display: inline-block; min-width: 1.5em; padding: .05rem .35rem; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; background: var(--surface-3); text-align: center; font-family: "Cascadia Code", Consolas, monospace; font-size: .85em; }
 footer { padding: 18px 4px 0; color: var(--muted); font-size: 11px; }
+.mobile-toc { display: none; }
+.breadcrumbs { margin: 0 0 10px; color: var(--muted); font-size: 12px; }
+.breadcrumbs a { color: var(--muted); }
+.chapter-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.chapter-card {
+  display: block;
+  padding: 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+}
+.chapter-card:hover {
+  border-color: var(--accent);
+  text-decoration: none;
+}
+.chapter-card strong { display: block; margin-bottom: 4px; color: var(--accent); }
+.chapter-card span { display: block; color: var(--muted); font-size: 12.5px; }
+.line-notes td:first-child { width: 8.5rem; color: var(--accent); font-family: "Cascadia Code", Consolas, monospace; }
+.construct {
+  margin: .75rem 0;
+  padding: 11px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+.construct h4 { margin-top: 0; }
+.construct p:last-child { margin-bottom: 0; }
+.symbol-heading { scroll-margin-top: 18px; }
+.page-nav {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+.page-nav a {
+  display: block;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.page-nav a:last-child { text-align: right; }
+.page-nav small { display: block; color: var(--muted); }
+.file-badge {
+  display: inline-block;
+  margin: 0 .25rem .25rem 0;
+  padding: 2px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font: 11px/1.6 "Cascadia Code", Consolas, monospace;
+}
+.coverage-ok { color: var(--success); font-weight: 700; }
+.reading-tip { border-left-color: var(--warning); }
 
 @media (max-width: 920px) {
   .layout { display: block; width: min(100% - 20px, 980px); padding-top: 10px; }
@@ -176,6 +235,46 @@ footer { padding: 18px 4px 0; color: var(--muted); font-size: 11px; }
   nav a { flex: 0 0 auto; }
   nav .nav-title, .aside-links { display: none; }
   section, .hero { padding: 17px; }
+  .code-page {
+    font-size: 15px;
+    line-height: 1.65;
+  }
+  .code-page .layout {
+    width: 100%;
+    padding: 0 0 32px;
+  }
+  .code-page aside { display: none; }
+  .code-page .hero {
+    margin: 0 0 8px;
+    padding: 17px 16px;
+    border-right: 0;
+    border-left: 0;
+    border-radius: 0;
+  }
+  .code-page section {
+    margin: 8px;
+    padding: 17px 16px;
+  }
+  .mobile-toc {
+    display: block;
+    margin-top: 14px;
+  }
+  .mobile-toc > summary {
+    min-height: 44px;
+    padding: 11px 12px;
+  }
+  .mobile-toc nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+    overflow: visible;
+    padding: 4px 8px 10px;
+  }
+  .mobile-toc nav a {
+    min-width: 0;
+    padding: 9px;
+    white-space: normal;
+  }
 }
 @media (max-width: 620px) {
   .grid, .grid.three { grid-template-columns: 1fr; }
@@ -183,6 +282,13 @@ footer { padding: 18px 4px 0; color: var(--muted); font-size: 11px; }
   pre { margin-right: -17px; margin-left: -17px; border-right: 0; border-left: 0; border-radius: 0; }
   td:first-child { white-space: normal; }
   .flow { text-align: left; }
+  .chapter-list, .page-nav { grid-template-columns: 1fr; }
+  .page-nav a:last-child { text-align: left; }
+  .mobile-toc nav { grid-template-columns: 1fr; }
+  .code-page section { margin-right: 0; margin-left: 0; border-right: 0; border-left: 0; border-radius: 0; }
+  .code-page .table-wrap,
+  .code-page pre { margin-right: -16px; margin-left: -16px; }
+  .line-notes td:first-child { width: auto; }
 }
 
 @page { size: A4; margin: 13mm; }

@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ru">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Полный разбор discord_loader.cpp и DiscordPresenceClient плагина DragonbornPresence."><title>Discord и Windows — код DragonbornPresence</title><link rel="stylesheet" href="site.css"></head>
+<body class="code-page"><div class="layout">
+<aside aria-label="Навигация по разбору кода"><div class="brand"><strong>Полный разбор кода</strong><span>4 из 7 · транспорт</span></div><nav><a href="architecture.html">Обзор</a><a href="code-entry.html">1. Точка входа</a><a href="code-foundation.html">2. Модели и JSON</a><a href="code-game.html">3. Skyrim и Papyrus</a><a href="code-discord.html">4. Discord и Windows</a><a href="code-application.html">5. Координатор</a><a href="code-build.html">6. Сборка</a><a href="code-recipes.html">7. Примеры</a><span class="nav-title">Эта страница</span><a href="#loader">Назначение loader</a><a href="#win-errors">Win32 ошибки</a><a href="#paths">Пути и registry</a><a href="#running">Процесс Discord</a><a href="#dll">Загрузка DLL</a><a href="#delay">Delay hook</a><a href="#results">Discord results</a><a href="#client-init">Client init</a><a href="#callbacks">Callbacks</a><a href="#update">UpdateActivity</a><a href="#shutdown">Отключение</a></nav></aside>
+<main><header class="hero"><p class="breadcrumbs"><a href="index.html">Документация</a> / <a href="architecture.html">Код</a> / Discord</p><p class="eyebrow">discord_loader.cpp · integration, строки 688–1110</p><h1>Windows loader и Discord-клиент</h1><p class="lead">От registry <code>discord://</code> и списка процессов до delay-load DLL, Activity signature, асинхронного callback и окончательного безопасного отключения.</p><div class="badges"><span class="badge">WinAPI</span><span class="badge">delayimp</span><span class="badge">Discord Game SDK</span><span class="badge">RAII</span></div><details class="mobile-toc"><summary>Оглавление и другие главы</summary><nav><a href="code-game.html">Предыдущая</a><a href="code-application.html">Следующая</a><a href="#running">Проверка Discord</a><a href="#delay">Delay-load</a><a href="#client-init">Инициализация</a><a href="#callbacks">Callbacks</a><a href="#update">Activity</a><a href="#shutdown">Ошибки</a></nav></details></header>
+
+<section id="coverage"><h2>Покрытие</h2><p><span class="coverage-ok">Разобран весь код:</span> 9 loader helpers/exports, registry и process walk, delay hook, 45 известных Discord results, SDK log hook и все 10 методов/7 полей <code>DiscordPresenceClient</code>.</p><p><a href="https://github.com/STB-Team/DragonbornPresence-SE/blob/master/src/discord_loader.cpp">discord_loader.cpp</a> · <a href="https://github.com/STB-Team/DragonbornPresence-SE/blob/master/src/DragonbornPresence.cpp#L688-L1110">integration layer</a></p></section>
+
+<section id="loader"><h2>1. Зачем отдельный <code>discord_loader.cpp</code></h2><p>Discord SDK состоит из C++ wrapper-кода и нативной <code>discord_game_sdk.dll</code>. Если обычный import DLL не разрешится при загрузке plugin, Windows может отклонить всю <code>DragonbornPresence.dll</code> до того, как наш лог объяснит причину. Проект использует delay-load и собственную проверку.</p><p>Loader выполняет только системную работу: не знает о PlayerSnapshot, Activity и правилах STB. Его публичный namespace — <code>DragonbornPresence::detail</code>.</p></section>
+
+<section id="win-errors"><h2>2. Ошибки и сообщения loader</h2>
+<h3><code>SetFailureReason</code>, строки 17–24</h3><pre><code>if (!target) return;
+try { target-&gt;assign(reason); } catch (...) {}</code></pre><p>Output pointer необязателен. Assignment string может выделить память и бросить; функция <code>noexcept</code> глотает ошибку. Сам bool результата остаётся главным каналом отказа.</p>
+<h3><code>WindowsErrorDetails</code> и <code>DescribeWindowsError</code></h3><p>Два <code>string_view</code> смотрят на static literals. <code>constexpr switch</code> декодирует: FILE/PATH_NOT_FOUND, ACCESS_DENIED, INVALID_HANDLE, OUTOFMEMORY, INVALID_DATA, MOD/PROC_NOT_FOUND, BAD_EXE_FORMAT, DLL_INIT_FAILED и unknown.</p><p>Некоторые Win32 codes объединены двумя case labels, например memory errors имеют одно объяснение.</p>
+<h3><code>SetWindowsFailureReason</code>, строки 61–79</h3><p>Добавляет operation, числовой DWORD, стабильное имя и объяснение. <code>std::format</code> может бросить, поэтому catch откатывается к короткому operation через безопасный helper.</p></section>
+
+<section id="paths"><h2>3. Разбор command и путь рядом с plugin</h2>
+<h3><code>ExtractExecutablePath(wchar_t*)</code></h3><ol><li>Пропускает leading whitespace через <code>std::iswspace</code>.</li><li>Пустой command → null.</li><li>Если первый символ quote, ищет closing quote через <code>wcschr</code>.</li><li>Заменяет closing quote на null terminator и возвращает начало path.</li><li>Без quotes идёт до первого whitespace и также вставляет terminator.</li></ol><p>Функция принимает mutable pointer, потому что режет registry buffer на месте. Новой string и allocation не требуется.</p>
+<h3><code>IsExistingFile</code></h3><p><code>GetFileAttributesW</code> должен вернуть не <code>INVALID_FILE_ATTRIBUTES</code>, а bit <code>FILE_ATTRIBUTE_DIRECTORY</code> должен отсутствовать. Существующий каталог не подходит вместо executable/DLL.</p>
+<h3><code>BuildPluginSiblingPath</code></h3><div class="table-wrap"><table class="line-notes"><thead><tr><th>Блок</th><th>Смысл</th></tr></thead><tbody><tr><td><code>wchar_t (&amp;path)[MAX_PATH]</code></td><td>Reference на массив ровно MAX_PATH; размер не теряется как при обычном pointer.</td></tr><tr><td><code>GetModuleFileNameW</code></td><td>Адрес <code>__ImageBase</code> определяет текущую plugin DLL.</td></tr><tr><td><code>wcsrchr(path, L'\\')</code></td><td>Ищет последний separator перед именем файла.</td></tr><tr><td><code>remaining</code></td><td>Pointer arithmetic вычисляет свободные wchar slots.</td></tr><tr><td><code>wcscpy_s</code></td><td>Копирует sibling filename с проверкой размера.</td></tr></tbody></table></div></section>
+
+<section id="running"><h2>4. <code>IsDiscordRunning()</code>, строки 128–245</h2>
+<h3>Registry: два прохода</h3><p>Key <code>HKEY_CLASSES_ROOT\discord\shell\open\command</code> хранит команду protocol handler. Первый <code>RegGetValueW</code> вызывается без buffer и возвращает byte count. После проверки создаётся <code>wstring</code>, второй вызов читает value и сообщает type.</p><p>Flags допускают <code>REG_SZ</code> и <code>REG_EXPAND_SZ</code>. Код получает <code>valueType</code>, но отдельно его дальше не использует: допустимые типы уже ограничены flags API.</p>
+<h3>Проверка executable</h3><p>Command режется helper-функцией. Путь обязан указывать на existing file. Затем <code>wcsrchr</code> оставляет basename процесса; если separator нет, используется весь path.</p>
+<h3>Snapshot процессов</h3><pre><code>const HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+PROCESSENTRY32W process{};
+process.dwSize = sizeof(process);
+if (!Process32FirstW(snapshot, &amp;process)) { /* close + error */ }
+do {
+    if (_wcsicmp(process.szExeFile, executableName) == 0) {
+        found = true;
+        break;
+    }
+} while (Process32NextW(snapshot, &amp;process));
+CloseHandle(snapshot);</code></pre>
+<ul><li><code>HANDLE</code> проверяется против специального <code>INVALID_HANDLE_VALUE</code>, не только null.</li><li>Windows требует заполнить <code>dwSize</code> для versioning структуры.</li><li><code>_wcsicmp</code> сравнивает wide strings без учёта регистра.</li><li>Handle закрывается и в error branch, и после цикла.</li></ul>
+<h3>Exception boundary</h3><p>Весь метод обёрнут try/catch, потому что <code>wstring</code> и <code>format</code> могут выделять память. Вложенные try защищают построение подробной причины. Результат любого исключения — false.</p>
+<div class="callout"><strong>Что метод не делает:</strong> не запускает Discord, не скачивает его, не исправляет registry и не принимает любой процесс с похожим именем.</div></section>
+
+<section id="dll"><h2>5. <code>LoadDiscordSdk()</code>, строки 247–278</h2><ol><li><code>GetModuleHandleW</code> возвращает true, если SDK уже загружена.</li><li>Строится sibling path рядом с plugin.</li><li>Файл обязан существовать.</li><li><code>LoadLibraryExW</code> вызывается с двумя search flags.</li><li>При ошибке <code>GetLastError()</code> декодируется.</li></ol><p><code>LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR</code> разрешает dependencies из каталога загружаемой DLL. <code>LOAD_LIBRARY_SEARCH_DEFAULT_DIRS</code> использует безопасные default directories вместо legacy current-directory search.</p></section>
+
+<section id="delay"><h2>6. <code>DiscordDelayHook</code>, строки 282–301</h2>
+<p>MSVC delay helper вызывает hook на нескольких стадиях. Код отвечает только когда:</p><ul><li><code>dliNotify == dliNotePreLoadLibrary</code>;</li><li>структуры и имя DLL не null;</li><li>имя равно <code>discord_game_sdk.dll</code> без учёта регистра.</li></ul>
+<p>Return null означает «hook не обработал, продолжить стандартный механизм». Для Discord возвращается загруженный <code>HMODULE</code>, приведённый к ожидаемому <code>FARPROC</code>.</p><pre><code>extern "C" const PfnDliHook __pfnDliNotifyHook2 = DiscordDelayHook;</code></pre><p>Имя переменной зарезервировано MSVC delayimp. C linkage обеспечивает точное linker name. <code>const</code> запрещает сменить function pointer runtime.</p></section>
+
+<section id="results"><h2>7. <code>DescribeResult</code> и SDK log hook</h2>
+<p><code>DiscordResultDetails</code> — маленькая структура из двух <code>string_view</code>: стабильное имя результата и человеческое объяснение. Оба view ссылаются на string literals из switch и не требуют allocation.</p>
+<p><code>using enum discord::Result</code> позволяет писать <code>case Ok</code> вместо <code>case discord::Result::Ok</code>. Switch покрывает текущий enum SDK 3.2.1:</p>
+<div class="table-wrap"><table><thead><tr><th>Группа</th><th>Значения</th></tr></thead><tbody>
+<tr><td>Общие</td><td>Ok, ServiceUnavailable, InvalidVersion, LockFailed, InternalError, InvalidPayload, InvalidCommand, InvalidPermissions, NotFetched, NotFound, Conflict</td></tr>
+<tr><td>Secrets/activity</td><td>InvalidSecret, InvalidJoinSecret, NoEligibleActivity, InvalidInvite</td></tr>
+<tr><td>Auth/application</td><td>NotAuthenticated, InvalidAccessToken, ApplicationMismatch, InvalidDataUrl, InvalidBase64, NotFiltered</td></tr>
+<tr><td>Lobby/files/entitlement</td><td>LobbyFull, InvalidLobbySecret, InvalidFilename, InvalidFileSize, InvalidEntitlement</td></tr>
+<tr><td>Desktop/buffer/purchase</td><td>NotInstalled, NotRunning, InsufficientBuffer, PurchaseCanceled</td></tr>
+<tr><td>Guild/event/channel</td><td>InvalidGuild, InvalidEvent, InvalidChannel, InvalidOrigin</td></tr>
+<tr><td>Limits/OAuth/timeouts</td><td>RateLimited, OAuth2Error, SelectChannelTimeout, GetGuildTimeout</td></tr>
+<tr><td>Voice/capture/achievement</td><td>SelectVoiceForceRequired, CaptureShortcutAlreadyListening, UnauthorizedForAchievement</td></tr>
+<tr><td>Commerce/drawing</td><td>InvalidGiftCode, PurchaseError, TransactionAborted, DrawingInitFailed</td></tr>
+<tr><td>Защита</td><td>default → UnknownResult</td></tr>
+</tbody></table></div>
+<p>Каждый result получает enum name и explanation. Числовой code добавляется позже.</p>
+<h3><code>LogSdkMessage</code></h3><p>SDK callback принимает level и nullable C-string. Error пишется как error с предупреждением о возможной остановке на следующей operation; остальные сообщения hook threshold Warn пишутся warning. Catch-all запрещает logging exception вернуться в SDK.</p></section>
+
+<section id="client-init"><h2>8. <code>DiscordPresenceClient::Initialize()</code></h2>
+<div class="table-wrap"><table class="line-notes"><thead><tr><th>Строки</th><th>Разбор</th></tr></thead><tbody>
+<tr><td>816</td><td>Health false до доказанного полного успеха.</td></tr><tr><td>817–821</td><td>Config disabled → info и false без SDK load.</td></tr><tr><td>823–837</td><td>Повторная process check и явная DLL load; обе дают operation-specific log.</td></tr><tr><td>839–856</td><td>Raw output pointer Core::Create защищён try/catch; при исключении provisional pointer удаляется.</td></tr><tr><td>858–862</td><td><code>unique_ptr candidate</code> принимает ownership; result и pointer проверяются вместе.</td></tr><tr><td>864–865</td><td>Ownership перемещается в member, health становится true.</td></tr><tr><td>866–877</td><td>Установка SDK log hook также считается обязательной; exception отключает client.</td></tr><tr><td>879–883</td><td>Успешный Application ID и session timestamp.</td></tr>
+</tbody></table></div>
+<h3><code>DiscordCreateFlags_NoRequireDiscord</code></h3><p>Флаг передаётся SDK, но plugin всё равно делает собственную строгую проверку process. Флаг не заменяет policy проекта.</p>
+<h3>Почему provisional <code>candidate</code></h3><p>До проверки result нельзя делать pointer постоянным member. RAII candidate удалит core при любом раннем return после Create.</p></section>
+
+<section id="callbacks"><h2>9. <code>RunCallbacks()</code></h2>
+<ol><li>Неактивный client сразу false.</li><li>Discord process проверяется на каждом tick.</li><li><code>core_-&gt;RunCallbacks()</code> обёрнут двумя catch.</li><li>Result не Ok → <code>DisableForResult</code>.</li><li>Если Activity callback поставил <code>transportHealthy_=false</code>, client отключается.</li><li>Без pending signature timeout counter сбрасывается.</li><li>С pending counter растёт; 20 ticks отключают зависший callback.</li></ol>
+<p>Callback UpdateActivity исполняется внутри RunCallbacks, поэтому после вызова проверяется health, изменённый асинхронной lambda.</p>
+<h3><code>IsActive() const noexcept</code></h3><pre><code>return core_ &amp;&amp; transportHealthy_;</code></pre><p><code>unique_ptr</code> имеет explicit bool conversion. Логическое AND возвращает обычный bool.</p></section>
+
+<section id="update"><h2>10. <code>UpdateActivity()</code>, строки 944–1034</h2>
+<h3>Admission control</h3><p>Неактивный client или непустая pending signature → false. Одновременно разрешена ровно одна операция.</p>
+<h3>Локальные owning strings</h3><p>Четыре human-readable поля проходят <code>LimitForDiscord</code> и хранятся до конца метода. Asset keys не ограничиваются этим helper и берутся как views payload.</p>
+<h3>Сигнатура без неоднозначности</h3><pre><code>std::size_t signatureSize = activityFields.size();
+for (const auto field : activityFields) signatureSize += field.size();
+std::string signature;
+signature.reserve(signatureSize);
+for (const auto field : activityFields) {
+    signature.append(field);
+    signature.push_back('\0');
+}</code></pre><p>Начальные шесть bytes capacity учитывают separators. Null bytes допустимы внутри <code>std::string</code>, потому что string хранит length отдельно. Они различают наборы полей с одинаковой простой concatenation.</p>
+<h3>Duplicate suppression</h3><p>Сравнение идёт с последней подтверждённой signature. Pending блокируется раньше. Если Activity не изменился, false означает «ничего не queued», а не ошибку.</p>
+<h3>Построение SDK Activity</h3><ul><li><code>discord::Activity activity{}</code> value-initializes wrapper.</li><li>Type Playing.</li><li>Timestamp start получает стабильное member field.</li><li>Пустые text/assets не устанавливаются.</li><li><code>c_str()</code> используется для owning strings; <code>data()</code> для asset views.</li></ul>
+<h3>Асинхронная lambda</h3><pre><code>[this, signature = std::move(signature)](discord::Result result) noexcept</code></pre><ul><li><code>this</code> даёт доступ к members.</li><li>Init-capture перемещает signature внутрь closure; она живёт до callback.</li><li>Параметр result приходит от SDK.</li><li><code>noexcept</code> и внутренние catch не выпускают исключения в SDK.</li></ul>
+<p>В начале callback pending state очищается. При Ok captured signature копируется в last (captured lambda operator по умолчанию const, поэтому здесь assignment из const value выполняет копию), пишется success. При ошибке health false и decoded log.</p>
+<div class="callout warning"><strong>Lifetime <code>this</code>:</strong> callback захватывает pointer client. Текущий client является полем глобального coordinator и живёт весь срок DLL; scheduler прекращает работу до разрушения. Нельзя перенести client во временный local object.</div></section>
+
+<section id="shutdown"><h2>11. Логи, отключение и поля client</h2>
+<h3><code>Shutdown</code></h3><p>Тонкая публичная обёртка над private <code>Disable</code>. Coordinator не получает доступ к деталям transport state.</p>
+<h3><code>LogResultFailure</code></h3><p>Получает decoder details, пишет operation, name, numeric code, explanation и обещание, что Skyrim продолжит. Catch-all защищает error path от вторичной ошибки logger.</p>
+<h3><code>LogFailure</code></h3><p>То же для текстовых/WinAPI/C++ причин, у которых нет <code>discord::Result</code>.</p>
+<h3><code>DisableForResult</code></h3><p>Сначала health false, затем pending очищается и counter=0, ошибка логируется, core reset. Порядок не допускает следующего вызова SDK после зафиксированного отказа.</p>
+<h3><code>Disable</code></h3><p><code>hadWork</code> предотвращает повторный одинаковый shutdown log для уже пустого client. Затем состояние обнуляется и <code>core_.reset()</code> запускает destructor SDK core.</p>
+<h3><code>CurrentUnixTimestamp</code></h3><p><code>system_clock::now().time_since_epoch()</code> даёт duration; <code>duration_cast&lt;seconds&gt;</code> отбрасывает доли; <code>count()</code> возвращает целое Discord Timestamp.</p>
+<h3>Все поля</h3><div class="table-wrap"><table><thead><tr><th>Поле</th><th>Роль</th></tr></thead><tbody><tr><td><code>unique_ptr&lt;Core&gt; core_</code></td><td>Единственный владелец SDK core.</td></tr><tr><td><code>transportHealthy_</code></td><td>Логический предохранитель будущих вызовов.</td></tr><tr><td><code>const sessionStartTimestamp_</code></td><td>Создаётся один раз вместе с client.</td></tr><tr><td><code>pendingActivityCallbackTicks_</code></td><td>Возраст pending operation.</td></tr><tr><td><code>lastActivitySignature_</code></td><td>Последний подтверждённый payload.</td></tr><tr><td><code>pendingActivitySignature_</code></td><td>Payload в полёте и признак busy.</td></tr></tbody></table></div>
+<div class="callout danger"><strong>Fail closed:</strong> reconnect/retry отсутствуют намеренно. После transport failure client в этом запуске не восстанавливается, чтобы неизвестное состояние SDK не угрожало Skyrim.</div></section>
+
+<nav class="page-nav" aria-label="Переход между главами"><a href="code-game.html"><small>Назад</small>Skyrim и Papyrus</a><a href="code-application.html"><small>Далее</small>Координатор и потоки</a></nav><footer>Полный разбор DragonbornPresence 3.1.5 · глава 4 из 7</footer>
+</main></div></body></html>
