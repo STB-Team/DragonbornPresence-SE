@@ -129,6 +129,7 @@ struct PlayerSnapshot {
     std::string difficulty;
     std::string location;
     std::string combatText;
+    std::string PlayerName;
     bool inCombat = false;
 };
 
@@ -555,6 +556,7 @@ public:
         if (!player) return snapshot;
 
         snapshot.level = player->GetLevel();
+        snapshot.PlayerName = text::FromGameString(player->GetName());
         if (runtimeData_.deaths) {
             snapshot.deaths = static_cast<int>(runtimeData_.deaths->value);
         }
@@ -574,7 +576,8 @@ public:
             }
             snapshot.combatText = lastCombatTarget_
                 ? std::format(
-                      "{} с {} (ур. {})",
+                      "{} {} с {} (ур. {})",
+                      snapshot.PlayerName,
                       constants::kCombatText,
                       lastCombatTarget_->name,
                       lastCombatTarget_->level)
