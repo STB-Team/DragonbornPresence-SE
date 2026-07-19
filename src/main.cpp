@@ -1,56 +1,146 @@
 #include <SKSE/SKSE.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <Windows.h>
+
 #include "DragonbornPresence.h"
 #include "discord_loader.h"
+
+#include <exception>
+#include <filesystem>
+#include <format>
+#include <memory>
+#include <string>
 
 extern "C" IMAGE_DOS_HEADER __ImageBase;
 
 namespace {
-    void InitializeLogging() {
-        auto logPath = SKSE::log::log_directory().value_or(
-            []() {
-                wchar_t buf[MAX_PATH] = {};
-                GetModuleFileNameW(reinterpret_cast<HMODULE>(&__ImageBase), buf, MAX_PATH);
-                return std::filesystem::path(buf).parent_path();
-            }()) / "DragonbornPresence.log";
 
-        auto sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(logPath.string(), true);
-        auto log  = std::make_shared<spdlog::logger>("global", std::move(sink));
+[[nodiscard]] bool InitializeLogging() noexcept
+{
+    try {
+        const auto logPath = SKSE::log::log_directory().value_or(
+            []() {
+                wchar_t buffer[MAX_PATH]{};
+                const DWORD length = GetModuleFileNameW(
+                    reinterpret_cast<HMODULE>(&__ImageBase),
+                    buffer,
+                    MAX_PATH);
+                if (length == 0 || length >= MAX_PATH) {
+                    return std::filesystem::current_path();
+                }
+                return std::filesystem::path(buffer).parent_path();
+            }()) /
+            "DragonbornPresence.log";
+
+        auto sink =
+            std::make_shared<spdlog::sinks::basic_file_sink_mt>(logPath.string(), true);
+        auto log = std::make_shared<spdlog::logger>("global", std::move(sink));
         log->set_level(spdlog::level::info);
         log->flush_on(spdlog::level::info);
         spdlog::set_default_logger(std::move(log));
+        return true;
+    } catch (const std::exception& error) {
+        OutputDebugStringA(
+            "DragonbornPresence: logging initialization failed: ");
+        OutputDebugStringA(error.what());
+        OutputDebugStringA(" The plugin was not started.\n");
+        return false;
+    } catch (...) {
+        OutputDebugStringA(
+            "DragonbornPresence: logging initialization raised an unknown "
+            "exception. The plugin was not started.\n");
+        return false;
     }
 }
 
-SKSEPluginLoad(const SKSE::LoadInterface* skse) {
-    if (!DragonbornPresence::detail::IsDiscordRunning()) {
-        OutputDebugStringW(
-            L"DragonbornPresence: Discord is not running; plugin initialization aborted.\n");
-        return false;
+void LogEntryPointFailure(const char* details) noexcept
+{
+    try {
+        SKSE::log::critical(
+            "DragonbornPresence entry-point failure: {} The plugin was stopped "
+            "before registering game work; Skyrim can continue normally.",
+            details ? details : "unknown error.");
+    } catch (...) {
+        OutputDebugStringA(
+            "DragonbornPresence: entry-point failure; plugin stopped.\n");
+    }
+}
+
+void OnSkseMessage(SKSE::MessagingInterface::Message* message) noexcept
+{
+    if (!message) {
+        LogEntryPointFailure("SKSE delivered a null messaging event.");
+        return;
     }
 
-    SKSE::Init(skse);
-    InitializeLogging();
-    const auto* plugin = SKSE::PluginDeclaration::GetSingleton();
-    const auto& ver    = plugin->GetVersion();
-    SKSE::log::info("DragonbornPresence {}.{}.{} — plugin loaded", ver.major(), ver.minor(), ver.patch());
+    using MI = SKSE::MessagingInterface;
+    switch (message->type) {
+    case MI::kDataLoaded:
+        DragonbornPresence::RegisterGameEventHandlers();
+        break;
+    case MI::kNewGame:
+    case MI::kPostLoadGame:
+        DragonbornPresence::OnGameLoaded();
+        break;
+    default:
+        break;
+    }
+}
 
-    DragonbornPresence::LoadConfig();
+}  // namespace
 
-    SKSE::GetMessagingInterface()->RegisterListener([](SKSE::MessagingInterface::Message* msg) {
-        using MI = SKSE::MessagingInterface;
-        switch (msg->type) {
-        case MI::kDataLoaded:
-            // Game data and singletons (UI, ScriptEventSourceHolder) are ready
-            DragonbornPresence::RegisterGameEventHandlers();
-            break;
-        case MI::kNewGame:
-        case MI::kPostLoadGame:
-            DragonbornPresence::OnGameLoaded();
-            break;
+SKSEPluginLoad(const SKSE::LoadInterface* skse)
+{
+    try {
+        if (!skse) {
+            OutputDebugStringA(
+                "DragonbornPresence: SKSE supplied a null LoadInterface. "
+                "The plugin was not started.\n");
+            return false;
         }
-    });
 
-    return true;
+        SKSE::Init(skse);
+        if (!InitializeLogging()) return false;
+
+        std::string discordFailure;
+        if (!DragonbornPresence::detail::IsDiscordRunning(&discordFailure)) {
+            SKSE::log::error(
+                "DragonbornPresence disabled before Discord SDK initialization: {}",
+                discordFailure.empty() ? "Discord Desktop is unavailable."
+                                       : discordFailure);
+            return false;
+        }
+
+        const auto* plugin = SKSE::PluginDeclaration::GetSingleton();
+        if (!plugin) {
+            LogEntryPointFailure("SKSE PluginDeclaration is unavailable.");
+            return false;
+        }
+        const auto& version = plugin->GetVersion();
+        SKSE::log::info(
+            "DragonbornPresence {}.{}.{} — plugin loaded.",
+            version.major(),
+            version.minor(),
+            version.patch());
+
+        DragonbornPresence::LoadConfig();
+
+        const auto* messaging = SKSE::GetMessagingInterface();
+        if (!messaging) {
+            LogEntryPointFailure("SKSE MessagingInterface is unavailable.");
+            return false;
+        }
+        if (!messaging->RegisterListener(OnSkseMessage)) {
+            LogEntryPointFailure(
+                "SKSE rejected the messaging listener registration.");
+            return false;
+        }
+        return true;
+    } catch (const std::exception& error) {
+        LogEntryPointFailure(error.what());
+        return false;
+    } catch (...) {
+        LogEntryPointFailure("unknown C++ exception.");
+        return false;
+    }
 }

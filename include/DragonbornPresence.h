@@ -4,8 +4,8 @@
 
 namespace DragonbornPresence {
 
-void LoadConfig();
-void RegisterGameEventHandlers();
-void OnGameLoaded();
+void LoadConfig() noexcept;
+void RegisterGameEventHandlers() noexcept;
+void OnGameLoaded() noexcept;
 
 }

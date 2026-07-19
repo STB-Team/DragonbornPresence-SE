@@ -58,6 +58,7 @@ D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence\SKSE\Plugins
 
 ```text
 SKSE\Plugins\DragonbornPresence.dll
+SKSE\Plugins\DragonbornPresence.pdb
 SKSE\Plugins\discord_game_sdk.dll
 SKSE\Plugins\DragonbornPresence.json
 ```
@@ -70,7 +71,7 @@ SKSE\Plugins\DragonbornPresence.json
 - запущенный Discord Desktop;
 - Discord Application ID `1527543892151373937` и загруженные STB Art Assets.
 
-Перед инициализацией плагин проверяет обработчик `discord://`, связанный исполняемый файл и соответствующий запущенный процесс. Если Discord Desktop не установлен или не запущен, точка входа SKSE возвращает отказ до инициализации плагина: `discord_game_sdk.dll` не загружается, Discord автоматически не запускается. Если клиент завершится позже либо Discord SDK вернёт ошибку, callback-loop и вся дальнейшая работа Presence немедленно прекращаются без повторных обращений к SDK.
+Перед инициализацией плагин проверяет обработчик `discord://`, связанный исполняемый файл, запущенный процесс и локальный `discord_game_sdk.dll`. Если Discord Desktop не установлен или не запущен, работа плагина прекращается до вызова SDK. Runtime-код не скачивает, не устанавливает, не восстанавливает и не запускает Discord. Если клиент завершится позже, SDK вернёт ошибку, callback зависнет на 10 секунд или возникнет C++-исключение, дальнейшая работа интеграции прекращается; исключения не выпускаются в Skyrim.
 
 ## Конфигурация
 
@@ -167,6 +168,7 @@ cmake --build --preset debug
 
 ```text
 D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence\SKSE\Plugins\DragonbornPresence.dll
+D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence\SKSE\Plugins\DragonbornPresence.pdb
 D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence\SKSE\Plugins\discord_game_sdk.dll
 D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence\SKSE\Plugins\DragonbornPresence.json
 ```
@@ -201,13 +203,38 @@ Presence updated; session_start=1784380000.
 [<причина>] level=<...> deaths=<...> location='<...>' large='<asset>' combat='<...>'
 ```
 
-Подробная строка снимка записывается только при изменении отправляемого Presence; неизменный секундный polling лог не засоряет.
+Подробная строка снимка записывается только при изменении отправляемого Presence; неизменный polling раз в 500 мс лог не засоряет.
 
-## Релиз 3.1.4
+Если Skyrim не обрабатывает задачу Discord в главном потоке дольше 500 мс, лог
+записывает имя задачи, приблизительное время ожидания и число объединённых
+callback-запросов. При продолжающемся ожидании предупреждение повторяется раз в
+5 секунд:
+
+```text
+Discord task 'RunCallbacks/RefreshPresence' has been waiting on Skyrim's main thread for about 500 ms; 1 callback request coalesced.
+```
+
+Боевые события не создают отдельные задачи главного потока: несколько событий
+объединяются и обрабатываются ближайшим общим polling-циклом через не более чем
+500 мс.
+
+Ошибки Discord записываются с названием, числовым кодом и объяснением. Все 45
+кодов `discord::Result` из SDK 3.2.1 имеют явную расшифровку. Пример:
+
+```text
+Discord operation 'UpdateActivity callback' failed: RateLimited (code 34). Explanation: Discord is rate-limiting requests; retrying was disabled. The integration is being disabled; Skyrim can continue normally.
+```
+
+`DragonbornPresence.pdb` содержит символы оптимизированной Release-сборки для
+расшифровки адресов в crash-log. PDB не меняет поведение DLL и сам по себе не
+предотвращает сбои, но позволяет определить точную функцию и строку при разборе
+ошибки.
+
+## Релиз 3.1.5
 
 ```bash
-git tag -a v3.1.4 -m "DragonbornPresence 3.1.4"
-git push origin v3.1.4
+git tag -a v3.1.5 -m "DragonbornPresence 3.1.5"
+git push origin v3.1.5
 ```
 
 Workflow `.github/workflows/release.yml` использует runner `windows-2025-vs2026`, собирает Visual Studio 2026 Release и прикрепляет `DragonbornPresence.zip` к GitHub Release.
@@ -224,7 +251,7 @@ Workflow `.github/workflows/release.yml` использует runner `windows-20
 | `assets::LocationAssetResolver` | применение 438 правил локаций |
 | `game::StbDataProvider` | формы STB и снимок игрока |
 | `integration::DiscordPresenceClient` | Discord SDK, timestamp и подавление дубликатов |
-| `application::PresenceCoordinator` | загрузка, бой, события и секундный polling |
+| `application::PresenceCoordinator` | загрузка, бой, события и polling раз в 500 мс |
 
 Структура репозитория:
 

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 4.2)
-project(DragonbornPresence VERSION 3.1.4 LANGUAGES CXX)
+project(DragonbornPresence VERSION 3.1.5 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -139,6 +139,13 @@ target_link_libraries(DragonbornPresence PRIVATE discord_cpp delayimp nlohmann_j
 target_link_options(DragonbornPresence PRIVATE /DELAYLOAD:discord_game_sdk.dll)
 target_compile_options(DragonbornPresence PRIVATE /utf-8)
 
+if(MSVC)
+    # Keep optimized Release code while emitting full symbols for crash diagnosis.
+    set_property(TARGET DragonbornPresence
+        PROPERTY MSVC_DEBUG_INFORMATION_FORMAT ProgramDatabase)
+    target_link_options(DragonbornPresence PRIVATE /DEBUG:FULL)
+endif()
+
 set(_pkg_plugins "${CMAKE_CURRENT_BINARY_DIR}/_package/SKSE/Plugins")
 file(MAKE_DIRECTORY "${_pkg_plugins}")
 configure_file(
@@ -156,11 +163,15 @@ add_custom_command(TARGET DragonbornPresence POST_BUILD
         "$<TARGET_FILE:DragonbornPresence>"
         "${_pkg_plugins}/DragonbornPresence.dll"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "$<TARGET_PDB_FILE:DragonbornPresence>"
+        "${_pkg_plugins}/DragonbornPresence.pdb"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${_discord_sdk_dir}/lib/x86_64/discord_game_sdk.dll"
         "${_pkg_plugins}/discord_game_sdk.dll"
     COMMAND ${CMAKE_COMMAND} -E tar cf
         "${CMAKE_CURRENT_BINARY_DIR}/DragonbornPresence.zip" --format=zip
         -- "SKSE/Plugins/DragonbornPresence.dll"
+           "SKSE/Plugins/DragonbornPresence.pdb"
            "SKSE/Plugins/discord_game_sdk.dll"
            "SKSE/Plugins/DragonbornPresence.json"
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_package"
@@ -179,6 +190,9 @@ if(DRAGONBORNPRESENCE_DEPLOY_DIR)
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "$<TARGET_FILE:DragonbornPresence>"
             "${_deploy_plugins_dir}/DragonbornPresence.dll"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_PDB_FILE:DragonbornPresence>"
+            "${_deploy_plugins_dir}/DragonbornPresence.pdb"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${_discord_sdk_dir}/lib/x86_64/discord_game_sdk.dll"
             "${_deploy_plugins_dir}/discord_game_sdk.dll"
