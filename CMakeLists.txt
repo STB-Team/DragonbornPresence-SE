@@ -123,11 +123,15 @@ set(DRAGONBORNPRESENCE_RESOURCES
 
 add_library(DragonbornPresenceCore STATIC
     src/core/TextUtils.cpp
+    src/core/Difficulty.cpp
+    src/core/LocationAssetResolver.cpp
 )
 
 target_include_directories(DragonbornPresenceCore PUBLIC 
 "${CMAKE_CURRENT_SOURCE_DIR}/include"
 )
+
+target_compile_options(DragonbornPresenceCore PRIVATE /utf-8)
 
 if(BUILD_TESTING)                                                                                                                                                                                                                          
        add_executable(DragonbornPresenceCoreTests

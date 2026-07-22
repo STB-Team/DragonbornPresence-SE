@@ -1,5 +1,13 @@
 #include "DragonbornPresence.h"
 #include "DragonbornPresence/core/TextUtils.h"
+#include "DragonbornPresence/core/Difficulty.h"
+#include "DragonbornPresence/core/RefreshReason.h"
+#include "DragonbornPresence/core/PlayerSnapshot.h"
+#include "DragonbornPresence/core/PresencePayload.h"
+#include "DragonbornPresence/core/LocationAssets.h"
+#include "DragonbornPresence/core/Config.h"
+#include "DragonbornPresence/core/LocationContext.h"
+#include "DragonbornPresence/core/LocationAssetResolver.h"
 #include "discord_loader.h"
 #include "AdditionalFunctions.h"
 #include "ScriptUtils.h"
@@ -32,7 +40,6 @@ namespace DragonbornPresence
         namespace constants
         {
 
-            constexpr discord::ClientId kDefaultApplicationId = 1527543892151373937;
             constexpr std::string_view kConfigPath = R"(Data\SKSE\Plugins\DragonbornPresence.json)";
             constexpr std::chrono::milliseconds kDiscordCallbackInterval{500};
             constexpr std::uint8_t kPresencePollIntervalInCallbackTicks = 1;
@@ -49,7 +56,6 @@ namespace DragonbornPresence
             constexpr std::string_view kLoadingMenuName = "Loading Menu";
             constexpr std::string_view kLoadingText = "Загрузка";
             constexpr std::string_view kUnknownDeathsText = "—";
-            constexpr std::string_view kUnknownDifficultyText = "не определена";
             constexpr std::string_view kNoStoneText = "не выбран";
             constexpr std::string_view kCombatText = "В бою";
 
@@ -87,29 +93,6 @@ namespace DragonbornPresence
                 StoneDefinition{"aaMZs_DoomstoneEarthDesc", "⛰️-Земля"},
             };
 
-            /// Defines one ordered rule that maps the player's location to a Discord asset.
-            struct LocationImageRule
-            {
-                std::string worldspace;
-                std::string location;
-                std::string cell;
-                std::string match;
-                std::string image;
-                std::string text;
-            };
-
-            /// Contains all user-configurable Discord presence settings.
-            struct Config
-            {
-                bool enabled = true;
-                discord::ClientId applicationId = constants::kDefaultApplicationId;
-                std::string largeImage = "stb_logo";
-                std::string largeText = "Skyrim True Believer";
-                std::string loadingImage = "loading";
-                std::string combatImage = "combat";
-                std::vector<LocationImageRule> locationImageRules;
-            };
-
             /// Stores a resolved standing-stone spell and its display name.
             struct StoneRuntimeData
             {
@@ -132,73 +115,6 @@ namespace DragonbornPresence
                 std::uint16_t level = 0;
             };
 
-            /// Immutable value snapshot used to build one Discord presence update.
-            struct PlayerSnapshot
-            {
-                int level = 0;
-                std::optional<int> deaths;
-                std::string stone;
-                std::string difficulty;
-                std::string location;
-                std::string combatText;
-                std::string PlayerName;
-                bool inCombat = false;
-            };
-
-            /// References the selected large image key and hover text in the active config.
-            struct LargeAssetSelection
-            {
-                std::string_view image;
-                std::string_view text;
-            };
-
-            /// Carries all text and asset fields required for one Discord activity.
-            struct ActivityPayload
-            {
-                std::string_view details;
-                std::string_view state;
-                std::string_view largeImage;
-                std::string_view largeText;
-                std::string_view smallImage;
-                std::string_view smallText;
-            };
-
-            /// Identifies why a presence refresh was requested.
-            enum class RefreshReason
-            {
-                kGameLoaded,
-                kLoadingFinished,
-                kCombat,
-                kPoll,
-            };
-
-            /// Provides the stable log label associated with a refresh reason.
-            [[nodiscard]] constexpr std::string_view ToLogLabel(RefreshReason reason) noexcept
-            {
-                switch (reason)
-                {
-                case RefreshReason::kGameLoaded:
-                    return "game-loaded";
-                case RefreshReason::kLoadingFinished:
-                    return "loading-finished";
-                case RefreshReason::kCombat:
-                    return "combat";
-                case RefreshReason::kPoll:
-                    return "poll";
-                }
-                return "unknown";
-            }
-
-            /// Strongly types the numeric difficulty values stored by the STB quest.
-            enum class Difficulty : int
-            {
-                kAdventure = 0,
-                kTactics = 1,
-                kHeroic = 2,
-                kTrialOfTheGods = 3,
-                kCustom = 4,
-            };
-
         } // namespace model
 
         namespace text
@@ -212,56 +128,6 @@ namespace DragonbornPresence
                 return core::IsValidUtf8(value) ? std::string(value) : Cp1251ToUtf8(value);
             }
 
-            /// Truncates a Discord text field at a UTF-8 code-point boundary.
-            [[nodiscard]] std::string LimitForDiscord(std::string_view value)
-            {
-                if (value.size() <= constants::kDiscordTextMaxBytes)
-                    return std::string(value);
-
-                std::size_t validSize = constants::kDiscordTextMaxBytes;
-                while (validSize > 0 &&
-                       (static_cast<unsigned char>(value[validSize]) & 0xC0) == 0x80)
-                {
-                    --validSize;
-                }
-                return std::string(value.substr(0, validSize));
-            }
-
-            /// Tests whether an ASCII pattern occurs in text using case-insensitive comparison.
-            [[nodiscard]] bool ContainsAsciiInsensitive(
-                std::string_view value,
-                std::string_view pattern) noexcept
-            {
-                if (pattern.empty())
-                    return true;
-                if (pattern.size() > value.size())
-                    return false;
-
-                const auto foldAscii = [](unsigned char character)
-                {
-                    return character >= 'A' && character <= 'Z'
-                               ? static_cast<unsigned char>(character + ('a' - 'A'))
-                               : character;
-                };
-
-                for (std::size_t offset = 0; offset + pattern.size() <= value.size(); ++offset)
-                {
-                    bool matches = true;
-                    for (std::size_t index = 0; index < pattern.size(); ++index)
-                    {
-                        if (foldAscii(static_cast<unsigned char>(value[offset + index])) !=
-                            foldAscii(static_cast<unsigned char>(pattern[index])))
-                        {
-                            matches = false;
-                            break;
-                        }
-                    }
-                    if (matches)
-                        return true;
-                }
-                return false;
-            }
-
         } // namespace text
 
         namespace configuration
@@ -272,9 +138,9 @@ namespace DragonbornPresence
             {
             public:
                 /// Reads the configured file and returns defaults for missing or invalid input.
-                [[nodiscard]] static model::Config Load()
+                [[nodiscard]] static core::Config Load()
                 {
-                    model::Config config;
+                    core::Config config;
                     std::ifstream file(constants::kConfigPath.data());
                     if (!file)
                     {
@@ -389,7 +255,7 @@ namespace DragonbornPresence
                 /// Parses a positive Discord application ID from an integer or decimal string.
                 static void ReadApplicationId(
                     const nlohmann::json &discordConfig,
-                    model::Config &config)
+                    core::Config &config)
                 {
                     const auto value = discordConfig.find("application_id");
                     if (value == discordConfig.end())
@@ -405,7 +271,7 @@ namespace DragonbornPresence
                     if (value->is_string())
                     {
                         const std::string encodedId = value->get<std::string>();
-                        discord::ClientId parsedId = 0;
+                        core::ApplicationId parsedId = 0;
                         const auto [end, error] = std::from_chars(
                             encodedId.data(),
                             encodedId.data() + encodedId.size(),
@@ -424,7 +290,7 @@ namespace DragonbornPresence
                 /// Parses ordered location-image rules and discards malformed entries.
                 static void ReadLocationImageRules(
                     const nlohmann::json &assets,
-                    model::Config &config)
+                    core::Config &config)
                 {
                     const auto rules = assets.find("location_images");
                     if (rules == assets.end())
@@ -436,7 +302,7 @@ namespace DragonbornPresence
                         return;
                     }
 
-                    std::vector<model::LocationImageRule> parsedRules;
+                    std::vector<core::LocationImageRule> parsedRules;
                     parsedRules.reserve(rules->size());
                     for (std::size_t ruleIndex = 0; ruleIndex < rules->size(); ++ruleIndex)
                     {
@@ -449,7 +315,7 @@ namespace DragonbornPresence
                             continue;
                         }
 
-                        model::LocationImageRule rule;
+                        core::LocationImageRule rule;
                         bool isValid = true;
                         const auto readOptionalString = [&](const char *key, std::string &target)
                         {
@@ -494,93 +360,6 @@ namespace DragonbornPresence
             };
 
         } // namespace configuration
-
-        namespace assets
-        {
-
-            /// Resolves the first configured Discord image rule matching the player location.
-            class LocationAssetResolver final
-            {
-            public:
-                /// Binds the resolver to the active immutable configuration.
-                explicit LocationAssetResolver(const model::Config &config) noexcept : config_(config) {}
-
-                /// Returns the matched location asset or the configured fallback asset.
-                [[nodiscard]] model::LargeAssetSelection Resolve(
-                    RE::PlayerCharacter *player,
-                    std::string_view displayLocation) const
-                {
-                    if (player)
-                    {
-                        for (const auto &rule : config_.locationImageRules)
-                        {
-                            if (RuleMatches(rule, player, displayLocation))
-                            {
-                                return {
-                                    rule.image,
-                                    rule.text.empty() ? std::string_view(config_.largeText)
-                                                      : std::string_view(rule.text),
-                                };
-                            }
-                        }
-                    }
-                    return {config_.largeImage, config_.largeText};
-                }
-
-            private:
-                /// Compares a form's Editor ID to a configured selector.
-                [[nodiscard]] static bool EditorIdEquals(
-                    const RE::TESForm *form,
-                    std::string_view expected)
-                {
-                    if (expected.empty())
-                        return true;
-                    if (!form)
-                        return false;
-                    const char *editorId = form->GetFormEditorID();
-                    return editorId && expected == editorId;
-                }
-
-                /// Checks every non-empty selector in a location-image rule.
-                [[nodiscard]] static bool RuleMatches(
-                    const model::LocationImageRule &rule,
-                    RE::PlayerCharacter *player,
-                    std::string_view displayLocation)
-                {
-                    if (!player)
-                        return false;
-                    if (!rule.worldspace.empty() &&
-                        !EditorIdEquals(player->GetWorldspace(), rule.worldspace))
-                    {
-                        return false;
-                    }
-                    if (!rule.cell.empty() && !EditorIdEquals(player->GetParentCell(), rule.cell))
-                    {
-                        return false;
-                    }
-                    if (!rule.location.empty())
-                    {
-                        bool found = false;
-                        for (auto *location = player->GetCurrentLocation(); location;
-                             location = location->parentLoc)
-                        {
-                            if (EditorIdEquals(location, rule.location))
-                            {
-                                found = true;
-                                break;
-                            }
-                        }
-                        if (!found)
-                            return false;
-                    }
-                    return rule.match.empty() ||
-                           text::ContainsAsciiInsensitive(displayLocation, rule.match);
-                }
-
-                const model::Config &config_;
-            };
-
-        } // namespace assets
 
         namespace game
         {
@@ -627,9 +406,9 @@ namespace DragonbornPresence
                 }
 
                 /// Reads all game values required for a single presence refresh.
-                [[nodiscard]] model::PlayerSnapshot ReadPlayerSnapshot()
+                [[nodiscard]] core::PlayerSnapshot ReadPlayerSnapshot()
                 {
-                    model::PlayerSnapshot snapshot;
+                    core::PlayerSnapshot snapshot;
                     auto *player = RE::PlayerCharacter::GetSingleton();
                     if (!player)
                         return snapshot;
@@ -642,7 +421,7 @@ namespace DragonbornPresence
                     }
                     snapshot.stone = ReadSelectedStone(player);
                     snapshot.difficulty = ReadSelectedDifficulty();
-                    snapshot.location = BuildDisplayPosition(player);
+                    snapshot.location = BuildLocationContext(player);
                     snapshot.inCombat = player->IsInCombat();
                     if (snapshot.inCombat)
                     {
@@ -708,26 +487,6 @@ namespace DragonbornPresence
                     return std::string(fallbackName);
                 }
 
-                /// Maps an STB difficulty enum to the existing localized presence text.
-                [[nodiscard]] static std::string_view DifficultyName(int rawDifficulty) noexcept
-                {
-                    switch (static_cast<model::Difficulty>(rawDifficulty))
-                    {
-                    case model::Difficulty::kAdventure:
-                        return "🟢Приключение";
-                    case model::Difficulty::kTactics:
-                        return "🟡Тактика";
-                    case model::Difficulty::kHeroic:
-                        return "🔴Героический";
-                    case model::Difficulty::kTrialOfTheGods:
-                        return "⚫Испытание богов";
-                    case model::Difficulty::kCustom:
-                        return "⚪Свой уровень сложности";
-                    default:
-                        return constants::kUnknownDifficultyText;
-                    }
-                }
-
                 /// Reads the selected STB difficulty from the data-storage quest.
                 [[nodiscard]] std::string ReadSelectedDifficulty() const
                 {
@@ -736,8 +495,7 @@ namespace DragonbornPresence
                             runtimeData_.difficultyQuest,
                             constants::kDifficultyScriptName.data(),
                             constants::kDifficultyPropertyName.data());
-                    return difficulty ? std::string(DifficultyName(*difficulty))
-                                      : std::string(constants::kUnknownDifficultyText);
+                    return std::string(core::DifficultyName(difficulty));
                 }
 
                 /// Finds the first configured stone spell currently affecting the player.
@@ -756,33 +514,82 @@ namespace DragonbornPresence
                                : std::string(constants::kNoStoneText);
                 }
 
-                /// Builds the same worldspace/location/cell display hierarchy used by Discord.
-                [[nodiscard]] static std::string BuildDisplayPosition(RE::PlayerCharacter *player)
+                [[nodiscard]] static std::string FormEditorId(
+                    const RE::TESForm *form)
                 {
-                    if (!player)
+                    if (!form)
                         return {};
+
+                    const char *editorId = form->GetFormEditorID();
+                    return editorId ? std::string(editorId) : std::string{};
+                }
+
+                [[nodiscard]] static core::LocationContext BuildLocationContext(
+                    RE::PlayerCharacter *player)
+                {
+                    core::LocationContext context;
+
+                    if (!player)
+                        return context;
 
                     auto *worldspace = player->GetWorldspace();
                     auto *location = player->GetCurrentLocation();
                     auto *cell = player->GetParentCell();
 
+                    context.worldspaceEditorId = FormEditorId(worldspace);
+                    context.cellEditorId = FormEditorId(cell);
+
                     std::string locationName;
-                    for (auto *current = location; current && locationName.empty();
+
+                    for (auto *current = location;
+                         current;
                          current = current->parentLoc)
                     {
-                        locationName = text::FromGameString(current->GetName());
+                        std::string editorId = FormEditorId(current);
+
+                        if (!editorId.empty())
+                        {
+                            context.locationEditorIds.push_back(
+                                std::move(editorId));
+                        }
+
+                        if (locationName.empty())
+                        {
+                            locationName =
+                                text::FromGameString(current->GetName());
+                        }
                     }
 
                     const std::string worldspaceName =
-                        worldspace ? text::FromGameString(worldspace->GetName()) : "";
-                    const std::string cellName = cell ? text::FromGameString(cell->GetName()) : "";
+                        worldspace
+                            ? text::FromGameString(worldspace->GetName())
+                            : "";
+
+                    const std::string cellName =
+                        cell
+                            ? text::FromGameString(cell->GetName())
+                            : "";
+
                     if (!worldspaceName.empty())
                     {
-                        return !locationName.empty() && locationName != worldspaceName
-                                   ? std::format("{}: {}", worldspaceName, locationName)
-                                   : worldspaceName;
+                        context.displayName =
+                            !locationName.empty() &&
+                                    locationName != worldspaceName
+                                ? std::format(
+                                      "{}: {}",
+                                      worldspaceName,
+                                      locationName)
+                                : worldspaceName;
                     }
-                    return !locationName.empty() ? locationName : cellName;
+                    else
+                    {
+                        context.displayName =
+                            !locationName.empty()
+                                ? locationName
+                                : cellName;
+                    }
+
+                    return context;
                 }
 
                 model::StbRuntimeData runtimeData_;
@@ -928,7 +735,7 @@ namespace DragonbornPresence
             {
             public:
                 /// Creates the Discord SDK core when presence is enabled and available.
-                [[nodiscard]] bool Initialize(const model::Config &config)
+                [[nodiscard]] bool Initialize(const core::Config &config)
                 {
                     transportHealthy_ = false;
                     if (!config.enabled)
@@ -961,7 +768,8 @@ namespace DragonbornPresence
                     try
                     {
                         result = discord::Core::Create(
-                            config.applicationId,
+                            static_cast<discord::ClientId>(
+                                config.applicationId),
                             DiscordCreateFlags_NoRequireDiscord,
                             &createdCore);
                     }
@@ -1084,19 +892,19 @@ namespace DragonbornPresence
                 /// Submits at most one activity update at a time.
                 ///
                 /// Returns true when a new Discord update was queued.
-                bool UpdateActivity(const model::ActivityPayload &payload)
+                bool UpdateActivity(const core::PresencePayload &payload)
                 {
                     if (!IsActive() || !pendingActivitySignature_.empty())
                         return false;
 
                     try
                     {
-                        const std::string detailsText = text::LimitForDiscord(payload.details);
-                        const std::string stateText = text::LimitForDiscord(payload.state);
+                        const std::string detailsText = core::LimitUtf8Bytes(payload.details, constants::kDiscordTextMaxBytes);
+                        const std::string stateText = core::LimitUtf8Bytes(payload.state, constants::kDiscordTextMaxBytes);
                         const std::string largeHoverText =
-                            text::LimitForDiscord(payload.largeText);
+                            core::LimitUtf8Bytes(payload.largeText, constants::kDiscordTextMaxBytes);
                         const std::string smallHoverText =
-                            text::LimitForDiscord(payload.smallText);
+                            core::LimitUtf8Bytes(payload.smallText, constants::kDiscordTextMaxBytes);
                         const std::array activityFields{
                             std::string_view(detailsText),
                             std::string_view(stateText),
@@ -1418,7 +1226,7 @@ namespace DragonbornPresence
                     SKSE::log::info("Game loaded — refreshing STB presence data.");
                     gameLoaded_ = true;
                     loading_ = false;
-                    RefreshPresence(model::RefreshReason::kGameLoaded);
+                    RefreshPresence(core::RefreshReason::kGameLoaded);
                 }
 
                 /// Applies menu transitions to the loading and game-ready state machine.
@@ -1486,7 +1294,7 @@ namespace DragonbornPresence
                 }
 
                 /// Builds and submits one complete activity from the latest player snapshot.
-                void RefreshPresence(model::RefreshReason reason)
+                void RefreshPresence(core::RefreshReason reason)
                 {
                     if (!active_)
                         return;
@@ -1496,7 +1304,7 @@ namespace DragonbornPresence
                         return;
                     }
 
-                    const model::PlayerSnapshot snapshot = stbDataProvider_.ReadPlayerSnapshot();
+                    const core::PlayerSnapshot snapshot = stbDataProvider_.ReadPlayerSnapshot();
                     const std::string deathsText = snapshot.deaths
                                                        ? std::to_string(*snapshot.deaths)
                                                        : std::string(constants::kUnknownDeathsText);
@@ -1512,10 +1320,8 @@ namespace DragonbornPresence
                     const std::string_view smallText = snapshot.inCombat
                                                            ? std::string_view(snapshot.combatText)
                                                            : std::string_view{};
-                    const assets::LocationAssetResolver assetResolver(config_);
-                    const auto largeAsset = assetResolver.Resolve(
-                        RE::PlayerCharacter::GetSingleton(),
-                        snapshot.location);
+                    const core::LocationAssetResolver assetResolver(config_);
+                    const auto largeAsset = assetResolver.Resolve(snapshot.location);
 
                     lastCombatState_ = snapshot.inCombat;
                     const bool activityChanged = discordClient_.UpdateActivity({
@@ -1537,12 +1343,12 @@ namespace DragonbornPresence
                     SKSE::log::info(
                         "[{}] level={} deaths={} stone='{}' difficulty='{}' location='{}' "
                         "large='{}' combat='{}'.",
-                        model::ToLogLabel(reason),
+                        core::ToLogLabel(reason),
                         snapshot.level,
                         deathsText,
                         snapshot.stone,
                         snapshot.difficulty,
-                        snapshot.location,
+                        snapshot.location.displayName,
                         largeAsset.image,
                         snapshot.combatText);
                 }
@@ -1557,7 +1363,7 @@ namespace DragonbornPresence
                     }
                     else if (gameLoaded_)
                     {
-                        RefreshPresence(model::RefreshReason::kLoadingFinished);
+                        RefreshPresence(core::RefreshReason::kLoadingFinished);
                     }
                 }
 
@@ -1620,8 +1426,8 @@ namespace DragonbornPresence
                                 if (gameLoaded_ && !loading_) {
                                     const auto reason =
                                         combatRefreshRequested_.exchange(false)
-                                        ? model::RefreshReason::kCombat
-                                        : model::RefreshReason::kPoll;
+                                        ? core::RefreshReason::kCombat
+                                        : core::RefreshReason::kPoll;
                                     RefreshPresence(reason);
                                 } else {
                                     // Retry the loading activity after an earlier
@@ -1666,7 +1472,7 @@ namespace DragonbornPresence
                     }
                 }
 
-                model::Config config_;
+                core::Config config_;
                 game::StbDataProvider stbDataProvider_;
                 integration::DiscordPresenceClient discordClient_;
                 MenuEventSink menuEventSink_;
