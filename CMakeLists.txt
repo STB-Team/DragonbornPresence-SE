@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
+include(CTest)
 
 # We build a DLL plugin, not an installable package — skip all install() rules
 # (prevents CommonLibSSE's install(EXPORT) from failing on FetchContent targets)
@@ -50,6 +51,16 @@ FetchContent_Declare(
     GIT_SHALLOW TRUE
 )
 FetchContent_MakeAvailable(nlohmann_json)
+
+if(BUILD_TESTING)                                                                                                                                                                                                                          
+       FetchContent_Declare(
+           Catch2
+           GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+           GIT_TAG v3.8.1
+           GIT_SHALLOW TRUE
+       )
+       FetchContent_MakeAvailable(Catch2)
+   endif()  
 
 # CommonLibSSE-NG — find_package(fmt/spdlog) intercepted above, tests disabled
 set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -110,6 +121,29 @@ set(DRAGONBORNPRESENCE_RESOURCES
     config/DragonbornPresence.json
 )
 
+add_library(DragonbornPresenceCore STATIC
+    src/core/TextUtils.cpp
+)
+
+target_include_directories(DragonbornPresenceCore PUBLIC 
+"${CMAKE_CURRENT_SOURCE_DIR}/include"
+)
+
+if(BUILD_TESTING)                                                                                                                                                                                                                          
+       add_executable(DragonbornPresenceCoreTests
+           tests/TextUtilsTests.cpp
+       )
+
+       target_link_libraries(DragonbornPresenceCoreTests PRIVATE
+           DragonbornPresenceCore
+           Catch2::Catch2WithMain
+       )
+       add_test(                                                                                                                                                                                                                                  
+       NAME DragonbornPresenceCoreTests
+       COMMAND DragonbornPresenceCoreTests
+   )  
+   endif()   
+
 add_commonlibsse_plugin(DragonbornPresence
     SOURCES
         ${DRAGONBORNPRESENCE_SOURCES}
@@ -135,7 +169,12 @@ target_precompile_headers(DragonbornPresence PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/include/pch.h"
 )
 
-target_link_libraries(DragonbornPresence PRIVATE discord_cpp delayimp nlohmann_json::nlohmann_json)
+target_link_libraries(DragonbornPresence PRIVATE 
+DragonbornPresenceCore 
+discord_cpp 
+delayimp 
+nlohmann_json::nlohmann_json
+)
 target_link_options(DragonbornPresence PRIVATE /DELAYLOAD:discord_game_sdk.dll)
 target_compile_options(DragonbornPresence PRIVATE /utf-8)
 
