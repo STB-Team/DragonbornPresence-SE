@@ -107,12 +107,14 @@ set_target_properties(discord_cpp PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIR
 set(DRAGONBORNPRESENCE_SOURCES
     src/main.cpp
     src/DragonbornPresence.cpp
+    src/adapters/config/JsonConfigProvider.cpp
     src/AdditionalFunctions.cpp
     src/discord_loader.cpp
 )
 set(DRAGONBORNPRESENCE_HEADERS
     include/DragonbornPresence.h
     include/AdditionalFunctions.h
+    include/DragonbornPresence/adapters/config/JsonConfigProvider.h
     include/ScriptUtils.h
     include/discord_loader.h
     include/pch.h
