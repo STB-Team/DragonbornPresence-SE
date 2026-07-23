@@ -30,7 +30,7 @@ tests/PresenceCoordinatorTests.cpp
 
 <section id="config"><h2>4. Добавить JSON-поле</h2><pre><code>core::Config safe default
   → JsonConfigProvider type-checked read
-  → config/DragonbornPresence.json shipped value
+  → config/DragonbornPresence.json shipped asset или DragonbornPresence.user.json runtime overlay
   → JsonConfigProviderTests valid/missing/invalid cases
   → README и web documentation</code></pre><p>Не увеличивайте <code>schema_version</code> при обратносуместимом optional поле. Повышение версии требуется только при несовместимой смене semantics или структуры. Provider сначала проверяет schema, а затем читает остальные разделы.</p></section>
 
@@ -43,7 +43,7 @@ tests/PresenceCoordinatorTests.cpp
   "match": "Отображаемое имя",
   "image": "discord_asset_key",
   "text": "Подсказка"
-}</code></pre><p>Нужен минимум один selector и непустой <code>image</code>. Все заданные selectors работают как AND. Более специфичное правило размещается раньше широкого. Exact duplicate selector делает более позднюю запись недостижимой.</p><p>После изменения JSON нужен перезапуск Skyrim, но не пересборка DLL. Asset key должен существовать в Discord Application.</p></section>
+}</code></pre><p>Нужен минимум один selector и непустой <code>image</code>. Все заданные selectors работают как AND. Более специфичное правило размещается раньше широкого. Exact duplicate selector делает более позднюю запись недостижимой.</p><p>Корректное изменение JSON применяется автоматически без перезапуска Skyrim и пересборки DLL. Asset key должен существовать в Discord Application.</p></section>
 
 <section id="verification"><h2>7. Проверка результата</h2><h3>Автоматически</h3><pre><code>cmake --preset vs2026-tests
 cmake --build --preset tests

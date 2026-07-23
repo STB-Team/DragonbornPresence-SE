@@ -1,9 +1,5 @@
 {
   "schema_version": 1,
-  "discord": {
-    "enabled": true,
-    "application_id": "1527543892151373937"
-  },
   "assets": {
     "large_image": "stb_logo",
     "large_text": "Skyrim True Believer",

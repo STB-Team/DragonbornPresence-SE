@@ -32,9 +32,55 @@ namespace DragonbornPresence::adapters::SkyrimTrueBeliever
             "aaMZ_SelectedLevel_OfDifficulty";
         constexpr std::string_view kDeathsGlobalEditorId =
             "aaMZgv_NowDeath";
+        constexpr std::string_view kActiveGodsListEditorId =
+            "aaMZfl_ActiveGodsList";
+        constexpr std::string_view kVampireBloodEditorId =
+            "aaMZgv_VampireBlood";
+        constexpr std::string_view kWerewolfBloodEditorId =
+            "aaMZgv_WerewolfBlood";
+        constexpr std::string_view kAedraCurseSpellEditorId =
+            "aaMZs_AedraCurseDUPLICATE001";
 
         constexpr std::string_view kNoStoneText = "не выбран";
         constexpr std::string_view kCombatText = "В бою";
+        constexpr std::string_view kAedraCurseText = "Проклятие Аэдра";
+        constexpr std::string_view kVampireText = "Вампир";
+        constexpr std::string_view kWerewolfText = "Вервольф";
+
+        struct GodDefinition
+        {
+            std::string_view activeFormEditorId;
+            std::string_view name;
+        };
+
+        /// Forms inserted into aaMZfl_ActiveGodsList by STB altar scripts.
+        constexpr std::array kGodDefinitions{
+            GodDefinition{"aaMZf_AkatoshFaction", "Акатош"},
+            GodDefinition{"aaMZf_ArkayFaction", "Аркей"},
+            GodDefinition{"aaMZf_JulianosFaction", "Джулианос"},
+            GodDefinition{"aaMZf_KynarethFaction", "Кинарет"},
+            GodDefinition{"aaMZf_ZenitharFaction", "Зенитар"},
+            GodDefinition{"aaMZf_StendarrFaction", "Стендарр"},
+            GodDefinition{"aaMZf_TalosFaction", "Талос"},
+            GodDefinition{"aaMZf_DibellaFaction", "Дибелла"},
+            GodDefinition{"aaMZf_MaraFaction", "Мара"},
+            GodDefinition{"aaMZgv_AzuraFaithPoints", "Азура"},
+            GodDefinition{"aaMZgv_BoetiyaFaithPoints", "Боэтия"},
+            GodDefinition{"aaMZgv_ClavikusVailFaithPoints", "Клавикус Вайл"},
+            GodDefinition{"aaMZgv_HermeusMoraFaithPoints", "Хермеус Мора"},
+            GodDefinition{"aaMZgv_HirsinFaithPoints", "Хирсин"},
+            GodDefinition{"aaMZgv_MalakatFaithPoints", "Малакат"},
+            GodDefinition{"aaMZgv_MehrunesDagonFaithPoints", "Мерунес Дагон"},
+            GodDefinition{"aaMZgv_MephalaFaithPoints", "Мефала"},
+            GodDefinition{"aaMZgv_MeridiaFaithPoints", "Меридия"},
+            GodDefinition{"aaMZgv_MolagBaalFaithPoints", "Молаг Бал"},
+            GodDefinition{"aaMZgv_NamiraFaithPoints", "Намира"},
+            GodDefinition{"aaMZgv_NoktyrnalFaithPoints", "Ноктюрнал"},
+            GodDefinition{"aaMZgv_PeriaytFaithPoints", "Периайт"},
+            GodDefinition{"aaMZgv_SangvinFaithPoints", "Сангвин"},
+            GodDefinition{"aaMZgv_SheogotatFaithPoints", "Шеогорат"},
+            GodDefinition{"aaMZgv_VerminaFaithPoints", "Вермина"},
+        };
 
         /// Static description of one STB standing stone.
         ///
@@ -104,6 +150,19 @@ namespace DragonbornPresence::adapters::SkyrimTrueBeliever
                 kDifficultyQuestFormId,
                 kStbPluginName.data());
 
+        runtimeData_.activeGods =
+            RE::TESForm::LookupByEditorID<RE::BGSListForm>(
+                kActiveGodsListEditorId.data());
+        runtimeData_.vampireBlood =
+            RE::TESForm::LookupByEditorID<RE::TESGlobal>(
+                kVampireBloodEditorId.data());
+        runtimeData_.werewolfBlood =
+            RE::TESForm::LookupByEditorID<RE::TESGlobal>(
+                kWerewolfBloodEditorId.data());
+        runtimeData_.aedraCurse =
+            RE::TESForm::LookupByEditorID<RE::SpellItem>(
+                kAedraCurseSpellEditorId.data());
+
         runtimeData_.stones.clear();
         runtimeData_.stones.reserve(kStoneDefinitions.size());
 
@@ -122,7 +181,8 @@ namespace DragonbornPresence::adapters::SkyrimTrueBeliever
         }
 
         SKSE::log::info(
-            "STB integration: deaths={} difficulty={} stones={}/{}.",
+            "STB integration: deaths={} difficulty={} stones={}/{} "
+            "gods={} vampire={} werewolf={} curse={}.",
             runtimeData_.deaths != nullptr,
             runtimeData_.difficultyQuest != nullptr,
             std::ranges::count_if(
@@ -131,7 +191,11 @@ namespace DragonbornPresence::adapters::SkyrimTrueBeliever
                 {
                     return stone.descriptionSpell != nullptr;
                 }),
-            runtimeData_.stones.size());
+            runtimeData_.stones.size(),
+            runtimeData_.activeGods != nullptr,
+            runtimeData_.vampireBlood != nullptr,
+            runtimeData_.werewolfBlood != nullptr,
+            runtimeData_.aedraCurse != nullptr);
     }
 
     core::PlayerSnapshot StbGameDataSource::ReadPlayerSnapshot()
@@ -143,6 +207,7 @@ namespace DragonbornPresence::adapters::SkyrimTrueBeliever
             return snapshot;
 
         snapshot.level = player->GetLevel();
+        snapshot.playerName = FromGameString(player->GetName());
 
         if (runtimeData_.deaths)
         {
@@ -152,6 +217,17 @@ namespace DragonbornPresence::adapters::SkyrimTrueBeliever
 
         snapshot.stone = ReadSelectedStone(player);
         snapshot.difficulty = ReadSelectedDifficulty();
+        snapshot.god = ReadSelectedGod(player);
+        snapshot.vampire =
+            runtimeData_.vampireBlood &&
+                    runtimeData_.vampireBlood->value > 0.0F
+                ? std::string(kVampireText)
+                : std::string{};
+        snapshot.werewolf =
+            runtimeData_.werewolfBlood &&
+                    runtimeData_.werewolfBlood->value > 0.0F
+                ? std::string(kWerewolfText)
+                : std::string{};
         snapshot.location = BuildLocationContext(player);
         snapshot.inCombat = player->IsInCombat();
 
@@ -257,6 +333,42 @@ namespace DragonbornPresence::adapters::SkyrimTrueBeliever
         return selectedStone != runtimeData_.stones.end()
                    ? selectedStone->name
                    : std::string(kNoStoneText);
+    }
+
+    std::string StbGameDataSource::ReadSelectedGod(
+        RE::PlayerCharacter *player) const
+    {
+        if (!player)
+            return {};
+
+        if (runtimeData_.aedraCurse &&
+            player->HasSpell(runtimeData_.aedraCurse))
+        {
+            return std::string(kAedraCurseText);
+        }
+
+        if (!runtimeData_.activeGods)
+            return {};
+
+        std::string selectedGods;
+        for (const auto *activeForm : runtimeData_.activeGods->forms)
+        {
+            const std::string editorId = FormEditorId(activeForm);
+            const auto definition = std::ranges::find_if(
+                kGodDefinitions,
+                [&editorId](const auto &candidate)
+                {
+                    return candidate.activeFormEditorId == editorId;
+                });
+            if (definition == kGodDefinitions.end())
+                continue;
+
+            if (!selectedGods.empty())
+                selectedGods.append(", ");
+            selectedGods.append(definition->name);
+        }
+
+        return selectedGods;
     }
 
     std::string StbGameDataSource::FormEditorId(

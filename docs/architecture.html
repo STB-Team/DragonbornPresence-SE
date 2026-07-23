@@ -70,7 +70,7 @@
           <tbody>
             <tr><td><code>include/DragonbornPresence/core</code><br><code>src/core</code></td><td>Модели, UTF-8, сложность и выбор asset локации. Нет I/O и SDK.</td></tr>
             <tr><td><code>include/DragonbornPresence/application</code><br><code>src/application</code></td><td><code>PresenceCoordinator</code> и четыре порта внешнего мира.</td></tr>
-            <tr><td><code>adapters/config</code></td><td>Чтение и валидация <code>DragonbornPresence.json</code>.</td></tr>
+            <tr><td><code>adapters/config</code></td><td>Чтение base-каталога <code>DragonbornPresence.json</code>, user overlay и hot reload.</td></tr>
             <tr><td><code>adapters/SkyrimTrueBeliever</code></td><td>Формы STB, Papyrus, CP1251, события Skyrim, scheduler и SKSE logger.</td></tr>
             <tr><td><code>adapters/discord</code></td><td>Проверка Discord Desktop, загрузка DLL и реализация Presence transport.</td></tr>
             <tr><td><code>src/DragonbornPresence.cpp</code></td><td>Composition root и три безопасные функции публичного фасада.</td></tr>
@@ -129,8 +129,8 @@ StbRuntimeAdapter(coordinator, logger)</code></pre>
       <h2>5. Жизненный цикл</h2>
       <ol class="steps">
         <li><strong><code>SKSEPluginLoad</code>.</strong> Проверяется входной указатель, вызывается <code>SKSE::Init</code>, создаётся file logger.</li>
-        <li><strong>Проверка Discord.</strong> <code>IsDiscordRunning</code> проверяет protocol handler, executable и процесс. Плагин не скачивает и не запускает Discord.</li>
-        <li><strong>Конфигурация.</strong> <code>LoadConfig</code> читает JSON либо оставляет безопасные defaults.</li>
+        <li><strong>Проверка Discord.</strong> При включённой интеграции <code>IsDiscordRunning</code> проверяет protocol handler, executable и процесс. Недоступный Discord не блокирует игровой runtime.</li>
+        <li><strong>Конфигурация.</strong> <code>LoadConfig</code> объединяет base JSON и user overlay; <code>Tick</code> применяет корректные изменения без перезапуска.</li>
         <li><strong>Messaging listener.</strong> <code>main.cpp</code> подписывается на сообщения SKSE.</li>
         <li><strong><code>kDataLoaded</code>.</strong> Runtime adapter проверяет UI, event source и TaskInterface; coordinator инициализирует Discord transport, кэширует формы STB и отправляет loading Presence.</li>
         <li><strong><code>kNewGame</code> / <code>kPostLoadGame</code>.</strong> Игра помечается готовой, читается первый полный snapshot и публикуется Presence.</li>

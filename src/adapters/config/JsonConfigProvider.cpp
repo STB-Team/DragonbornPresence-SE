@@ -2,10 +2,8 @@
 
 #include <spdlog/spdlog.h>
 
-#include <charconv>
-#include <cstddef>
-#include <cstdint>
 #include <fstream>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -24,89 +22,104 @@ namespace DragonbornPresence::adapters::config
         ///
         /// The path is an infrastructure detail, so it remains inside this translation
         /// unit instead of becoming part of core::Config or the public adapter API.
-        constexpr std::string_view kConfigPath =
+        constexpr std::string_view kBaseConfigPath =
             R"(Data\SKSE\Plugins\DragonbornPresence.json)";
+        constexpr std::string_view kUserConfigPath =
+            R"(Data\SKSE\Plugins\DragonbornPresence.user.json)";
 
         /// Translation-unit-local parser that converts JSON values into core models.
         ///
-        /// Keeping this class in the anonymous namespace prevents other components
-        /// from depending on its parsing helpers. JsonConfigProvider::Load is the only
-        /// public entry point of this adapter.
+        /// from depending on its parsing helpers.
         class ConfigLoader final
         {
         public:
-            /// Reads the configured file and returns defaults for missing or invalid input.
-            [[nodiscard]] static core::Config Load()
+            [[nodiscard]] static std::optional<core::Config> Load()
             {
                 core::Config config;
-                std::ifstream file(kConfigPath.data());
-                if (!file)
-                {
-                    spdlog::info("Config not found; using defaults.");
-                    return config;
-                }
 
-                try
-                {
-                    const auto root = nlohmann::json::parse(file);
-                    if (!root.is_object())
-                    {
-                        spdlog::warn("Config root must be an object; using defaults.");
-                        return config;
-                    }
+                const auto baseDocument =
+                    ReadDocument(kBaseConfigPath, "base config");
+                if (!baseDocument.valid)
+                    return std::nullopt;
+                if (baseDocument.root)
+                    ReadBaseConfig(*baseDocument.root, config);
 
-                    if (!HasSupportedSchemaVersion(root))
-                        return config;
+                const auto userDocument =
+                    ReadDocument(kUserConfigPath, "user config");
+                if (!userDocument.valid)
+                    return std::nullopt;
+                if (userDocument.root)
+                    ReadUserConfig(*userDocument.root, config);
 
-                    if (const auto *discordConfig = FindObject(root, "discord", "discord"))
-                    {
-                        ReadBool(*discordConfig, "enabled", config.enabled, "discord");
-                        ReadApplicationId(*discordConfig, config);
-                    }
-                    if (const auto *assets = FindObject(root, "assets", "assets"))
-                    {
-                        ReadString(*assets, "large_image", config.largeImage, "assets");
-                        ReadString(*assets, "large_text", config.largeText, "assets");
-                        if (const auto *smallImages =
-                                FindObject(*assets, "small_images", "assets.small_images"))
-                        {
-                            ReadString(
-                                *smallImages,
-                                "loading",
-                                config.loadingImage,
-                                "assets.small_images");
-                            ReadString(
-                                *smallImages,
-                                "combat",
-                                config.combatImage,
-                                "assets.small_images");
-                        }
-                        ReadLocationImageRules(*assets, config);
-                    }
-                    spdlog::info("Config loaded.");
-                }
-                catch (const nlohmann::json::exception &error)
-                {
-                    spdlog::error("Failed to parse config JSON: {}", error.what());
-                    return {};
-                }
                 return config;
             }
 
         private:
-            /// Accepts the current schema and legacy documents that predate the field.
-            ///
-            /// An explicit invalid or unsupported version rejects the whole document so
-            /// a future schema cannot be partially interpreted with obsolete semantics.
+            struct DocumentResult
+            {
+                bool valid = true;
+                std::optional<nlohmann::json> root;
+            };
+
+            [[nodiscard]] static DocumentResult ReadDocument(
+                std::string_view path,
+                std::string_view label)
+            {
+                std::error_code error;
+                if (!std::filesystem::exists(path, error))
+                    return {};
+                if (error)
+                {
+                    spdlog::error(
+                        "Failed to inspect {} '{}': {}.",
+                        label,
+                        path,
+                        error.message());
+                    return {false, std::nullopt};
+                }
+
+                std::ifstream file(path.data());
+                if (!file)
+                {
+                    spdlog::error("Failed to open {} '{}'.", label, path);
+                    return {false, std::nullopt};
+                }
+
+                try
+                {
+                    auto root = nlohmann::json::parse(file);
+                    if (!root.is_object())
+                    {
+                        spdlog::warn(
+                            "{} root must be an object.",
+                            label);
+                        return {false, std::nullopt};
+                    }
+                    if (!HasSupportedSchemaVersion(root, label))
+                        return {false, std::nullopt};
+                    return {true, std::move(root)};
+                }
+                catch (const nlohmann::json::exception &parseError)
+                {
+                    spdlog::error(
+                        "Failed to parse {} JSON: {}",
+                        label,
+                        parseError.what());
+                    return {false, std::nullopt};
+                }
+            }
+
             [[nodiscard]] static bool HasSupportedSchemaVersion(
-                const nlohmann::json &root)
+                const nlohmann::json &root,
+                std::string_view label)
             {
                 const auto value = root.find("schema_version");
                 if (value == root.end())
                 {
                     spdlog::warn(
-                        "Config: 'schema_version' is missing; treating the document as "
+                        "{}: 'schema_version' is missing; treating the document as "
                         "legacy schema {}.",
+                        label,
                         core::kSupportedConfigSchemaVersion);
                     return true;
                 }
@@ -114,23 +127,90 @@ namespace DragonbornPresence::adapters::config
                 if (!value->is_number_integer())
                 {
                     spdlog::warn(
-                        "Config: 'schema_version' must be an integer; using defaults.");
+                        "{}: 'schema_version' must be an integer.",
+                        label);
                     return false;
                 }
-
                 if (*value != core::kSupportedConfigSchemaVersion)
                 {
                     spdlog::warn(
-                        "Config schema {} is unsupported; expected {}; using defaults.",
+                        "{} schema {} is unsupported; expected {}.",
+                        label,
                         value->dump(),
                         core::kSupportedConfigSchemaVersion);
                     return false;
                 }
-
                 return true;
             }
 
-            /// Returns an object-valued child or reports a type mismatch.
+            static void ReadBaseConfig(
+                const nlohmann::json &root,
+                core::Config &config)
+            {
+                if (const auto *assets = FindObject(root, "assets", "assets"))
+                {
+                    ReadString(*assets, "large_image", config.largeImage, "assets");
+                    ReadString(*assets, "large_text", config.largeText, "assets");
+                    if (const auto *smallImages =
+                            FindObject(*assets, "small_images", "assets.small_images"))
+                    {
+                        ReadString(
+                            *smallImages,
+                            "loading",
+                            config.loadingImage,
+                            "assets.small_images");
+                        ReadString(
+                            *smallImages,
+                            "combat",
+                            config.combatImage,
+                            "assets.small_images");
+                    }
+                    ReadLocationImageRules(*assets, config);
+                }
+            }
+
+            static void ReadUserConfig(
+                const nlohmann::json &root,
+                core::Config &config)
+            {
+                if (const auto *discordConfig =
+                        FindObject(root, "discord", "discord"))
+                {
+                    ReadBool(*discordConfig, "enabled", config.enabled, "discord");
+                }
+
+                if (const auto *presence =
+                        FindObject(root, "presence", "presence"))
+                {
+                    ReadString(
+                        *presence,
+                        "details",
+                        config.detailsTemplate,
+                        "presence");
+                    ReadString(
+                        *presence,
+                        "state",
+                        config.stateTemplate,
+                        "presence");
+                    if (config.stateTemplate ==
+                        core::kLegacyDefaultStateTemplate)
+                    {
+                        config.stateTemplate =
+                            core::kDefaultStateTemplate;
+                    }
+                    ReadString(
+                        *presence,
+                        "large_text",
+                        config.largeTextTemplate,
+                        "presence");
+                    ReadString(
+                        *presence,
+                        "combat_text",
+                        config.combatTextTemplate,
+                        "presence");
+                }
+            }
+
             [[nodiscard]] static const nlohmann::json *FindObject(
                 const nlohmann::json &parent,
                 const char *key,
@@ -141,13 +221,12 @@ namespace DragonbornPresence::adapters::config
                     return nullptr;
                 if (!value->is_object())
                 {
-                    spdlog::warn("Config: '{}' must be an object; using defaults.", path);
+                    spdlog::warn("Config: '{}' must be an object.", path);
                     return nullptr;
                 }
                 return &*value;
             }
 
-            /// Reads an optional boolean property without replacing its default on error.
             static void ReadBool(
                 const nlohmann::json &object,
                 const char *key,
@@ -168,7 +247,6 @@ namespace DragonbornPresence::adapters::config
                 target = value->get<bool>();
             }
 
-            /// Reads an optional string property without replacing its default on error.
             static void ReadString(
                 const nlohmann::json &object,
                 const char *key,
@@ -189,42 +267,7 @@ namespace DragonbornPresence::adapters::config
                 target = value->get<std::string>();
             }
 
-            /// Parses a positive Discord application ID from an integer or decimal string.
-            static void ReadApplicationId(
-                const nlohmann::json &discordConfig,
-                core::Config &config)
-            {
-                const auto value = discordConfig.find("application_id");
-                if (value == discordConfig.end())
-                    return;
 
-                if (value->is_number_integer())
-                {
-                    const auto parsedId = value->get<std::int64_t>();
-                    if (parsedId > 0)
-                        config.applicationId = parsedId;
-                    return;
-                }
-                if (value->is_string())
-                {
-                    const std::string encodedId = value->get<std::string>();
-                    core::ApplicationId parsedId = 0;
-                    const auto [end, error] = std::from_chars(
-                        encodedId.data(),
-                        encodedId.data() + encodedId.size(),
-                        parsedId);
-                    if (error == std::errc{} && end == encodedId.data() + encodedId.size() &&
-                        parsedId > 0)
-                    {
-                        config.applicationId = parsedId;
-                        return;
-                    }
-                }
-                spdlog::warn(
-                    "Config: 'discord.application_id' is invalid; using default.");
-            }
-
-            /// Parses ordered location-image rules and discards malformed entries.
             static void ReadLocationImageRules(
                 const nlohmann::json &assets,
                 core::Config &config)
@@ -254,7 +297,8 @@ namespace DragonbornPresence::adapters::config
 
                     core::LocationImageRule rule;
                     bool isValid = true;
-                    const auto readOptionalString = [&](const char *key, std::string &target)
+                    const auto readOptionalString =
+                        [&](const char *key, std::string &target)
                     {
                         const auto field = value.find(key);
                         if (field == value.end())
@@ -298,6 +342,66 @@ namespace DragonbornPresence::adapters::config
     } // namespace
     core::Config JsonConfigProvider::Load()
     {
-        return ConfigLoader::Load();
+        baseState_ = Inspect(kBaseConfigPath);
+        userState_ = Inspect(kUserConfigPath);
+        hasObservedFiles_ = true;
+
+        const auto config = ConfigLoader::Load();
+        if (!config)
+        {
+            spdlog::warn(
+                "Initial configuration is invalid; using safe defaults.");
+            return {};
+        }
+
+        spdlog::info("Configuration loaded.");
+        return *config;
+    }
+
+    std::optional<core::Config> JsonConfigProvider::ReloadIfChanged()
+    {
+        const auto baseState = Inspect(kBaseConfigPath);
+        const auto userState = Inspect(kUserConfigPath);
+        if (hasObservedFiles_ &&
+            baseState == baseState_ &&
+            userState == userState_)
+        {
+            return std::nullopt;
+        }
+
+        baseState_ = baseState;
+        userState_ = userState;
+        hasObservedFiles_ = true;
+
+        const auto config = ConfigLoader::Load();
+        if (!config)
+        {
+            spdlog::error(
+                "Configuration reload failed; keeping the last valid configuration.");
+            return std::nullopt;
+        }
+
+        spdlog::info("Configuration files changed; configuration reloaded.");
+        return config;
+    }
+
+    JsonConfigProvider::FileState JsonConfigProvider::Inspect(
+        const std::filesystem::path &path) noexcept
+    {
+        FileState state;
+        std::error_code error;
+        state.exists = std::filesystem::exists(path, error);
+        if (error || !state.exists)
+            return state;
+
+        state.writeTime = std::filesystem::last_write_time(path, error);
+        if (error)
+            state.writeTime = {};
+
+        error.clear();
+        state.size = std::filesystem::file_size(path, error);
+        if (error)
+            state.size = 0;
+        return state;
     }
 } // namespace DragonbornPresence::adapters::config

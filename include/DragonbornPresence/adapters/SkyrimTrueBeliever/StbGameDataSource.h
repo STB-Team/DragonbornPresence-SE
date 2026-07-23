@@ -52,6 +52,10 @@ namespace DragonbornPresence::adapters::SkyrimTrueBeliever
             RE::TESGlobal *deaths = nullptr;
             RE::TESQuest *difficultyQuest = nullptr;
             std::vector<StoneRuntimeData> stones;
+            RE::BGSListForm *activeGods = nullptr;
+            RE::TESGlobal *vampireBlood = nullptr;
+            RE::TESGlobal *werewolfBlood = nullptr;
+            RE::SpellItem *aedraCurse = nullptr;
         };
 
         /// Keeps the last copied combat target while Skyrim temporarily loses its handle.
@@ -73,6 +77,10 @@ namespace DragonbornPresence::adapters::SkyrimTrueBeliever
 
         /// Returns the first resolved standing stone currently affecting the player.
         [[nodiscard]] std::string ReadSelectedStone(
+            RE::PlayerCharacter *player) const;
+
+        /// Returns selected Aedra or Daedra names, or the active Aedra curse.
+        [[nodiscard]] std::string ReadSelectedGod(
             RE::PlayerCharacter *player) const;
 
         /// Copies a nullable Skyrim form Editor ID into an owned string.

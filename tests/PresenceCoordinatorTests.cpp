@@ -13,6 +13,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace application = DragonbornPresence::application;
@@ -68,8 +69,18 @@ namespace
             return config;
         }
 
+        std::optional<core::Config> ReloadIfChanged() override
+        {
+            ++reloadCalls;
+            auto result = std::move(pendingReload);
+            pendingReload.reset();
+            return result;
+        }
+
         core::Config config;
+        std::optional<core::Config> pendingReload;
         int loadCalls = 0;
+        int reloadCalls = 0;
     };
 
     class FakeGameDataSource final
@@ -96,11 +107,9 @@ namespace
         : public ports::IPresenceClient
     {
     public:
-        bool Initialize(
-            const core::Config &config) override
+        bool Initialize() override
         {
             ++initializeCalls;
-            initializedConfig = config;
             active = initializeResult;
             return initializeResult;
         }
@@ -108,6 +117,8 @@ namespace
         bool RunCallbacks() override
         {
             ++callbackCalls;
+            if (!callbacksResult)
+                active = false;
             return callbacksResult;
         }
 
@@ -134,7 +145,6 @@ namespace
             active = false;
         }
 
-        core::Config initializedConfig;
         std::vector<CapturedPayload> payloads;
         std::vector<std::string> shutdownReasons;
         bool initializeResult = true;
@@ -197,6 +207,9 @@ namespace
         snapshot.deaths = 7;
         snapshot.stone = "🌙-Луна";
         snapshot.difficulty = "🔴Героический";
+        snapshot.playerName = "Довакин";
+        snapshot.god = "Акатош, Азура";
+        snapshot.vampire = "Вампир";
         snapshot.location = {
             "Tamriel",
             "WhiterunExterior01",
@@ -223,7 +236,6 @@ TEST_CASE("Coordinator loads configuration and starts dependencies")
     CHECK(harness.configProvider.loadCalls == 1);
     CHECK(harness.presenceClient.initializeCalls == 1);
     CHECK(harness.gameDataSource.initializeCalls == 1);
-    CHECK(harness.presenceClient.initializedConfig.largeImage == "configured_large");
     REQUIRE(harness.presenceClient.payloads.size() == 1);
 
     const auto &loading = harness.presenceClient.payloads.front();
@@ -235,17 +247,25 @@ TEST_CASE("Coordinator loads configuration and starts dependencies")
     CHECK(loading.smallText == "Загрузка");
 }
 
-TEST_CASE("Coordinator does not initialize game data when transport startup fails")
+TEST_CASE("Transport startup failure keeps runtime available for explicit retry")
 {
     Harness harness;
     harness.presenceClient.initializeResult = false;
     harness.coordinator.LoadConfig();
 
-    CHECK_FALSE(harness.coordinator.Start());
+    CHECK(harness.coordinator.Start());
     CHECK(harness.presenceClient.initializeCalls == 1);
-    CHECK(harness.gameDataSource.initializeCalls == 0);
+    CHECK(harness.gameDataSource.initializeCalls == 1);
     CHECK(harness.presenceClient.payloads.empty());
-    CHECK_FALSE(harness.coordinator.Tick());
+    CHECK(harness.coordinator.Tick());
+    CHECK(harness.presenceClient.initializeCalls == 1);
+
+    harness.presenceClient.initializeResult = true;
+    harness.configProvider.pendingReload = harness.configProvider.config;
+    CHECK(harness.coordinator.Tick());
+    CHECK(harness.presenceClient.initializeCalls == 2);
+    REQUIRE(harness.presenceClient.payloads.size() == 1);
+    CHECK(harness.presenceClient.payloads.back().state == "Загрузка");
 }
 
 TEST_CASE("Game-loaded refresh builds the complete gameplay payload")
@@ -254,6 +274,7 @@ TEST_CASE("Game-loaded refresh builds the complete gameplay payload")
     harness.configProvider.config.largeImage = "fallback";
     harness.configProvider.config.largeText = "Fallback text";
     harness.configProvider.config.combatImage = "combat_asset";
+    harness.configProvider.config.combatTextTemplate = "{combat} / {player}";
     harness.configProvider.config.locationImageRules = {
         {"Tamriel", "WhiterunLocation", "", "whiterun", "whiterun_asset", "Whiterun text"},
     };
@@ -271,9 +292,9 @@ TEST_CASE("Game-loaded refresh builds the complete gameplay payload")
     CHECK(gameplay.details == "🔴Героический");
     CHECK(gameplay.state == "lvl-42 💀-7 🌙-Луна");
     CHECK(gameplay.largeImage == "whiterun_asset");
-    CHECK(gameplay.largeText == "Whiterun text");
+    CHECK(gameplay.largeText == "Довакин");
     CHECK(gameplay.smallImage == "combat_asset");
-    CHECK(gameplay.smallText == "В бою с Драугр (ур. 30)");
+    CHECK(gameplay.smallText == "В бою с Драугр (ур. 30) / Довакин");
     CHECK(ContainsMessage(harness.logger.infos, "[game-loaded]"));
 }
 
@@ -292,6 +313,68 @@ TEST_CASE("Unknown deaths and inactive combat use stable fallbacks")
     CHECK(gameplay.state == "lvl-42 💀-— 🌙-Луна");
     CHECK(gameplay.smallImage.empty());
     CHECK(gameplay.smallText.empty());
+}
+
+TEST_CASE("Runtime configuration enables and disables Discord without restart")
+{
+    Harness harness;
+    harness.configProvider.config.enabled = false;
+    harness.coordinator.LoadConfig();
+
+    REQUIRE(harness.coordinator.Start());
+    CHECK(harness.gameDataSource.initializeCalls == 1);
+    CHECK(harness.presenceClient.initializeCalls == 0);
+    CHECK(harness.presenceClient.payloads.empty());
+
+    harness.configProvider.config.enabled = true;
+    harness.configProvider.pendingReload = harness.configProvider.config;
+    REQUIRE(harness.coordinator.Tick());
+    CHECK(harness.presenceClient.initializeCalls == 1);
+    REQUIRE(harness.presenceClient.payloads.size() == 1);
+
+    harness.configProvider.config.enabled = false;
+    harness.configProvider.pendingReload = harness.configProvider.config;
+    REQUIRE(harness.coordinator.Tick());
+    REQUIRE(harness.presenceClient.shutdownReasons.size() == 1);
+    CHECK_FALSE(harness.presenceClient.active);
+}
+
+TEST_CASE("Presence templates replace current payload fields and reload at runtime")
+{
+    Harness harness;
+    harness.configProvider.config.detailsTemplate =
+        "{stone} lvl-{lvl} / {stone}";
+    harness.configProvider.config.stateTemplate =
+        "{difficulty} {deaths} {player} {god} {vampire} {werewolf} "
+        "{location} {combat} {unknown}";
+    harness.gameDataSource.snapshot = MakeSnapshot();
+
+    harness.coordinator.LoadConfig();
+    REQUIRE(harness.coordinator.Start());
+    harness.coordinator.OnGameLoaded();
+
+    const auto &gameplay = harness.presenceClient.payloads.back();
+    CHECK(gameplay.details == "🌙-Луна lvl-42 / 🌙-Луна");
+    CHECK(
+        gameplay.state ==
+        "🔴Героический 💀-7 Довакин Акатош, Азура Вампир  "
+        "Skyrim: Whiterun В бою с Драугр (ур. 30) {unknown}");
+
+    harness.configProvider.config.detailsTemplate = "Уровень {lvl}";
+    harness.configProvider.config.stateTemplate = "";
+    harness.configProvider.pendingReload = harness.configProvider.config;
+    REQUIRE(harness.coordinator.Tick());
+
+    CHECK(harness.presenceClient.payloads.back().details == "Уровень 42");
+    CHECK(harness.presenceClient.payloads.back().state.empty());
+
+    harness.gameDataSource.snapshot.god.clear();
+    harness.gameDataSource.snapshot.vampire.clear();
+    harness.gameDataSource.snapshot.werewolf.clear();
+    harness.configProvider.config.detailsTemplate = "{god}{vampire}{werewolf}";
+    harness.configProvider.pendingReload = harness.configProvider.config;
+    REQUIRE(harness.coordinator.Tick());
+    CHECK(harness.presenceClient.payloads.back().details.empty());
 }
 
 TEST_CASE("Loading and main-menu transitions publish only valid states")
@@ -321,19 +404,23 @@ TEST_CASE("Loading and main-menu transitions publish only valid states")
     CHECK(harness.gameDataSource.readCalls == 2);
 }
 
-TEST_CASE("Tick stops permanently after callback transport failure")
+TEST_CASE("Callback failure pauses transport until explicit configuration reload")
 {
     Harness harness;
     harness.coordinator.LoadConfig();
     REQUIRE(harness.coordinator.Start());
     harness.presenceClient.callbacksResult = false;
 
-    CHECK_FALSE(harness.coordinator.Tick());
+    CHECK(harness.coordinator.Tick());
     CHECK(harness.presenceClient.callbackCalls == 1);
-    CHECK_FALSE(harness.coordinator.Tick());
+    CHECK(harness.coordinator.Tick());
     CHECK(harness.presenceClient.callbackCalls == 1);
-    CHECK_FALSE(harness.coordinator.Start());
     CHECK(harness.presenceClient.initializeCalls == 1);
+
+    harness.presenceClient.callbacksResult = true;
+    harness.configProvider.pendingReload = harness.configProvider.config;
+    CHECK(harness.coordinator.Tick());
+    CHECK(harness.presenceClient.initializeCalls == 2);
     CHECK_FALSE(harness.logger.errors.empty());
 }
 
@@ -379,16 +466,22 @@ TEST_CASE("Duplicate presence updates do not produce refresh diagnostics")
     CHECK_FALSE(ContainsMessage(harness.logger.infos, "[game-loaded]"));
 }
 
-TEST_CASE("Inactive transport after an update permanently stops the coordinator")
+TEST_CASE("Inactive transport after update waits for explicit retry")
 {
     Harness harness;
     harness.presenceClient.deactivateOnUpdate = true;
     harness.coordinator.LoadConfig();
 
-    CHECK_FALSE(harness.coordinator.Start());
+    CHECK(harness.coordinator.Start());
     CHECK(harness.gameDataSource.initializeCalls == 1);
-    CHECK_FALSE(harness.coordinator.Start());
     CHECK(harness.presenceClient.initializeCalls == 1);
+    CHECK(harness.coordinator.Tick());
+    CHECK(harness.presenceClient.initializeCalls == 1);
+
+    harness.presenceClient.deactivateOnUpdate = false;
+    harness.configProvider.pendingReload = harness.configProvider.config;
+    CHECK(harness.coordinator.Tick());
+    CHECK(harness.presenceClient.initializeCalls == 2);
 }
 
 TEST_CASE("Exception handling logs context and shuts down the transport")

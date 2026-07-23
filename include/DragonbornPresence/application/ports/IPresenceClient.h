@@ -1,6 +1,5 @@
 #pragma once
 
-#include "DragonbornPresence/core/Config.h"
 #include "DragonbornPresence/core/PresencePayload.h"
 
 #include <string_view>
@@ -20,17 +19,18 @@ namespace DragonbornPresence::application::ports
         /// Enables destruction through an interface pointer or reference.
         virtual ~IPresenceClient() = default;
 
-        /// Initializes the external Presence transport.
+        /// Initializes one external Presence transport session.
         ///
-        /// Returns true only when the client is ready to accept updates.
-        /// Failed initialization must leave the client inactive.
-        [[nodiscard]] virtual bool Initialize(
-            const core::Config &config) = 0;
+        /// Returns true only when the client is ready to accept updates. A later
+        /// explicit configuration reload may call this method again after shutdown
+        /// or a failed session.
+        [[nodiscard]] virtual bool Initialize() = 0;
 
-        /// Processes callbacks required by the external Presence transport.
+        /// Processes callbacks required by the active Presence transport session.
         ///
-        /// Returns false when the transport is unavailable or has failed
-        /// permanently and no further operations should be submitted.
+        /// Returns false when that session has failed. The application must not
+        /// retry automatically, but may initialize a new session after an explicit
+        /// configuration reload.
         [[nodiscard]] virtual bool RunCallbacks() = 0;
 
         /// Reports whether the transport can currently accept work.
@@ -44,11 +44,11 @@ namespace DragonbornPresence::application::ports
         virtual bool UpdateActivity(
             const core::PresencePayload &payload) = 0;
 
-        /// Permanently stops the transport and releases its resources.
+        /// Stops the current transport session and releases its resources.
         ///
+        /// A later explicit configuration reload may initialize a new session.
         /// Implementations must not allow exceptions to escape during shutdown.
-        virtual void Shutdown(
-            std::string_view reason) noexcept = 0;
+        virtual void Shutdown(std::string_view reason) noexcept = 0;
     };
 
 } // namespace DragonbornPresence::application::ports

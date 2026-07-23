@@ -14,19 +14,18 @@ namespace DragonbornPresence::adapters::discord
 
     /// Discord Game SDK implementation of the Presence output port.
     ///
-    /// The adapter owns the Discord SDK core, translates core Presence payloads
+    /// The adapter owns one Discord SDK session, translates core Presence payloads
     /// into Discord activities, processes asynchronous SDK callbacks, suppresses
-    /// duplicate updates, and permanently disables itself after transport errors.
+    /// duplicate updates, and stops the current session after transport errors.
     class DiscordPresenceClient final
         : public ::DragonbornPresence::application::ports::IPresenceClient
     {
     public:
-        /// Creates the Discord SDK core when Presence is enabled and available.
+        /// Creates the Discord SDK core for the fixed STB Discord application.
         ///
         /// Returns true only when the SDK core was created and the transport is
         /// ready to process callbacks and activity updates.
-        [[nodiscard]] bool Initialize(
-            const core::Config &config) override;
+        [[nodiscard]] bool Initialize() override;
 
         /// Processes pending Discord SDK callbacks.
         ///
@@ -44,9 +43,8 @@ namespace DragonbornPresence::adapters::discord
         bool UpdateActivity(
             const core::PresencePayload &payload) override;
 
-        /// Releases the Discord SDK core and prevents future transport calls.
-        void Shutdown(
-            std::string_view reason) noexcept override;
+        /// Releases the current Discord SDK session.
+        void Shutdown(std::string_view reason) noexcept override;
 
     private:
         /// Logs a decoded Discord SDK result without allowing exceptions to escape.

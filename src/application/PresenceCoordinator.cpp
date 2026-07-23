@@ -5,6 +5,8 @@
 
 #include <cstdint>
 #include <format>
+#include <iterator>
+#include <utility>
 #include <string>
 #include <string_view>
 
@@ -79,10 +81,7 @@ namespace DragonbornPresence::application
         config_ = configProvider_.Load();
     }
 
-    /// Initializes game data and the Presence transport.
-    ///
-    /// Returns true only when the application is ready to receive game signals
-    /// and periodic ticks.
+    /// Initializes game data and runtime processing independently of Discord.
     bool PresenceCoordinator::Start()
     {
         if (permanentlyStopped_)
@@ -90,18 +89,66 @@ namespace DragonbornPresence::application
             logger_.Error(
                 "DragonbornPresence registration was skipped because an earlier "
                 "fatal error permanently stopped this plugin instance.");
-
             return false;
         }
 
-        if (!presenceClient_.Initialize(config_))
-            return false;
-
-        active_ = true;
         gameDataSource_.Initialize();
-        SendLoadingPresence();
+        active_ = true;
+        if (config_.enabled)
+            (void)StartTransport();
+        else
+            logger_.Info(
+                "Discord presence is disabled in user configuration.");
 
-        return active_;
+        return true;
+    }
+
+    bool PresenceCoordinator::StartTransport()
+    {
+        if (!active_ || permanentlyStopped_ || !config_.enabled)
+            return false;
+        if (presenceClient_.IsActive())
+            return true;
+        if (!presenceClient_.Initialize())
+        {
+            logger_.Error(
+                "Discord transport is unavailable. Automatic retries are disabled; "
+                "change or reload user configuration to try again.");
+            return false;
+        }
+
+        if (gameLoaded_ && !loading_)
+            RefreshPresence(core::RefreshReason::kPoll);
+        else
+            SendLoadingPresence();
+        return presenceClient_.IsActive();
+    }
+
+    void PresenceCoordinator::ApplyReloadedConfig(core::Config config)
+    {
+        config_ = std::move(config);
+        if (!config_.enabled)
+        {
+            if (presenceClient_.IsActive())
+            {
+                presenceClient_.Shutdown(
+                    "disabled by DragonbornPresence user configuration");
+            }
+            logger_.Info(
+                "Discord presence is disabled in user configuration.");
+            return;
+        }
+
+        if (!presenceClient_.IsActive())
+        {
+            (void)StartTransport();
+            return;
+        }
+
+        if (gameLoaded_ && !loading_)
+            RefreshPresence(core::RefreshReason::kPoll);
+        else
+            SendLoadingPresence();
     }
 
     /// Stops future application work without directly controlling runtime threads.
@@ -177,10 +224,21 @@ namespace DragonbornPresence::application
         if (!active_)
             return false;
 
+        if (auto changedConfig = configProvider_.ReloadIfChanged())
+        {
+            ApplyReloadedConfig(std::move(*changedConfig));
+            return active_;
+        }
+
+        if (!config_.enabled || !presenceClient_.IsActive())
+            return active_;
+
         if (!presenceClient_.RunCallbacks())
         {
-            Stop();
-            return false;
+            logger_.Error(
+                "Discord transport session stopped after an error. Automatic retries "
+                "are disabled; change or reload user configuration to try again.");
+            return active_;
         }
 
         if (++presencePollTicks_ >=
@@ -207,10 +265,115 @@ namespace DragonbornPresence::application
 
         return active_;
     }
+    std::string PresenceCoordinator::RenderPresenceTemplate(
+        std::string_view presenceTemplate,
+        const core::PlayerSnapshot &snapshot,
+        std::string_view locationText)
+    {
+        std::string text;
+        text.reserve(presenceTemplate.size() + 32);
+
+        for (std::size_t index = 0; index < presenceTemplate.size();)
+        {
+            if (presenceTemplate[index] != '{')
+            {
+                text.push_back(presenceTemplate[index++]);
+                continue;
+            }
+
+            const std::size_t closingBrace =
+                presenceTemplate.find('}', index + 1);
+            if (closingBrace == std::string_view::npos)
+            {
+                text.append(presenceTemplate.substr(index));
+                break;
+            }
+
+            const std::string_view token = presenceTemplate.substr(
+                index + 1,
+                closingBrace - index - 1);
+            bool recognized = true;
+            if (token == "difficulty")
+            {
+                text.append(snapshot.difficulty);
+            }
+            else if (token == "lvl")
+            {
+                std::format_to(
+                    std::back_inserter(text),
+                    "{}",
+                    snapshot.level);
+            }
+            else if (token == "deaths")
+            {
+                text.append("💀-");
+                if (snapshot.deaths)
+                {
+                    std::format_to(
+                        std::back_inserter(text),
+                        "{}",
+                        *snapshot.deaths);
+                }
+                else
+                {
+                    text.append(kUnknownDeathsText);
+                }
+            }
+            else if (token == "stone")
+            {
+                text.append(snapshot.stone);
+            }
+            else if (token == "player")
+            {
+                text.append(snapshot.playerName);
+            }
+            else if (token == "god")
+            {
+                text.append(snapshot.god);
+            }
+            else if (token == "vampire")
+            {
+                text.append(snapshot.vampire);
+            }
+            else if (token == "werewolf")
+            {
+                text.append(snapshot.werewolf);
+            }
+            else if (token == "location")
+            {
+                text.append(
+                    locationText.empty()
+                        ? std::string_view(snapshot.location.displayName)
+                        : locationText);
+            }
+            else if (token == "combat")
+            {
+                text.append(snapshot.combatText);
+            }
+            else
+            {
+                recognized = false;
+            }
+
+            if (recognized)
+            {
+                index = closingBrace + 1;
+            }
+            else
+            {
+                text.push_back(presenceTemplate[index++]);
+            }
+        }
+        return text;
+    }
+
 
     /// Sends the stable loading activity used before a playable save is ready.
     void PresenceCoordinator::SendLoadingPresence()
     {
+        if (!presenceClient_.IsActive())
+            return;
+
         presenceClient_.UpdateActivity({
             {},
             kLoadingText,
@@ -219,14 +382,12 @@ namespace DragonbornPresence::application
             config_.loadingImage,
             kLoadingText,
         });
-        if (!presenceClient_.IsActive())
-            Stop();
     }
 
     /// Builds and submits one complete activity from the latest player snapshot.
     void PresenceCoordinator::RefreshPresence(core::RefreshReason reason)
     {
-        if (!active_)
+        if (!active_ || !presenceClient_.IsActive())
             return;
         if (loading_ || !gameLoaded_)
         {
@@ -235,40 +396,41 @@ namespace DragonbornPresence::application
         }
 
         const core::PlayerSnapshot snapshot = gameDataSource_.ReadPlayerSnapshot();
-        const std::string deathsText = snapshot.deaths
-                                           ? std::to_string(*snapshot.deaths)
-                                           : std::string(kUnknownDeathsText);
-        const std::string detailsText = snapshot.difficulty;
-        const std::string stateText = std::format(
-            "lvl-{} 💀-{} {}",
-            snapshot.level,
-            deathsText,
-            snapshot.stone);
+        const std::string detailsText =
+            RenderPresenceTemplate(config_.detailsTemplate, snapshot);
+        const std::string stateText =
+            RenderPresenceTemplate(config_.stateTemplate, snapshot);
+        const core::LocationAssetResolver assetResolver(config_);
+        const auto largeAsset = assetResolver.Resolve(snapshot.location);
+        const std::string largeText =
+            RenderPresenceTemplate(
+                config_.largeTextTemplate,
+                snapshot,
+                largeAsset.text);
+        const std::string smallText = snapshot.inCombat
+                                          ? RenderPresenceTemplate(
+                                                config_.combatTextTemplate,
+                                                snapshot)
+                                          : std::string{};
         const std::string_view smallImage = snapshot.inCombat
                                                 ? std::string_view(config_.combatImage)
                                                 : std::string_view{};
-        const std::string_view smallText = snapshot.inCombat
-                                               ? std::string_view(snapshot.combatText)
-                                               : std::string_view{};
-        const core::LocationAssetResolver assetResolver(config_);
-        const auto largeAsset = assetResolver.Resolve(snapshot.location);
 
         lastCombatState_ = snapshot.inCombat;
         const bool activityChanged = presenceClient_.UpdateActivity({
             detailsText,
             stateText,
             largeAsset.image,
-            largeAsset.text,
+            largeText,
             smallImage,
             smallText,
         });
-        if (!presenceClient_.IsActive())
-        {
-            Stop();
+        if (!presenceClient_.IsActive() || !activityChanged)
             return;
-        }
-        if (!activityChanged)
-            return;
+
+        const std::string deathsText = snapshot.deaths
+                                           ? std::to_string(*snapshot.deaths)
+                                           : std::string(kUnknownDeathsText);
 
         logger_.Info(std::format(
             "[{}] level={} deaths={} stone='{}' difficulty='{}' location='{}' "

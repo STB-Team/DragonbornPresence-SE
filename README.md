@@ -8,15 +8,19 @@
 
 | Поле Discord | Значение | Пример |
 |---|---|---|
-| `details` | выбранная сложность STB | `🟢Приключение` |
-| `state` | `lvl-<уровень> 💀-<смерти> <камень>` | `lvl-14 💀-3 🎭-Атронах` |
+| `details` | настраиваемая первая строка из параметров STB | `🟢Приключение` |
+| `state` | настраиваемая вторая строка; по умолчанию уровень, смерти и камень | `lvl-14 💀-3 🎭-Атронах` |
 | большая картинка | первое совпавшее правило текущей локации | `whiteruncapital` |
+| подпись большой картинки | настраиваемая строка; по умолчанию имя персонажа | `Довакин` |
 | маленькая картинка | только `loading` или `combat` | `combat` |
+| подпись боевой иконки | настраиваемая строка; по умолчанию текущий бой | `В бою с Драугр (ур. 30)` |
 | таймер | длительность текущего запуска Skyrim | не сбрасывается при обновлении Presence |
 
-При наведении на боевую иконку отображается `В бою с <имя противника> (ур. <уровень>)`. Пока Skyrim не определил цель — `В бою`.
+При наведении на большую картинку по умолчанию отображается имя персонажа. Подпись боевой иконки по умолчанию содержит имя и уровень текущей цели; пока Skyrim не определил цель — `В бою`.
 
 Таймер получает один Unix timestamp при загрузке плагина. Смена локации, загрузка, бой и секундное обновление Presence не меняют время начала.
+
+Через раздел **STB Widgets → Discord Presence** можно независимо менять обе строки Presence, подпись большой картинки и подпись боевой иконки. Кнопки параметров добавляют значения в текущую строку-шаблон.
 
 ## Источники данных STB
 
@@ -26,6 +30,11 @@
 | смерти | Global `aaMZgv_NowDeath` |
 | сложность | `aaMZ_SelectedLevel_OfDifficulty` в alias-скрипте `aaMZ_MCMDataStorage` |
 | камень | первое активное заклинание из 19 описаний камней STB |
+| имя персонажа | `RE::PlayerCharacter::GetName()` |
+| боги | runtime-список STB `aaMZfl_ActiveGodsList`; поддерживаются 9 Аэдра и 16 Даэдра |
+| проклятие | активное заклинание `aaMZs_AedraCurseDUPLICATE001` |
+| вампир | Global `aaMZgv_VampireBlood`; выводится только при значении больше нуля |
+| вервольф | Global `aaMZgv_WerewolfBlood`; выводится только при значении больше нуля |
 | локация | worldspace, текущая location и parent cell |
 | противник | имя и уровень текущей combat target игрока |
 
@@ -61,6 +70,7 @@ SKSE\Plugins\DragonbornPresence.dll
 SKSE\Plugins\DragonbornPresence.pdb
 SKSE\Plugins\discord_game_sdk.dll
 SKSE\Plugins\DragonbornPresence.json
+SKSE\Plugins\DragonbornPresence.user.json  (создаётся STB-Widgets)
 ```
 
 Обязательные зависимости текущей сборки:
@@ -68,28 +78,27 @@ SKSE\Plugins\DragonbornPresence.json
 - Skyrim SE/AE и соответствующий SKSE64;
 - Address Library for SKSE Plugins;
 - текущий `STB.esp` с MCM data-storage quest;
-- запущенный Discord Desktop;
-- Discord Application ID `1527543892151373937` и загруженные STB Art Assets.
+- Discord Application ID `1527543892151373937` и загруженные STB Art Assets;
+- запущенный Discord Desktop — только для активной публикации Presence.
 
-Перед инициализацией плагин проверяет обработчик `discord://`, связанный исполняемый файл, запущенный процесс и локальный `discord_game_sdk.dll`. Если Discord Desktop не установлен или не запущен, работа плагина прекращается до вызова SDK. Runtime-код не скачивает, не устанавливает, не восстанавливает и не запускает Discord. Если клиент завершится позже, SDK вернёт ошибку, callback зависнет на 10 секунд или возникнет C++-исключение, дальнейшая работа интеграции прекращается; исключения не выпускаются в Skyrim.
+Плагин и игровой runtime запускаются даже при выключенной интеграции или недоступном Discord Desktop. Перед созданием transport-сессии проверяются обработчик `discord://`, связанный исполняемый файл, запущенный процесс и локальный `discord_game_sdk.dll`. Runtime-код не скачивает, не устанавливает, не восстанавливает и не запускает Discord.
+
+После ошибки Discord автоматических повторов нет. Следующая попытка выполняется только после явного изменения настроек или нажатия **«Перезагрузить конфигурацию Discord»** в STB-Widgets.
 
 ## Конфигурация
 
-Рабочий файл:
+Используются два файла:
 
 ```text
 <корень мода MO2>\SKSE\Plugins\DragonbornPresence.json
+<корень мода MO2>\SKSE\Plugins\DragonbornPresence.user.json
 ```
 
-Основной блок:
+`DragonbornPresence.json` поставляется вместе с плагином и содержит только каталог изображений:
 
 ```json
 {
   "schema_version": 1,
-  "discord": {
-    "enabled": true,
-    "application_id": "1527543892151373937"
-  },
   "assets": {
     "large_image": "stb_logo",
     "large_text": "Skyrim True Believer",
@@ -102,7 +111,27 @@ SKSE\Plugins\DragonbornPresence.json
 }
 ```
 
-`schema_version` проверяется до чтения остальных разделов. Поддерживается версия `1`: отсутствие поля принимается как legacy schema 1 с warning, а неверный тип или неподдерживаемая версия отклоняют весь документ и сохраняют безопасные defaults.
+`DragonbornPresence.user.json` — небольшой пользовательский overlay, который атомарно сохраняет STB-Widgets:
+
+```json
+{
+  "schema_version": 1,
+  "discord": {
+    "enabled": true
+  },
+  "presence": {
+    "details": "{difficulty}",
+    "state": "lvl-{lvl} {deaths} {stone}",
+    "large_text": "{player}",
+    "combat_text": "{combat}"
+  },
+  "reload_revision": 1
+}
+```
+
+Поддерживаются параметры `{difficulty}`, `{lvl}`, `{deaths}`, `{stone}`, `{player}`, `{god}`, `{vampire}`, `{werewolf}`, `{location}` и `{combat}`. `{deaths}` добавляет оформление `💀-` во время публикации, поэтому emoji не хранится в редактируемой строке меню. `{god}` содержит выбранных богов через запятую либо `Проклятие Аэдра`. Если бог, вампир или вервольф не выбраны, соответствующий параметр заменяется пустой строкой. Неизвестные параметры сохраняются как обычный текст.
+
+`schema_version` проверяется до чтения остальных разделов. Поддерживается версия `1`: отсутствие поля принимается как legacy schema 1 с warning, а неверный тип или неподдерживаемая версия отклоняют изменённый документ и сохраняют последнюю рабочую конфигурацию.
 
 ### Правила локаций
 
@@ -135,9 +164,9 @@ SKSE\Plugins\DragonbornPresence.json
 | `cell` | Editor ID текущей ячейки |
 | `match` | подстрока отображаемого имени; ASCII без учёта регистра |
 | `image` | обязательный Asset key |
-| `text` | подсказка; пустое значение заменяется `large_text` |
+| `text` | подпись выбранного location asset; доступна как `{location}` в шаблоне `large_text` |
 
-В текущем JSON находятся 439 правил. Изменение JSON требует полного перезапуска Skyrim, но не пересборки DLL.
+Оба JSON-файла отслеживаются во время игры. Корректное изменение применяется на главном потоке Skyrim без пересборки DLL и перезапуска игры; незавершённый или повреждённый JSON не заменяет последнюю рабочую конфигурацию.
 
 ## Сборка Visual Studio 2026
 
@@ -196,8 +225,8 @@ CTest запускает три изолированные цели:
 | Цель | Контракты |
 |---|---|
 | `DragonbornPresenceCoreTests` | UTF-8, лимит Discord-строк, сложность и выбор первого правила локации |
-| `DragonbornPresenceApplicationTests` | запуск, loading/game transitions, polling, бой, ошибки и постоянная остановка координатора |
-| `DragonbornPresenceAdapterTests` | CP1251 → UTF-8, JSON defaults, schema version и чтение/валидация конфигурации |
+| `DragonbornPresenceApplicationTests` | запуск runtime без Discord, динамический toggle/retry, настраиваемые Presence-строки, loading/game transitions, polling, бой и fatal errors |
+| `DragonbornPresenceAdapterTests` | CP1251 → UTF-8, base/user JSON overlay, hot reload, сохранение last-known-good и schema version |
 
 Workflow `.github/workflows/ci.yml` запускает два независимых job на каждом push в `dev`, pull request и ручном запуске: все три CTest-цели и полную Release-сборку SKSE-плагина со строгой проверкой ZIP. Runtime smoke test в игре остаётся обязательным для изменений RE/SKSE.
 

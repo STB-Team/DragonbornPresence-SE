@@ -2,6 +2,8 @@
 
 #include "DragonbornPresence/core/Config.h"
 
+#include <optional>
+
 namespace DragonbornPresence::application::ports
 {
 
@@ -22,6 +24,13 @@ namespace DragonbornPresence::application::ports
         /// can therefore store it without depending on the provider's lifetime for
         /// the returned data.
         [[nodiscard]] virtual core::Config Load() = 0;
+
+        /// Returns a complete replacement only after either runtime JSON file changes.
+        ///
+        /// Invalid changed input is logged by the adapter and leaves the last
+        /// application-owned configuration untouched.
+        [[nodiscard]] virtual std::optional<core::Config>
+        ReloadIfChanged() = 0;
     };
 
 } // namespace DragonbornPresence::application::ports
