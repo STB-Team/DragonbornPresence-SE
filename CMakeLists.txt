@@ -162,6 +162,9 @@ add_commonlibsse_plugin(DragonbornPresence
     VERSION "${PROJECT_VERSION}"
     USE_ADDRESS_LIBRARY
 )
+set_property(TARGET DragonbornPresence PROPERTY
+    VS_GLOBAL_VcpkgXUseBuiltInApplocalDeps true
+)
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     ${DRAGONBORNPRESENCE_SOURCES}
     ${DRAGONBORNPRESENCE_HEADERS}
