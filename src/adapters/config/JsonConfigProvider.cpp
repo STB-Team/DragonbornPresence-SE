@@ -1,6 +1,6 @@
 #include "DragonbornPresence/adapters/config/JsonConfigProvider.h"
 
-#include <SKSE/SKSE.h>
+#include <spdlog/spdlog.h>
 
 #include <charconv>
 #include <cstddef>
@@ -42,7 +42,7 @@ namespace DragonbornPresence::adapters::config
                 std::ifstream file(kConfigPath.data());
                 if (!file)
                 {
-                    SKSE::log::info("Config not found; using defaults.");
+                    spdlog::info("Config not found; using defaults.");
                     return config;
                 }
 
@@ -51,7 +51,7 @@ namespace DragonbornPresence::adapters::config
                     const auto root = nlohmann::json::parse(file);
                     if (!root.is_object())
                     {
-                        SKSE::log::warn("Config root must be an object; using defaults.");
+                        spdlog::warn("Config root must be an object; using defaults.");
                         return config;
                     }
 
@@ -80,11 +80,11 @@ namespace DragonbornPresence::adapters::config
                         }
                         ReadLocationImageRules(*assets, config);
                     }
-                    SKSE::log::info("Config loaded.");
+                    spdlog::info("Config loaded.");
                 }
                 catch (const nlohmann::json::exception &error)
                 {
-                    SKSE::log::error("Failed to parse config JSON: {}", error.what());
+                    spdlog::error("Failed to parse config JSON: {}", error.what());
                     return {};
                 }
                 return config;
@@ -102,7 +102,7 @@ namespace DragonbornPresence::adapters::config
                     return nullptr;
                 if (!value->is_object())
                 {
-                    SKSE::log::warn("Config: '{}' must be an object; using defaults.", path);
+                    spdlog::warn("Config: '{}' must be an object; using defaults.", path);
                     return nullptr;
                 }
                 return &*value;
@@ -120,7 +120,7 @@ namespace DragonbornPresence::adapters::config
                     return;
                 if (!value->is_boolean())
                 {
-                    SKSE::log::warn(
+                    spdlog::warn(
                         "Config: '{}.{}' must be a boolean; using default.",
                         path,
                         key);
@@ -141,7 +141,7 @@ namespace DragonbornPresence::adapters::config
                     return;
                 if (!value->is_string())
                 {
-                    SKSE::log::warn(
+                    spdlog::warn(
                         "Config: '{}.{}' must be a string; using default.",
                         path,
                         key);
@@ -181,7 +181,7 @@ namespace DragonbornPresence::adapters::config
                         return;
                     }
                 }
-                SKSE::log::warn(
+                spdlog::warn(
                     "Config: 'discord.application_id' is invalid; using default.");
             }
 
@@ -195,7 +195,7 @@ namespace DragonbornPresence::adapters::config
                     return;
                 if (!rules->is_array())
                 {
-                    SKSE::log::warn(
+                    spdlog::warn(
                         "Config: 'assets.location_images' must be an array; using defaults.");
                     return;
                 }
@@ -207,7 +207,7 @@ namespace DragonbornPresence::adapters::config
                     const auto &value = (*rules)[ruleIndex];
                     if (!value.is_object())
                     {
-                        SKSE::log::warn(
+                        spdlog::warn(
                             "Config: 'assets.location_images[{}]' must be an object; ignoring.",
                             ruleIndex);
                         continue;
@@ -222,7 +222,7 @@ namespace DragonbornPresence::adapters::config
                             return;
                         if (!field->is_string())
                         {
-                            SKSE::log::warn(
+                            spdlog::warn(
                                 "Config: 'assets.location_images[{}].{}' must be a string; "
                                 "ignoring rule.",
                                 ruleIndex,
@@ -245,7 +245,7 @@ namespace DragonbornPresence::adapters::config
                         !rule.cell.empty() || !rule.match.empty();
                     if (!isValid || !hasSelector || rule.image.empty())
                     {
-                        SKSE::log::warn(
+                        spdlog::warn(
                             "Config: 'assets.location_images[{}]' requires 'image' and a "
                             "selector; ignoring.",
                             ruleIndex);

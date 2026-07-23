@@ -15,7 +15,7 @@ jobs:
 
     steps:
       - name: Получение исходного кода
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Настройка Visual Studio 2026
         run: cmake --preset vs2026

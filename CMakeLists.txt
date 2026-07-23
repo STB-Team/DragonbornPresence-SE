@@ -211,7 +211,7 @@ if(BUILD_TESTING)
         "${rapidcsv_SOURCE_DIR}/src"
     )
     target_link_libraries(DragonbornPresenceAdapterTests PRIVATE
-        CommonLibSSE::CommonLibSSE
+        spdlog::spdlog
         nlohmann_json::nlohmann_json
         Catch2::Catch2WithMain
     )
