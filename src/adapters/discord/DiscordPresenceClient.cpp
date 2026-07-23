@@ -1,7 +1,7 @@
 #include "DragonbornPresence/adapters/discord/DiscordPresenceClient.h"
 
 #include "DragonbornPresence/core/TextUtils.h"
-#include "discord_loader.h"
+#include "DragonbornPresence/adapters/discord/DiscordSdkLoader.h"
 
 #include <SKSE/SKSE.h>
 
@@ -166,7 +166,7 @@ namespace DragonbornPresence::adapters::discord
         }
 
         std::string failureReason;
-        if (!DragonbornPresence::detail::IsDiscordRunning(&failureReason))
+        if (!IsDiscordRunning(&failureReason))
         {
             LogFailure(
                 "Discord availability check",
@@ -174,7 +174,7 @@ namespace DragonbornPresence::adapters::discord
                                       : failureReason);
             return false;
         }
-        if (!DragonbornPresence::detail::LoadDiscordSdk(&failureReason))
+        if (!LoadDiscordSdk(&failureReason))
         {
             LogFailure(
                 "Discord SDK load",
@@ -248,7 +248,7 @@ namespace DragonbornPresence::adapters::discord
             return false;
 
         std::string failureReason;
-        if (!DragonbornPresence::detail::IsDiscordRunning(&failureReason))
+        if (!IsDiscordRunning(&failureReason))
         {
             Disable(
                 failureReason.empty() ? "Discord Desktop stopped responding or exited"
