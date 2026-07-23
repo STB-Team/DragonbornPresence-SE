@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
+include(CTest)
 
 # We build a DLL plugin, not an installable package — skip all install() rules
 # (prevents CommonLibSSE's install(EXPORT) from failing on FetchContent targets)
@@ -51,6 +52,16 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(nlohmann_json)
 
+if(BUILD_TESTING)
+    FetchContent_Declare(
+        Catch2
+        GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+        GIT_TAG v3.8.1
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(Catch2)
+endif()
+
 # CommonLibSSE-NG — find_package(fmt/spdlog) intercepted above, tests disabled
 set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
@@ -96,19 +107,127 @@ set_target_properties(discord_cpp PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIR
 set(DRAGONBORNPRESENCE_SOURCES
     src/main.cpp
     src/DragonbornPresence.cpp
-    src/AdditionalFunctions.cpp
-    src/discord_loader.cpp
+    src/adapters/config/JsonConfigProvider.cpp
+    src/adapters/discord/DiscordPresenceClient.cpp
+    src/adapters/discord/DiscordSdkLoader.cpp
+    src/adapters/SkyrimTrueBeliever/SkseLogger.cpp
+    src/adapters/SkyrimTrueBeliever/StbGameDataSource.cpp
+    src/adapters/SkyrimTrueBeliever/StbRuntimeAdapter.cpp
+    src/adapters/SkyrimTrueBeliever/StbStringEncoding.cpp
 )
 set(DRAGONBORNPRESENCE_HEADERS
     include/DragonbornPresence.h
-    include/AdditionalFunctions.h
-    include/ScriptUtils.h
-    include/discord_loader.h
+    include/DragonbornPresence/application/ports/IConfigProvider.h
+    include/DragonbornPresence/application/ports/IGameDataSource.h
+    include/DragonbornPresence/adapters/config/JsonConfigProvider.h
+    include/DragonbornPresence/application/ports/IPresenceClient.h
+    include/DragonbornPresence/adapters/discord/DiscordPresenceClient.h
+    include/DragonbornPresence/adapters/discord/DiscordSdkLoader.h
+    include/DragonbornPresence/application/ports/ILogger.h
+    include/DragonbornPresence/adapters/SkyrimTrueBeliever/SkseLogger.h
+    include/DragonbornPresence/adapters/SkyrimTrueBeliever/PapyrusValueReader.h
+    include/DragonbornPresence/adapters/SkyrimTrueBeliever/StbStringEncoding.h
+    include/DragonbornPresence/application/PresenceCoordinator.h
+    include/DragonbornPresence/adapters/SkyrimTrueBeliever/StbGameDataSource.h
+    include/DragonbornPresence/adapters/SkyrimTrueBeliever/StbRuntimeAdapter.h
     include/pch.h
 )
 set(DRAGONBORNPRESENCE_RESOURCES
     config/DragonbornPresence.json
 )
+
+add_library(DragonbornPresenceCore STATIC
+    src/core/TextUtils.cpp
+    src/core/Difficulty.cpp
+    src/core/LocationAssetResolver.cpp
+)
+
+target_include_directories(DragonbornPresenceCore PUBLIC 
+"${CMAKE_CURRENT_SOURCE_DIR}/include"
+)
+
+target_compile_options(DragonbornPresenceCore PRIVATE /utf-8)
+
+add_library(DragonbornPresenceApplication STATIC
+    src/application/PresenceCoordinator.cpp
+    include/DragonbornPresence/application/PresenceCoordinator.h
+)
+
+target_include_directories(
+    DragonbornPresenceApplication
+    PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}/include"
+)
+
+target_link_libraries(
+    DragonbornPresenceApplication
+    PUBLIC
+        DragonbornPresenceCore
+)
+
+target_compile_options(
+    DragonbornPresenceApplication
+    PRIVATE
+        /utf-8
+)
+
+if(BUILD_TESTING)
+    add_executable(DragonbornPresenceCoreTests
+        tests/TextUtilsTests.cpp
+        tests/DifficultyTests.cpp
+        tests/LocationAssetResolverTests.cpp
+    )
+    target_link_libraries(DragonbornPresenceCoreTests PRIVATE
+        DragonbornPresenceCore
+        Catch2::Catch2WithMain
+    )
+    target_compile_options(DragonbornPresenceCoreTests PRIVATE /utf-8)
+    add_test(
+        NAME DragonbornPresenceCoreTests
+        COMMAND DragonbornPresenceCoreTests
+    )
+
+    add_executable(DragonbornPresenceApplicationTests
+        tests/PresenceCoordinatorTests.cpp
+    )
+    target_link_libraries(DragonbornPresenceApplicationTests PRIVATE
+        DragonbornPresenceApplication
+        Catch2::Catch2WithMain
+    )
+    target_compile_options(DragonbornPresenceApplicationTests PRIVATE /utf-8)
+    add_test(
+        NAME DragonbornPresenceApplicationTests
+        COMMAND DragonbornPresenceApplicationTests
+    )
+
+    add_executable(DragonbornPresenceAdapterTests
+        tests/JsonConfigProviderTests.cpp
+        tests/StbStringEncodingTests.cpp
+        src/adapters/config/JsonConfigProvider.cpp
+        src/adapters/SkyrimTrueBeliever/StbStringEncoding.cpp
+    )
+    target_include_directories(DragonbornPresenceAdapterTests PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/include"
+        "${rapidcsv_SOURCE_DIR}/src"
+    )
+    target_link_libraries(DragonbornPresenceAdapterTests PRIVATE
+        spdlog::spdlog
+        nlohmann_json::nlohmann_json
+        Catch2::Catch2WithMain
+    )
+    target_compile_options(DragonbornPresenceAdapterTests PRIVATE /utf-8)
+    add_test(
+        NAME DragonbornPresenceAdapterTests
+        COMMAND DragonbornPresenceAdapterTests
+    )
+    set_property(
+        TARGET
+            DragonbornPresenceCoreTests
+            DragonbornPresenceApplicationTests
+            DragonbornPresenceAdapterTests
+        PROPERTY VS_GLOBAL_VcpkgXUseBuiltInApplocalDeps true
+    )
+endif()
 
 add_commonlibsse_plugin(DragonbornPresence
     SOURCES
@@ -119,6 +238,9 @@ add_commonlibsse_plugin(DragonbornPresence
     AUTHOR "Fozar / Frem (STB adaptation)"
     VERSION "${PROJECT_VERSION}"
     USE_ADDRESS_LIBRARY
+)
+set_property(TARGET DragonbornPresence PROPERTY
+    VS_GLOBAL_VcpkgXUseBuiltInApplocalDeps true
 )
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     ${DRAGONBORNPRESENCE_SOURCES}
@@ -135,7 +257,13 @@ target_precompile_headers(DragonbornPresence PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/include/pch.h"
 )
 
-target_link_libraries(DragonbornPresence PRIVATE discord_cpp delayimp nlohmann_json::nlohmann_json)
+target_link_libraries(DragonbornPresence PRIVATE
+    DragonbornPresenceApplication
+    DragonbornPresenceCore
+    discord_cpp
+    delayimp
+    nlohmann_json::nlohmann_json
+)
 target_link_options(DragonbornPresence PRIVATE /DELAYLOAD:discord_game_sdk.dll)
 target_compile_options(DragonbornPresence PRIVATE /utf-8)
 

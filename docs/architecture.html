@@ -3,848 +3,287 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Подробный учебник по архитектуре и исходному коду SKSE-плагина STB DragonbornPresence для начинающего C++ разработчика.">
-<title>Как устроен код — STB DragonbornPresence 3.1.5</title>
+<meta name="description" content="Архитектура SKSE-плагина STB DragonbornPresence: core, application ports, Skyrim True Believer и Discord adapters, lifecycle, потоки, тесты и сборка.">
+<title>Архитектура — STB DragonbornPresence 3.1.5</title>
 <link rel="stylesheet" href="site.css">
 </head>
-<body class="code-page">
+<body>
 <div class="layout">
-  <aside aria-label="Навигация по учебнику">
+  <aside aria-label="Навигация по архитектуре">
     <div class="brand">
       <strong>STB Presence 3.1.5</strong>
-      <span>Учебник по исходному коду</span>
+      <span>Архитектура текущего кода</span>
     </div>
     <nav>
       <a href="index.html">← Главная документация</a>
-      <span class="nav-title">Сначала прочитать</span>
-      <a href="#purpose">Назначение страницы</a>
-      <a href="#vocabulary">Базовые понятия</a>
+      <span class="nav-title">Обзор</span>
+      <a href="#purpose">Назначение</a>
       <a href="#map">Карта репозитория</a>
-      <a href="#full-reference">Полный разбор по главам</a>
-      <a href="source-walkthrough.html">Весь C++ построчно</a>
-      <a href="#coverage-map">Карта всех блоков</a>
-      <span class="nav-title">Архитектура</span>
-      <a href="#architecture">Слои и зависимости</a>
+      <a href="#layers">Слои и зависимости</a>
+      <a href="#composition">Composition root</a>
+      <span class="nav-title">Выполнение</span>
       <a href="#lifecycle">Жизненный цикл</a>
-      <a href="#state">Состояние и модели</a>
-      <a href="#threads">Потоки и события</a>
-      <span class="nav-title">Код по файлам</span>
-      <a href="#entry">main.cpp</a>
-      <a href="#core">DragonbornPresence.cpp</a>
-      <a href="#config-code">Конфигурация</a>
-      <a href="#game-code">Данные Skyrim и STB</a>
-      <a href="#text-code">Строки и кодировки</a>
-      <a href="#discord-loader">Загрузка Discord SDK</a>
-      <a href="#discord-client">Клиент Discord</a>
-      <a href="#coordinator">Координатор</a>
-      <a href="#headers">Заголовки и PCH</a>
-      <a href="#build-code">CMake и релиз</a>
-      <span class="nav-title">Практика</span>
-      <a href="#logging">Логирование</a>
-      <a href="#errors">Ошибки и безопасность</a>
-      <a href="#changes">Примеры изменений</a>
-      <a href="#invariants">Что нельзя ломать</a>
-      <a href="#reading-route">Маршрут изучения</a>
+      <a href="#application">Координатор</a>
+      <a href="#runtime">STB runtime adapter</a>
+      <a href="#game-data">Данные STB</a>
+      <a href="#discord">Discord adapter</a>
+      <span class="nav-title">Поддержка</span>
+      <a href="#threads">Потоки</a>
+      <a href="#errors">Ошибки</a>
+      <a href="#tests">Тесты и CI</a>
+      <a href="#build">Сборка и релиз</a>
+      <a href="#invariants">Инварианты</a>
+      <a href="#route">Маршрут чтения</a>
     </nav>
     <div class="aside-links">
       <a href="https://github.com/STB-Team/DragonbornPresence-SE">Исходный код на GitHub</a>
-      <a href="index.html#diagnostics">Краткая диагностика</a>
+      <a href="index.html#diagnostics">Диагностика</a>
     </div>
   </aside>
 
   <main>
     <header class="hero">
-      <p class="eyebrow">От первой инструкции SKSE до записи в лог</p>
-      <h1>Как устроен весь код плагина</h1>
-      <p class="lead">Фундаментальное объяснение текущей версии 3.1.5 для начинающего разработчика: архитектура, жизненный цикл, C++ конструкции, Skyrim API, Discord Game SDK, многопоточность, обработка ошибок, сборка и безопасные способы изменения.</p>
+      <p class="eyebrow">Чистая архитектура вокруг Skyrim и Discord</p>
+      <h1>Как устроен текущий код плагина</h1>
+      <p class="lead">Версия 3.1.5 разделяет чистые модели и правила, application orchestration и внешние адаптеры. Skyrim True Believer — единственный игровой runtime; универсального Skyrim adapter в проекте нет.</p>
       <div class="badges">
-        <span class="badge">Версия кода: 3.1.5</span>
         <span class="badge">C++23</span>
+        <span class="badge">Visual Studio 2026</span>
         <span class="badge">SKSE + CommonLibSSE-NG</span>
         <span class="badge">Discord Game SDK 3.2.1</span>
-        <span class="badge">Для начинающего разработчика</span>
+        <span class="badge">Catch2 + GitHub Actions</span>
       </div>
-      <details class="mobile-toc">
-        <summary>Полный разбор по файлам</summary>
-        <nav>
-          <a href="code-entry.html">1. Точка входа</a>
-          <a href="code-foundation.html">2. Модели и JSON</a>
-          <a href="code-game.html">3. Skyrim и Papyrus</a>
-          <a href="code-discord.html">4. Discord и Windows</a>
-          <a href="code-application.html">5. Координатор</a>
-          <a href="code-build.html">6. Сборка</a>
-          <a href="code-recipes.html">7. Примеры</a>
-        </nav>
-      </details>
     </header>
 
-    <section id="full-reference" class="guide-banner">
-      <h2>Полный разбор реального кода</h2>
-      <p>Обзор ниже объясняет архитектуру целиком. Для последовательного чтения с телефона код дополнительно разделён на семь небольших глав. В них разобраны все функции, методы, поля, важные выражения и конструкции C++ текущего проекта.</p>
-      <div class="callout success"><strong>Нужен буквально каждый ряд исходника?</strong> Откройте <a href="source-walkthrough.html">полный построчный разбор всех 2178 строк C++</a>. Там сохранён точный код четырёх <code>.cpp</code> и пяти <code>.h</code>, а каждая физическая строка получила отдельное пояснение и постоянный якорь.</div>
-      <div class="chapter-list">
-        <a class="chapter-card" href="code-entry.html"><strong>1. Точка входа и заголовки</strong><span>main.cpp, SKSEPluginLoad, logger, messages, публичный API и базовый синтаксис.</span></a>
-        <a class="chapter-card" href="code-foundation.html"><strong>2. Константы, модели, строки и JSON</strong><span>constants, structs, UTF-8, ConfigLoader и выбор location asset.</span></a>
-        <a class="chapter-card" href="code-game.html"><strong>3. Skyrim и Papyrus</strong><span>Forms, PlayerSnapshot, камни, сложность, позиции и шаблоны ScriptUtils.</span></a>
-        <a class="chapter-card" href="code-discord.html"><strong>4. Discord и Windows</strong><span>Registry, процессы, delay-load DLL, Core, callbacks, signatures и ошибки.</span></a>
-        <a class="chapter-card" href="code-application.html"><strong>5. Координатор, события и потоки</strong><span>State machine, event sinks, polling, atomics, jthread и границы исключений.</span></a>
-        <a class="chapter-card" href="code-build.html"><strong>6. Сборка и релиз</strong><span>CMake, зависимости, PDB, ZIP, MO2, presets, JSON и GitHub Actions.</span></a>
-        <a class="chapter-card" href="code-recipes.html"><strong>7. Практические изменения</strong><span>Двенадцать расширений с точками изменения, рисками и проверкой в Skyrim.</span></a>
-      </div>
-    </section>
-
-    <section id="coverage-map">
-      <h2>Карта полноты: где разобран каждый блок</h2>
-      <p>Список ниже повторяет структуру исходников. Если встретили имя функции в коде, по этой карте можно сразу перейти к её объяснению.</p>
-      <details>
-        <summary><code>src/main.cpp</code> и маленькие заголовки</summary>
-        <div>
-          <p><a href="code-entry.html#translation-unit">includes, __ImageBase, anonymous namespace</a>; <a href="code-entry.html#logging">InitializeLogging</a>; <a href="code-entry.html#entry-failure">LogEntryPointFailure</a>; <a href="code-entry.html#messages">OnSkseMessage</a>; <a href="code-entry.html#plugin-load">SKSEPluginLoad</a>; <a href="code-entry.html#public-header">DragonbornPresence.h</a>; <a href="code-entry.html#small-headers">AdditionalFunctions.h, discord_loader.h, pch.h</a>.</p>
-        </div>
-      </details>
-      <details>
-        <summary><code>DragonbornPresence.cpp</code>: фундамент</summary>
-        <div>
-          <p><a href="code-foundation.html#constants">constants</a>; <a href="code-foundation.html#stones">StoneDefinition и kStoneDefinitions</a>; <a href="code-foundation.html#models">все структуры model, RefreshReason, Difficulty, ToLogLabel</a>; <a href="code-foundation.html#text">FromGameString, LimitForDiscord, ContainsAsciiInsensitive</a>; <a href="code-foundation.html#config">ConfigLoader и все private readers</a>; <a href="code-foundation.html#resolver">LocationAssetResolver, Resolve, EditorIdEquals, RuleMatches</a>; <a href="code-foundation.html#additional">Cp1251ToUtf8 и IsValidUtf8</a>.</p>
-        </div>
-      </details>
-      <details>
-        <summary><code>DragonbornPresence.cpp</code>: Skyrim и <code>ScriptUtils.h</code></summary>
-        <div>
-          <p><a href="code-game.html#initialize">StbDataProvider::Initialize</a>; <a href="code-game.html#snapshot">ReadPlayerSnapshot</a>; <a href="code-game.html#stone-name">ParseStoneName</a>; <a href="code-game.html#difficulty">DifficultyName и ReadSelectedDifficulty</a>; <a href="code-game.html#stone">ReadSelectedStone</a>; <a href="code-game.html#position">BuildDisplayPosition</a>; <a href="code-game.html#script-utils">все четыре шаблона ScriptUtils</a>.</p>
-        </div>
-      </details>
-      <details>
-        <summary><code>discord_loader.cpp</code> и Discord client</summary>
-        <div>
-          <p><a href="code-discord.html#win-errors">SetFailureReason, WindowsErrorDetails, DescribeWindowsError, SetWindowsFailureReason</a>; <a href="code-discord.html#paths">ExtractExecutablePath, IsExistingFile, BuildPluginSiblingPath</a>; <a href="code-discord.html#running">IsDiscordRunning</a>; <a href="code-discord.html#dll">LoadDiscordSdk</a>; <a href="code-discord.html#delay">DiscordDelayHook и __pfnDliNotifyHook2</a>; <a href="code-discord.html#results">DescribeResult и LogSdkMessage</a>; <a href="code-discord.html#client-init">Initialize</a>; <a href="code-discord.html#callbacks">RunCallbacks и IsActive</a>; <a href="code-discord.html#update">UpdateActivity</a>; <a href="code-discord.html#shutdown">Shutdown, logging, Disable и timestamp</a>.</p>
-        </div>
-      </details>
-      <details>
-        <summary><code>DragonbornPresence.cpp</code>: application</summary>
-        <div>
-          <p><a href="code-application.html#sinks">MenuEventSink и CombatEventSink</a>; <a href="code-application.html#owner">constructor coordinator</a>; <a href="code-application.html#exceptions">HandleException, HandleUnknownException, Stop</a>; <a href="code-application.html#registration">LoadConfig и RegisterGameEventHandlers</a>; <a href="code-application.html#state-machine">OnGameLoaded, HandleMenuEvent, HandleCombatEvent, SetLoading</a>; <a href="code-application.html#refresh">SendLoadingPresence и RefreshPresence</a>; <a href="code-application.html#scheduler">StartCallbackThread и HandleBackgroundException</a>; <a href="code-application.html#fields">все поля</a>; <a href="code-application.html#sink-bodies">обе ProcessEvent</a>; <a href="code-application.html#wrappers">глобальный coordinator и три публичные обёртки</a>.</p>
-        </div>
-      </details>
-      <details>
-        <summary>Сборочная и релизная инфраструктура</summary>
-        <div>
-          <p><a href="code-build.html#project">project и C++ standard</a>; <a href="code-build.html#deps">все FetchContent dependencies</a>; <a href="code-build.html#sdk">Discord SDK download и wrapper target</a>; <a href="code-build.html#target">SKSE target, headers, resources, PCH</a>; <a href="code-build.html#link">линковка и flags</a>; <a href="code-build.html#symbols">Release PDB</a>; <a href="code-build.html#package">packaging и MO2 deploy</a>; <a href="code-build.html#presets">все presets</a>; <a href="code-build.html#json">runtime JSON</a>; <a href="code-build.html#workflow">весь release workflow</a>.</p>
-        </div>
-      </details>
-    </section>
-
     <section id="purpose">
-      <h2>1. Что объясняет этот раздел</h2>
-      <p>DragonbornPresence — нативная DLL, которую SKSE загружает внутрь процесса Skyrim. Плагин читает состояние игрока и отправляет его в Discord Rich Presence. Он не является отдельной программой: код работает в адресном пространстве игры, поэтому необработанное исключение, неверный указатель или обращение к игровым объектам из неправильного потока может повредить стабильности Skyrim.</p>
-      <p>Главная задача архитектуры — разделить четыре разные ответственности:</p>
-      <ol>
-        <li>получить сигнал от SKSE о стадии загрузки игры;</li>
-        <li>безопасно прочитать формы STB и текущее состояние игрока;</li>
-        <li>преобразовать данные в ограниченный контракт Discord Activity;</li>
-        <li>при любой ошибке отключить только интеграцию, не выпуская исключение в Skyrim.</li>
-      </ol>
-      <div class="callout success"><strong>Главный принцип кода:</strong> Discord Presence вторичен, Skyrim первичен. Если Discord, конфигурация или внутренний код интеграции отказали, плагин прекращает собственную работу, а игра должна продолжить работу.</div>
-      <div class="callout"><strong>Границы документа:</strong> здесь разобран весь собственный код репозитория. Внутренности Skyrim, CommonLibSSE-NG и Discord Game SDK объясняются в той мере, в которой плагин ими пользуется; исходники самих внешних библиотек не дублируются.</div>
-    </section>
-
-    <section id="vocabulary">
-      <h2>2. Базовые понятия</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Термин</th><th>Что означает здесь</th><th>Зачем это знать</th></tr></thead>
-          <tbody>
-            <tr><td>DLL</td><td>Динамическая библиотека <code>DragonbornPresence.dll</code>, загружаемая SKSE в Skyrim.</td><td>У DLL нет обычного <code>main()</code>; входом служит <code>SKSEPluginLoad</code>.</td></tr>
-            <tr><td>SKSE</td><td>Skyrim Script Extender. Загружает нативные плагины и предоставляет Messaging, Task и другие интерфейсы.</td><td>Через него код узнаёт о <code>kDataLoaded</code>, новой игре и загрузке сохранения.</td></tr>
-            <tr><td>CommonLibSSE-NG</td><td>C++ обёртки над Skyrim runtime и SKSE.</td><td>Даёт типы <code>RE::PlayerCharacter</code>, <code>RE::TESForm</code>, event sinks и безопасные lookup-функции.</td></tr>
-            <tr><td>Form</td><td>Объект данных Skyrim: global, quest, spell, location, cell и так далее.</td><td>Уровень сложности, смерти и камни берутся из форм STB.</td></tr>
-            <tr><td>Editor ID</td><td>Текстовый идентификатор формы в Creation Kit.</td><td>Используется для поиска global, spell и правил локаций.</td></tr>
-            <tr><td>Form ID</td><td>Числовой идентификатор формы в ESP/ESM.</td><td>Quest сложности ищется по локальному ID <code>0x1417C4</code> внутри <code>STB.esp</code>.</td></tr>
-            <tr><td>Event sink</td><td>Объект-получатель событий Skyrim.</td><td><code>MenuEventSink</code> и <code>CombatEventSink</code> переводят игровые события в вызовы координатора.</td></tr>
-            <tr><td>Game thread</td><td>Главный поток Skyrim.</td><td>Игровые объекты и Discord core в этом проекте обрабатываются через задачи этого потока.</td></tr>
-            <tr><td>Callback</td><td>Функция, вызываемая позже после завершения асинхронной операции.</td><td>Discord сообщает результат <code>UpdateActivity</code> только во время <code>RunCallbacks()</code>.</td></tr>
-            <tr><td>RAII</td><td>Ресурс принадлежит C++ объекту и освобождается его деструктором.</td><td><code>std::unique_ptr&lt;discord::Core&gt;</code> освобождает SDK core при <code>reset()</code>.</td></tr>
-            <tr><td><code>std::optional&lt;T&gt;</code></td><td>Значение типа <code>T</code> либо явное отсутствие значения.</td><td>Отличает «смертей 0» от «global смертей не найден».</td></tr>
-            <tr><td><code>std::string_view</code></td><td>Невладеющий вид на существующую строку.</td><td>Не копирует данные, но не должен переживать строку-владельца.</td></tr>
-            <tr><td><code>noexcept</code></td><td>Функция обещает не выпускать исключения наружу.</td><td>Особенно важно на границе callbacks Skyrim и точки входа плагина.</td></tr>
-            <tr><td><code>std::atomic</code></td><td>Значение, которое несколько потоков читают и меняют без data race.</td><td>Связывает scheduler thread с задачами game thread.</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <h2>1. Назначение архитектуры</h2>
+      <p>DragonbornPresence загружается внутрь процесса Skyrim через SKSE. Он читает формы и состояние игрока, формирует стабильный Presence и передаёт его Discord Game SDK. Ошибка плагина не должна завершать Skyrim, а код application-слоя не должен зависеть от типов <code>RE::*</code>, <code>SKSE::*</code> или <code>discord::*</code>.</p>
+      <p>Граница построена по правилу зависимостей: внутренние слои определяют модели и интерфейсы, внешние адаптеры реализуют эти интерфейсы для конкретной инфраструктуры.</p>
+      <div class="callout"><strong>Область поддержки:</strong> игровой адаптер называется <code>SkyrimTrueBeliever</code>, потому что формы, Papyrus scripts, камни и fallback-тексты относятся к текущей сборке STB.</div>
     </section>
 
     <section id="map">
-      <h2>3. Карта репозитория</h2>
+      <h2>2. Карта репозитория</h2>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Файл</th><th>Роль</th><th>Когда читать</th></tr></thead>
+          <thead><tr><th>Каталог или файл</th><th>Ответственность</th></tr></thead>
           <tbody>
-            <tr><td><code>src/main.cpp</code></td><td>Точка входа DLL, настройка логирования, подписка на сообщения SKSE.</td><td>Первым: отсюда начинается выполнение.</td></tr>
-            <tr><td><code>src/DragonbornPresence.cpp</code></td><td>Модели, JSON, игровые данные, Discord client, event sinks и координатор.</td><td>После <code>main.cpp</code>; это основная логика.</td></tr>
-            <tr><td><code>src/discord_loader.cpp</code></td><td>Windows-проверки Discord и контролируемая загрузка <code>discord_game_sdk.dll</code>.</td><td>Для понимания запуска и системных ошибок.</td></tr>
-            <tr><td><code>src/AdditionalFunctions.cpp</code></td><td>Проверка UTF-8 и преобразование CP1251 → UTF-8.</td><td>Для понимания русских строк Skyrim.</td></tr>
-            <tr><td><code>include/DragonbornPresence.h</code></td><td>Три публичные функции модуля, используемые точкой входа.</td><td>Чтобы увидеть узкую внешнюю границу.</td></tr>
-            <tr><td><code>include/ScriptUtils.h</code></td><td>Шаблонное чтение Papyrus property/variable у form, effect или alias.</td><td>Перед разбором сложности STB.</td></tr>
-            <tr><td><code>include/discord_loader.h</code></td><td>Контракт двух функций Windows-загрузчика.</td><td>Вместе с реализацией loader.</td></tr>
-            <tr><td><code>include/AdditionalFunctions.h</code></td><td>Объявления строковых функций.</td><td>Вместе с реализацией строк.</td></tr>
-            <tr><td><code>include/pch.h</code></td><td>Precompiled header CommonLibSSE и string literals.</td><td>Для понимания сборки, не runtime-логики.</td></tr>
-            <tr><td><code>config/DragonbornPresence.json</code></td><td>Application ID, стандартные assets и 438 упорядоченных правил локаций.</td><td>Когда меняется отображение без изменения DLL.</td></tr>
-            <tr><td><code>CMakeLists.txt</code></td><td>Зависимости, DLL target, линковка, PDB, ZIP и автокопирование в MO2.</td><td>Перед первой сборкой.</td></tr>
-            <tr><td><code>CMakePresets.json</code></td><td>Генератор VS 2026, x64, Release/Debug и путь развёртывания.</td><td>Перед запуском команд CMake.</td></tr>
-            <tr><td><code>.github/workflows/release.yml</code></td><td>Сборка и публикация ZIP при push тега <code>v*</code>.</td><td>Перед релизом.</td></tr>
-            <tr><td><code>docs/</code></td><td>Только статические HTML/CSS-файлы GitHub Pages.</td><td>При изменении документации.</td></tr>
+            <tr><td><code>include/DragonbornPresence/core</code><br><code>src/core</code></td><td>Модели, UTF-8, сложность и выбор asset локации. Нет I/O и SDK.</td></tr>
+            <tr><td><code>include/DragonbornPresence/application</code><br><code>src/application</code></td><td><code>PresenceCoordinator</code> и четыре порта внешнего мира.</td></tr>
+            <tr><td><code>adapters/config</code></td><td>Чтение и валидация <code>DragonbornPresence.json</code>.</td></tr>
+            <tr><td><code>adapters/SkyrimTrueBeliever</code></td><td>Формы STB, Papyrus, CP1251, события Skyrim, scheduler и SKSE logger.</td></tr>
+            <tr><td><code>adapters/discord</code></td><td>Проверка Discord Desktop, загрузка DLL и реализация Presence transport.</td></tr>
+            <tr><td><code>src/DragonbornPresence.cpp</code></td><td>Composition root и три безопасные функции публичного фасада.</td></tr>
+            <tr><td><code>src/main.cpp</code></td><td>SKSE entry point, лог-файл и маршрутизация сообщений SKSE.</td></tr>
+            <tr><td><code>tests</code></td><td>Core, application и adapter test suites.</td></tr>
+            <tr><td><code>CMakeLists.txt</code><br><code>CMakePresets.json</code></td><td>Цели, зависимости, presets, упаковка и deploy в MO2.</td></tr>
           </tbody>
         </table>
       </div>
-      <p class="source-link">Исходники: <a href="https://github.com/STB-Team/DragonbornPresence-SE/tree/master/src">src/</a> · <a href="https://github.com/STB-Team/DragonbornPresence-SE/tree/master/include">include/</a> · <a href="https://github.com/STB-Team/DragonbornPresence-SE/blob/master/CMakeLists.txt">CMakeLists.txt</a></p>
+      <p class="source-link">Текущий код: <a href="https://github.com/STB-Team/DragonbornPresence-SE/tree/dev/include/DragonbornPresence">include/DragonbornPresence</a> · <a href="https://github.com/STB-Team/DragonbornPresence-SE/tree/dev/src">src</a> · <a href="https://github.com/STB-Team/DragonbornPresence-SE/tree/dev/tests">tests</a></p>
     </section>
 
-    <section id="architecture">
-      <h2>4. Архитектура: слои и направление зависимостей</h2>
-      <pre class="flow"><code>SKSE / Skyrim events
-        │
-        ▼
-application::PresenceCoordinator
-   ┌────┼──────────────────────────┐
-   ▼    ▼                          ▼
-game::StbDataProvider     assets::LocationAssetResolver
-   │                               │
-   └──────────────┬────────────────┘
-                  ▼
-          model::ActivityPayload
-                  │
-                  ▼
-integration::DiscordPresenceClient
-                  │
-                  ▼
-          Discord Game SDK</code></pre>
-      <p><code>PresenceCoordinator</code> — точка сборки системы. Он знает о слоях ниже, но низкоуровневые слои не вызывают координатор. Такое направление уменьшает связанность: например, <code>StbDataProvider</code> не обязан знать, как Discord называет поля activity.</p>
-      <div class="grid three">
-        <div class="card"><strong><code>model</code></strong><p>Пассивные структуры данных и enum. Не выполняют I/O и не управляют жизненным циклом.</p></div>
-        <div class="card"><strong><code>text</code></strong><p>Кодировки, поиск подстроки и лимит Discord. Не знает о Skyrim событиях.</p></div>
-        <div class="card"><strong><code>configuration</code></strong><p>Превращает JSON в валидный <code>model::Config</code> с безопасными defaults.</p></div>
-        <div class="card"><strong><code>assets</code></strong><p>Сопоставляет позицию игрока с первым подходящим правилом изображения.</p></div>
-        <div class="card"><strong><code>game</code></strong><p>Кэширует формы STB и строит снимок игрока.</p></div>
-        <div class="card"><strong><code>integration</code></strong><p>Владеет Discord core, отправляет Activity и декодирует ошибки SDK.</p></div>
-        <div class="card"><strong><code>application</code></strong><p>Состояние загрузки, event sinks, scheduler и координация слоёв.</p></div>
-        <div class="card"><strong><code>detail</code> loader</strong><p>Изолирует WinAPI-проверки и фактическую загрузку DLL.</p></div>
-        <div class="card"><strong>Публичная граница</strong><p><code>LoadConfig</code>, <code>RegisterGameEventHandlers</code>, <code>OnGameLoaded</code>; каждая ловит исключения.</p></div>
-      </div>
-      <h3>Почему большая реализация находится в одном <code>.cpp</code></h3>
-      <p>Внутренние типы помещены в анонимный namespace. Они имеют internal linkage и недоступны другим translation unit. Это скрывает детали и оставляет внешнему коду только три функции из <code>DragonbornPresence.h</code>. Цена решения — большой файл; навигацию поддерживают именованные namespaces и классы.</p>
+    <section id="layers">
+      <h2>3. Слои и направление зависимостей</h2>
+      <pre class="flow"><code>SKSE messages, menus, combat, task queue         Discord Desktop / Game SDK
+                    │                                         ▲
+                    ▼                                         │
+       StbRuntimeAdapter ───────────────┐       DiscordPresenceClient
+                                       │                  ▲
+       StbGameDataSource ───────┐       │                  │
+                                ▼       ▼                  │
+                         application::PresenceCoordinator
+                           ▲       ▲       ▲       ▲
+                           │       │       │       │
+                    IConfigProvider IGameDataSource IPresenceClient ILogger
+                           ▲       ▲                       ▲
+                           │       │                       │
+                  JsonConfigProvider       SkseLogger ─────┘
+                                │
+                                ▼
+                              core</code></pre>
+      <ul>
+        <li><code>core</code> содержит только принадлежащие приложению значения: <code>Config</code>, <code>PlayerSnapshot</code>, <code>LocationContext</code>, <code>PresencePayload</code> и <code>RefreshReason</code>.</li>
+        <li><code>application</code> зависит от core и портов. Он не включает RE/SKSE, WinAPI или Discord headers.</li>
+        <li>Адаптеры зависят от application-контрактов и переводят внешние типы в обычные строки, числа, флаги и core-модели.</li>
+        <li>Composition root — единственное место, где выбираются конкретные реализации портов.</li>
+      </ul>
+      <div class="callout warning"><strong>Запрещённая зависимость:</strong> добавление <code>RE::PlayerCharacter*</code>, <code>discord::Activity</code> или <code>SKSE::TaskInterface</code> в <code>core</code> либо <code>application</code> разрушает границу и делает чистые тесты зависимыми от игры.</div>
+    </section>
+
+    <section id="composition">
+      <h2>4. Composition root и владение</h2>
+      <p><code>src/DragonbornPresence.cpp</code> создаёт конкретные объекты в порядке их зависимостей:</p>
+      <pre><code>JsonConfigProvider
+StbGameDataSource
+DiscordPresenceClient
+SkseLogger
+PresenceCoordinator(config, gameData, presence, logger)
+StbRuntimeAdapter(coordinator, logger)</code></pre>
+      <p>Все зависимости координатора — non-owning references. Глобальные адаптеры живут дольше него. <code>StbRuntimeAdapter</code> объявлен последним и уничтожается первым: его <code>std::jthread</code> останавливается и присоединяется до уничтожения coordinator и transport.</p>
+      <p>Публичный заголовок <code>DragonbornPresence.h</code> экспортирует только <code>LoadConfig()</code>, <code>RegisterGameEventHandlers()</code> и <code>OnGameLoaded()</code>. Каждая функция <code>noexcept</code> и не выпускает исключения обратно в SKSE.</p>
     </section>
 
     <section id="lifecycle">
-      <h2>5. Полный жизненный цикл</h2>
+      <h2>5. Жизненный цикл</h2>
       <ol class="steps">
-        <li><strong>Windows/SKSE загружает DLL.</strong> Вызывается <code>SKSEPluginLoad(skse)</code>.</li>
-        <li><strong>SKSE инициализируется.</strong> <code>SKSE::Init(skse)</code> подготавливает интерфейсы CommonLib.</li>
-        <li><strong>Создаётся лог.</strong> <code>InitializeLogging()</code> открывает <code>DragonbornPresence.log</code> с очисткой предыдущего содержимого для нового запуска.</li>
-        <li><strong>Discord проверяется заранее.</strong> Код проверяет регистрацию <code>discord://</code>, путь к EXE и наличие соответствующего процесса.</li>
-        <li><strong>Читается JSON.</strong> <code>LoadConfig()</code> сохраняет валидированную конфигурацию в глобальном координаторе.</li>
-        <li><strong>Регистрируется Messaging listener.</strong> Теперь SKSE может сообщать о стадиях загрузки.</li>
-        <li><strong><code>kDataLoaded</code>.</strong> Данные игры готовы: проверяются сервисы UI, событий и задач; создаётся Discord core; кэшируются формы STB; отправляется loading activity; регистрируются event sinks; запускается scheduler.</li>
-        <li><strong><code>kNewGame</code> или <code>kPostLoadGame</code>.</strong> Координатор помечает игру готовой и отправляет полный снимок игрока.</li>
-        <li><strong>Каждые 500 мс.</strong> Scheduler ставит не более одной задачи в game thread. Задача вызывает Discord callbacks и перечитывает Presence.</li>
-        <li><strong>При изменении.</strong> Новый Activity отправляется; неизменный payload отбрасывается по сигнатуре.</li>
-        <li><strong>При ошибке.</strong> Интеграция становится permanently stopped, scheduler получает stop request, Discord core освобождается в безопасной точке.</li>
+        <li><strong><code>SKSEPluginLoad</code>.</strong> Проверяется входной указатель, вызывается <code>SKSE::Init</code>, создаётся file logger.</li>
+        <li><strong>Проверка Discord.</strong> <code>IsDiscordRunning</code> проверяет protocol handler, executable и процесс. Плагин не скачивает и не запускает Discord.</li>
+        <li><strong>Конфигурация.</strong> <code>LoadConfig</code> читает JSON либо оставляет безопасные defaults.</li>
+        <li><strong>Messaging listener.</strong> <code>main.cpp</code> подписывается на сообщения SKSE.</li>
+        <li><strong><code>kDataLoaded</code>.</strong> Runtime adapter проверяет UI, event source и TaskInterface; coordinator инициализирует Discord transport, кэширует формы STB и отправляет loading Presence.</li>
+        <li><strong><code>kNewGame</code> / <code>kPostLoadGame</code>.</strong> Игра помечается готовой, читается первый полный snapshot и публикуется Presence.</li>
+        <li><strong>Runtime.</strong> Каждые 500 мс scheduler ставит не более одной задачи в главный поток Skyrim. Она обрабатывает Discord callbacks и обновляет Presence.</li>
+        <li><strong>Ошибка или shutdown процесса.</strong> Новые операции прекращаются; transport освобождается только в безопасном порядке владения.</li>
       </ol>
-      <h3>Последовательность первого рабочего Presence</h3>
-      <pre class="flow"><code>SKSEPluginLoad
-  → LoadConfig
-  → SKSE message kDataLoaded
-  → DiscordPresenceClient::Initialize
-  → StbDataProvider::Initialize
-  → SendLoadingPresence
-  → SKSE message kPostLoadGame / kNewGame
-  → ReadPlayerSnapshot
-  → LocationAssetResolver::Resolve
-  → DiscordPresenceClient::UpdateActivity
-  → следующий RunCallbacks
-  → callback Ok
-  → запись "Presence updated"</code></pre>
     </section>
 
-    <section id="state">
-      <h2>6. Данные и состояние</h2>
-      <h3>Константы</h3>
-      <p><code>namespace constants</code> содержит значения, одинаковые для всего запуска: путь JSON, Application ID, 500-миллисекундный интервал, таймаут callback, Form ID quest, Editor ID global, имена меню и fallback-тексты. <code>constexpr</code> означает, что значение известно во время компиляции и не требует изменяемого runtime-объекта.</p>
+    <section id="application">
+      <h2>6. Application coordinator</h2>
+      <p><code>PresenceCoordinator</code> получает четыре порта:</p>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Константа</th><th>Значение</th><th>Назначение</th></tr></thead>
+          <thead><tr><th>Порт</th><th>Что coordinator может делать</th><th>Чего он не знает</th></tr></thead>
           <tbody>
-            <tr><td><code>kConfigPath</code></td><td><code>Data\SKSE\Plugins\DragonbornPresence.json</code></td><td>Путь относительно каталога Skyrim.</td></tr>
-            <tr><td><code>kDiscordCallbackInterval</code></td><td>500 мс</td><td>Частота scheduler tick.</td></tr>
-            <tr><td><code>kActivityCallbackTimeoutTicks</code></td><td>20 тиков</td><td>10 секунд ожидания завершения UpdateActivity.</td></tr>
-            <tr><td><code>kDiscordTextMaxBytes</code></td><td>127 байт</td><td>Безопасная длина текстового поля Discord с учётом UTF-8.</td></tr>
-            <tr><td><code>kDifficultyQuestFormId</code></td><td><code>0x1417C4</code></td><td>Локальный ID quest в <code>STB.esp</code>.</td></tr>
+            <tr><td><code>IConfigProvider</code></td><td>Получить полный <code>core::Config</code>.</td><td>Файл, JSON и путь SKSE.</td></tr>
+            <tr><td><code>IGameDataSource</code></td><td>Инициализировать данные и получить <code>PlayerSnapshot</code>.</td><td>TESForm, Papyrus и STB.esp.</td></tr>
+            <tr><td><code>IPresenceClient</code></td><td>Инициализировать transport, обработать callbacks, отправить payload, остановить transport.</td><td>Discord core, activity и DLL.</td></tr>
+            <tr><td><code>ILogger</code></td><td>Записать info, warning, error или critical message.</td><td>spdlog и SKSE backend.</td></tr>
           </tbody>
         </table>
       </div>
-      <h3>Модели</h3>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Тип</th><th>Что хранит</th><th>Почему отдельный тип</th></tr></thead>
-          <tbody>
-            <tr><td><code>StoneDefinition</code></td><td>Editor ID spell и fallback-имя камня.</td><td>Compile-time таблица 19 камней не смешивается с найденными runtime-указателями.</td></tr>
-            <tr><td><code>LocationImageRule</code></td><td>Селекторы worldspace/location/cell/match и выбранные image/text.</td><td>Одна строка JSON после валидации.</td></tr>
-            <tr><td><code>Config</code></td><td>enabled, applicationId, assets и правила.</td><td>Все defaults находятся в одном месте.</td></tr>
-            <tr><td><code>StoneRuntimeData</code></td><td>Найденный <code>SpellItem*</code> и готовое имя.</td><td>Lookup и разбор description выполняются один раз.</td></tr>
-            <tr><td><code>StbRuntimeData</code></td><td>Указатели deaths global, difficulty quest и камни.</td><td>Кэш форм снижает повторную работу каждые 500 мс.</td></tr>
-            <tr><td><code>CombatTargetData</code></td><td>Последние имя и уровень противника.</td><td>Skyrim может кратковременно потерять combat target handle.</td></tr>
-            <tr><td><code>PlayerSnapshot</code></td><td>Значения игрока для одного refresh.</td><td>Остальной код работает с обычными значениями, а не долго хранит игровые указатели.</td></tr>
-            <tr><td><code>LargeAssetSelection</code></td><td><code>string_view</code> на image и hover text активного config.</td><td>Возвращает пару без лишних копий.</td></tr>
-            <tr><td><code>ActivityPayload</code></td><td>Шесть полей будущего Discord Activity.</td><td>Отделяет форматирование Presence от SDK-вызова.</td></tr>
-            <tr><td><code>RefreshReason</code></td><td>game-loaded, loading-finished, combat или poll.</td><td>Причина влияет на диагностику, но не дублирует логику refresh.</td></tr>
-            <tr><td><code>Difficulty</code></td><td>Именованные значения 0–4.</td><td>Избавляет switch от «магических чисел».</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <h3>Состояние координатора</h3>
+      <p>Координатор хранит состояния <code>active</code>, <code>permanentlyStopped</code>, <code>gameLoaded</code>, <code>loading</code>, последнее состояние боя и coalesced combat flag. При playable state он строит строки сложности и <code>lvl-&lt;level&gt; ...</code>, применяет <code>LocationAssetResolver</code> и передаёт готовый <code>PresencePayload</code> в порт.</p>
+      <p><code>LocationAssetResolver</code> проверяет правила сверху вниз и возвращает первое полное совпадение; если совпадений нет, используются <code>largeImage</code> и <code>largeText</code> из конфигурации.</p>
+    </section>
+
+    <section id="runtime">
+      <h2>7. <code>StbRuntimeAdapter</code></h2>
+      <p>Runtime adapter владеет <code>MenuEventSink</code>, <code>CombatEventSink</code>, указателем на <code>SKSE::TaskInterface</code> и scheduler thread. Event sinks переводят Skyrim events в простые application-вызовы:</p>
       <ul>
-        <li><code>active_</code> — интеграция сейчас может выполнять работу;</li>
-        <li><code>permanentlyStopped_</code> — повторная инициализация в этом экземпляре запрещена после фатальной ошибки;</li>
-        <li><code>loading_</code> — нужно показывать loading activity;</li>
-        <li><code>gameLoaded_</code> — существует игровая сессия, данные игрока можно публиковать;</li>
-        <li><code>lastCombatState_</code> — помогает заметить завершение боя;</li>
-        <li><code>callbackTaskPending_</code> — в очереди уже есть задача scheduler;</li>
-        <li><code>combatRefreshRequested_</code> — combat event просит ближайший poll пометить причиной <code>combat</code>.</li>
+        <li><code>Main Menu</code> открыт → <code>OnMainMenuOpened()</code>;</li>
+        <li><code>Loading Menu</code> открыт или закрыт → <code>OnLoadingChanged(bool)</code>;</li>
+        <li>combat event → <code>RequestCombatRefresh(involvesPlayer, combatEnded)</code>.</li>
+      </ul>
+      <p>RE-объекты не пересекают application boundary. Каждый <code>ProcessEvent</code> имеет собственный <code>try/catch</code> и всегда возвращает <code>kContinue</code>, чтобы ошибка Presence не ломала Skyrim event chain.</p>
+    </section>
+
+    <section id="game-data">
+      <h2>8. <code>StbGameDataSource</code> и STB helpers</h2>
+      <p><code>Initialize()</code> после <code>kDataLoaded</code> кэширует deaths global, difficulty quest и 19 description spells камней. Отсутствующая форма остаётся <code>nullptr</code> и приводит к fallback, а не к аварийному завершению.</p>
+      <p><code>ReadPlayerSnapshot()</code> копирует из Skyrim только нужные значения: уровень, смерти, сложность, выбранный камень, иерархию локации, состояние боя и текущую combat target. Core и application не хранят указатели на объекты игры.</p>
+      <ul>
+        <li><code>PapyrusValueReader.h</code> ограничивает допустимые form/effect/alias types через concepts и возвращает <code>std::optional</code>.</li>
+        <li><code>StbStringEncoding</code> сохраняет корректный UTF-8 и преобразует legacy CP1251 через WinAPI.</li>
+        <li><code>ParseStoneName</code> читает JSON description spell и использует стабильное STB fallback-имя при ошибке.</li>
+      </ul>
+      <div class="callout danger"><strong>Контракт STB:</strong> Editor IDs, Form ID quest, plugin name, script/property names и список камней синхронизированы с текущим <code>STB.esp</code>. Их нельзя обобщать или переименовывать без проверки сборки STB.</div>
+    </section>
+
+    <section id="discord">
+      <h2>9. Discord adapter</h2>
+      <h3><code>DiscordSdkLoader</code></h3>
+      <p>Loader проверяет Discord Desktop до первого SDK-вызова и загружает только bundled <code>discord_game_sdk.dll</code> из каталога <code>SKSE/Plugins</code>. Delay-load hook возвращает уже проверенный module handle; системные ошибки превращаются в диагностический текст.</p>
+      <h3><code>DiscordPresenceClient</code></h3>
+      <p>Клиент реализует <code>IPresenceClient</code>, владеет <code>discord::Core</code> через <code>unique_ptr</code>, хранит один session timestamp, signature последнего успешного payload и signature ожидающего callback payload.</p>
+      <ul>
+        <li>Одинаковый payload не отправляется повторно.</li>
+        <li>Пока предыдущий update callback не завершён, второй update не ставится.</li>
+        <li>Callback timeout, Discord result error или исчезновение клиента permanently disables transport.</li>
+        <li>Все известные <code>discord::Result</code> декодируются в имя, числовой код и понятное объяснение.</li>
       </ul>
     </section>
 
     <section id="threads">
-      <h2>7. Потоки, очередь задач и события</h2>
-      <p>В проекте есть scheduler thread (<code>std::jthread</code>) и главный поток Skyrim. Scheduler сам не читает <code>PlayerCharacter</code> и не вызывает <code>discord::Core</code>. Он спит 500 мс и через <code>SKSE::TaskInterface::AddTask</code> просит game thread выполнить работу.</p>
-      <pre class="flow"><code>scheduler thread                         Skyrim game thread
+      <h2>10. Потоки и bounded scheduling</h2>
+      <pre class="flow"><code>scheduler thread                         Skyrim main thread
 ----------------                         ------------------
-sleep_for(500 ms)
-callbackTaskPending_.exchange(true)
-AddTask(lambda) -----------------------> callbackTaskPending_ = false
-                                         Discord RunCallbacks()
-                                         ReadPlayerSnapshot()
-                                         UpdateActivity()
-                                         return
-следующий tick</code></pre>
-      <h3>Зачем <code>callbackTaskPending_</code></h3>
-      <p>Если Skyrim занят загрузкой и не исполняет очередь задач, scheduler продолжает просыпаться. Без защиты он добавлял бы новую lambda каждые 500 мс, очередь и память росли бы. <code>exchange(true)</code> атомарно проверяет и устанавливает флаг: если задача уже ожидает, новая не создаётся.</p>
-      <p><code>callbackTaskPendingTicks_</code> считает пропущенные постановки. Предупреждение пишется примерно через 500 мс ожидания и затем раз в 5 секунд. Это не таймаут game thread и не авария — это наблюдаемая задержка с ограниченной очередью.</p>
-      <h3>Почему <code>std::jthread</code>, а не <code>std::thread</code></h3>
-      <p><code>jthread</code> имеет <code>stop_token</code>, поддерживает <code>request_stop()</code> и при уничтожении соединяется с потоком. Код может попросить цикл завершиться без собственного небезопасного флага остановки.</p>
-      <h3>Почему combat event не отправляет Activity сразу</h3>
-      <p><code>HandleCombatEvent</code> лишь устанавливает atomic-флаг. Следующий общий poll читает фактическое состояние игрока и объединяет несколько событий в один refresh. Это предотвращает очередь из повторяющихся задач и устраняет конкуренцию между event path и периодическим обновлением.</p>
-      <div class="callout warning"><strong>Правило изменения:</strong> не переносите чтение Skyrim forms или вызовы Discord core внутрь scheduler lambda до <code>AddTask</code>. Фоновый поток должен только планировать работу.</div>
-    </section>
-
-    <section id="entry">
-      <h2>8. <code>src/main.cpp</code>: вход в плагин</h2>
-      <h3><code>extern "C" IMAGE_DOS_HEADER __ImageBase</code></h3>
-      <p><code>__ImageBase</code> — символ текущего PE-модуля. Его адрес приводится к <code>HMODULE</code>, чтобы WinAPI определил путь именно к <code>DragonbornPresence.dll</code>, а не к <code>SkyrimSE.exe</code>. <code>extern "C"</code> отключает C++ name mangling для системного символа.</p>
-      <h3><code>InitializeLogging()</code></h3>
-      <ol>
-        <li>Просит <code>SKSE::log::log_directory()</code> вернуть стандартный каталог SKSE logs.</li>
-        <li>Если каталог недоступен, через <code>GetModuleFileNameW</code> берёт каталог DLL; последний fallback — current working directory.</li>
-        <li>Добавляет имя <code>DragonbornPresence.log</code>.</li>
-        <li>Создаёт многопоточный <code>basic_file_sink_mt</code>; аргумент <code>true</code> включает truncate, поэтому каждый запуск начинает новый лог.</li>
-        <li>Устанавливает уровень <code>info</code> и flush на каждом сообщении уровня info или выше.</li>
-        <li>Делает logger глобальным для <code>SKSE::log</code>.</li>
-      </ol>
-      <p>Функция <code>noexcept</code> и сама ловит всё. Если файл открыть нельзя, обычного logger ещё нет, поэтому сообщение отправляется в Windows debugger через <code>OutputDebugStringA</code>, а плагин не запускается.</p>
-      <h3><code>LogEntryPointFailure()</code></h3>
-      <p>Единый аварийный выход ранней стадии. Пытается написать <code>critical</code>; если даже logging сломан, использует debugger. Функция ничего не бросает обратно в загрузчик SKSE.</p>
-      <h3><code>OnSkseMessage()</code></h3>
-      <ul>
-        <li><code>kDataLoaded</code> → <code>RegisterGameEventHandlers()</code>. Только теперь формы и игровые сервисы считаются готовыми.</li>
-        <li><code>kNewGame</code> и <code>kPostLoadGame</code> → <code>OnGameLoaded()</code>. Для новой игры и загруженного сохранения нужен одинаковый первый полный refresh.</li>
-        <li>Другие сообщения игнорируются намеренно.</li>
-      </ul>
-      <h3><code>SKSEPluginLoad()</code></h3>
-      <p>Это экспортируемая CommonLib-макросом точка входа. Она валидирует <code>LoadInterface*</code>, вызывает <code>SKSE::Init</code>, поднимает лог, проверяет Discord, пишет версию из <code>PluginDeclaration</code>, читает config и регистрирует listener. Возвращаемое <code>true</code> сообщает SKSE, что плагин принят; <code>false</code> прекращает его загрузку.</p>
-      <div class="callout"><strong>Важная текущая семантика:</strong> если Discord Desktop не запущен уже в <code>SKSEPluginLoad</code>, функция возвращает <code>false</code>. Плагин не остаётся загруженным в ожидании запуска Discord.</div>
-    </section>
-
-    <section id="core">
-      <h2>9. <code>src/DragonbornPresence.cpp</code>: основной модуль</h2>
-      <p>Файл организован сверху вниз от простых данных к управляющему объекту:</p>
-      <pre><code>constants → model → text → configuration → assets → game
-          → integration → application → публичные noexcept-обёртки</code></pre>
-      <p>Почти всё находится в анонимном namespace внутри <code>namespace DragonbornPresence</code>. Поэтому внутренние классы не экспортируются из DLL и не создают публичного API. В конце файла существует один глобальный <code>g_presenceCoordinator</code>; он живёт весь срок жизни DLL и владеет всеми подсистемами.</p>
-      <h3>Публичные обёртки</h3>
-      <p><code>LoadConfig()</code>, <code>RegisterGameEventHandlers()</code> и <code>OnGameLoaded()</code> вызывают одноимённые методы глобального координатора. Каждая функция объявлена <code>noexcept</code>, ловит <code>std::exception</code> и неизвестные исключения и переводит их в <code>HandleException</code>. Это последняя защита на границе с <code>main.cpp</code> и SKSE.</p>
-    </section>
-
-    <section id="config-code">
-      <h2>10. Конфигурация: <code>ConfigLoader</code></h2>
-      <h3>Алгоритм <code>Load()</code></h3>
-      <ol>
-        <li>Сразу создаётся <code>model::Config config</code> со всеми defaults.</li>
-        <li>Открывается <code>Data\SKSE\Plugins\DragonbornPresence.json</code>.</li>
-        <li>Если файла нет, возвращаются defaults и пишется info.</li>
-        <li><code>nlohmann::json::parse(file)</code> разбирает синтаксис JSON.</li>
-        <li>Корень обязан быть object.</li>
-        <li>Блоки <code>discord</code>, <code>assets</code> и <code>small_images</code> читаются только как objects.</li>
-        <li>Каждое корректное поле заменяет свой default; поле неверного типа игнорируется с warning.</li>
-        <li>Правила локаций сначала собираются во временный vector и только затем целиком перемещаются в config.</li>
-      </ol>
-      <h3>Маленькие функции валидации</h3>
-      <ul>
-        <li><code>FindObject</code> различает «ключ отсутствует» и «ключ существует, но имеет неверный тип».</li>
-        <li><code>ReadBool</code> принимает только настоящий JSON boolean, не строки <code>"true"</code> и не числа.</li>
-        <li><code>ReadString</code> принимает только JSON string.</li>
-        <li><code>ReadApplicationId</code> принимает положительное целое число или строку только из десятичных цифр. <code>std::from_chars</code> не создаёт исключений и позволяет проверить, что обработана вся строка.</li>
-        <li><code>ReadLocationImageRules</code> требует array; каждое правило требует непустой <code>image</code> и хотя бы один selector.</li>
-      </ul>
-      <h3>Почему временный <code>parsedRules</code></h3>
-      <p>Объект config не получает частично разобранный vector. <code>reserve(rules-&gt;size())</code> заранее выделяет достаточно места и уменьшает количество reallocations. В конце <code>std::move(parsedRules)</code> передаёт внутренний буфер без копирования каждого правила.</p>
-      <h3>Что сейчас не используется</h3>
-      <p>Поле <code>schema_version</code> присутствует в JSON, но текущий <code>ConfigLoader</code> его не читает и не валидирует. Оно документирует формат для людей, но не влияет на runtime.</p>
-      <h3>Правила локаций</h3>
-      <p><code>LocationAssetResolver::Resolve</code> идёт по vector сверху вниз. <code>RuleMatches</code> требует совпадения всех непустых селекторов:</p>
-      <ul>
-        <li><code>worldspace</code> — точный Editor ID текущего worldspace;</li>
-        <li><code>cell</code> — точный Editor ID parent cell;</li>
-        <li><code>location</code> — точный Editor ID текущей location или одного из её <code>parentLoc</code>;</li>
-        <li><code>match</code> — подстрока display location с ASCII case folding.</li>
-      </ul>
-      <p>Первое полное совпадение возвращает asset. Пустой <code>text</code> заменяется общим <code>largeText</code>. Если совпадений нет или player отсутствует, возвращается <code>largeImage/largeText</code>.</p>
-      <div class="callout warning"><strong>Почему порядок важен:</strong> общее правило, поставленное раньше специального, сделает специальное недостижимым. Самые точные правила должны идти выше общих.</div>
-    </section>
-
-    <section id="game-code">
-      <h2>11. Игровые данные: <code>StbDataProvider</code> и <code>ScriptUtils</code></h2>
-      <h3><code>StbDataProvider::Initialize()</code></h3>
-      <p>Метод вызывается один раз после <code>kDataLoaded</code>. Он получает <code>TESDataHandler</code>, ищет deaths global по Editor ID, difficulty quest по Form ID и имени plugin, затем ищет 19 description spells камней. Результаты сохраняются в <code>runtimeData_</code>.</p>
-      <p>Кэш нужен потому, что lookup форм дороже чтения готового указателя и не должен повторяться два раза в секунду. После инициализации лог показывает, какие формы найдены и сколько камней разрешено.</p>
-      <h3><code>ParseStoneName()</code></h3>
-      <p>STB хранит описание spell как JSON-текст. Метод вызывает <code>GetDescription</code>, разбирает JSON и берёт строковое поле <code>name</code>. Если spell отсутствует, description пуст, JSON сломан или <code>name</code> непригоден, используется compile-time fallback из <code>kStoneDefinitions</code>.</p>
-      <h3><code>ReadPlayerSnapshot()</code></h3>
-      <ol>
-        <li>Создаёт snapshot с безопасными начальными значениями.</li>
-        <li>Получает singleton игрока; при отсутствии возвращает пустой snapshot.</li>
-        <li>Читает level.</li>
-        <li>Если deaths global найден, преобразует его float-поле <code>value</code> в <code>int</code>.</li>
-        <li>Определяет первый активный камень через <code>HasSpell</code>.</li>
-        <li>Читает сложность из Papyrus alias.</li>
-        <li>Строит отображаемую позицию.</li>
-        <li>Проверяет бой и current combat target.</li>
-      </ol>
-      <p>Когда player в бою и target доступен, имя и уровень сохраняются в <code>lastCombatTarget_</code>. Если следующий snapshot всё ещё в бою, но handle временно пуст, Discord продолжает показывать последнюю цель. После выхода из боя cache сбрасывается.</p>
-      <h3><code>BuildDisplayPosition()</code></h3>
-      <p>Метод сначала ищет первое непустое имя в цепочке current location → parent location. Затем читает worldspace и cell:</p>
-      <ul>
-        <li>если worldspace имеет имя и location отличается — <code>"worldspace: location"</code>;</li>
-        <li>если location совпадает с worldspace — только worldspace;</li>
-        <li>без worldspace — location;</li>
-        <li>без location — cell.</li>
-      </ul>
-      <h3><code>ScriptUtils::GetPropertyOrVariable</code></h3>
-      <p>Это закрытый шаблон для доступа к данным Papyrus:</p>
-      <ol>
-        <li><code>requires</code> разрешает только <code>TESForm</code>, <code>ActiveEffect</code> или <code>BGSBaseAlias</code>. Ошибочный тип не скомпилируется.</li>
-        <li>Получается singleton Papyrus Virtual Machine и object handle policy.</li>
-        <li>Для разных типов определяется правильный VM type ID.</li>
-        <li><code>GetHandleForObject</code> связывает C++ объект с Papyrus instance.</li>
-        <li><code>BSSpinLockGuard</code> защищает таблицу <code>attachedScripts</code> на время чтения.</li>
-        <li>Ищется script с точным именем типа.</li>
-        <li>Сначала ищется property, затем variable.</li>
-        <li>Возвращается <code>optional&lt;Variable*&gt;</code>, поэтому отсутствие не маскируется нулём.</li>
-      </ol>
-      <p><code>GetVariableValue&lt;T&gt;</code> с <code>if constexpr</code> выбирает getter во время компиляции: bool, signed/enum, unsigned, float или string. Неподдерживаемый тип вызывает compile-time <code>static_assert</code>, а не runtime-ошибку.</p>
-      <p><code>GetFirstAliasScriptPropertyOrVariable</code> ищет первый непустой alias quest и применяет общий reader. В текущем плагине через него читается <code>aaMZ_SelectedLevel_OfDifficulty</code>.</p>
-      <div class="callout danger"><strong>Осторожно:</strong> имя Papyrus script сравнивается точно с <code>aamz_mcmdatastorage</code>, а property — с <code>aaMZ_SelectedLevel_OfDifficulty</code>. Изменение имен в STB.esp/Papyrus требует синхронного изменения констант C++.</div>
-    </section>
-
-    <section id="text-code">
-      <h2>12. Строки, UTF-8 и CP1251</h2>
-      <h3>Зачем нужна конвертация</h3>
-      <p>Discord ожидает UTF-8. Строки Skyrim/STB могут уже быть UTF-8 либо приходить в CP1251. Нельзя безусловно перекодировать всё: повторное преобразование корректного UTF-8 испортит кириллицу.</p>
-      <h3><code>IsValidUtf8()</code></h3>
-      <p>Функция проходит по байтам и распознаёт последовательности длиной 1–4 байта. Для continuation bytes проверяется префикс <code>10xxxxxx</code>. После сборки code point отвергаются:</p>
-      <ul>
-        <li>значения выше Unicode <code>0x10FFFF</code>;</li>
-        <li>UTF-16 surrogate range <code>0xD800–0xDFFF</code>;</li>
-        <li>overlong encodings, когда символ записан большим числом байт, чем требуется;</li>
-        <li>обрезанные и неправильно начинающиеся последовательности.</li>
-      </ul>
-      <h3><code>Cp1251ToUtf8()</code></h3>
-      <p>WinAPI выполняет преобразование в два этапа: <code>MultiByteToWideChar(1251)</code> создаёт UTF-16, затем <code>WideCharToMultiByte(CP_UTF8)</code> создаёт UTF-8. Сначала каждый API вызывается без выходного буфера для вычисления размера, затем создаётся строка точного размера. Null terminator исключается из результата.</p>
-      <h3><code>text::FromGameString()</code></h3>
-      <p>Null и пустая строка дают <code>{}</code>. Валидный UTF-8 копируется как есть; невалидный считается CP1251 и конвертируется.</p>
-      <h3><code>text::LimitForDiscord()</code></h3>
-      <p>Discord-поле ограничивается 127 байтами, не символами. Кириллица и emoji занимают несколько байт. Если byte 127 находится внутри continuation sequence, индекс сдвигается назад к началу code point. Поэтому на выходе не возникает обрезанного UTF-8 символа.</p>
-      <h3><code>ContainsAsciiInsensitive()</code></h3>
-      <p>Функция вручную приводит только ASCII <code>A–Z</code> к <code>a–z</code> и ищет pattern во всех offsets. Кириллица не меняет регистр. Следовательно, <code>match</code> с кириллицей должен совпадать по регистру; case-insensitive гарантирован только для ASCII.</p>
-    </section>
-
-    <section id="discord-loader">
-      <h2>13. <code>discord_loader.cpp</code>: Windows и delay-load</h2>
-      <h3>Общая цель</h3>
-      <p>Плагин не должен позволить Windows неявно искать Discord DLL по непредсказуемым каталогам и не должен пытаться чинить или запускать Discord. Loader проверяет окружение до первого SDK-вызова и загружает только DLL рядом с плагином.</p>
-      <h3>Маленькие helper-функции</h3>
-      <ul>
-        <li><code>SetFailureReason</code> безопасно записывает текст в optional output pointer и глотает allocation exceptions.</li>
-        <li><code>DescribeWindowsError</code> сопоставляет известные Win32 коды стабильному имени и объяснению.</li>
-        <li><code>SetWindowsFailureReason</code> формирует единый actionable error с числом, именем и смыслом.</li>
-        <li><code>ExtractExecutablePath</code> получает первый executable из registry command, учитывая quoted и unquoted путь. Функция изменяет переданный mutable buffer, вставляя null terminator.</li>
-        <li><code>IsExistingFile</code> проверяет, что путь существует и не является каталогом.</li>
-        <li><code>BuildPluginSiblingPath</code> берёт путь текущей DLL через <code>__ImageBase</code> и заменяет имя файла на запрошенное.</li>
-      </ul>
-      <h3><code>IsDiscordRunning()</code></h3>
-      <ol>
-        <li>Читает <code>HKEY_CLASSES_ROOT\discord\shell\open\command</code>.</li>
-        <li>Первый <code>RegGetValueW</code> узнаёт размер registry value.</li>
-        <li>Второй читает строку в <code>std::wstring</code>.</li>
-        <li>Из command извлекается путь executable и проверяется файл.</li>
-        <li>Из пути берётся имя процесса.</li>
-        <li><code>CreateToolhelp32Snapshot</code> получает список процессов Windows.</li>
-        <li><code>Process32FirstW/Process32NextW</code> ищут имя без учёта регистра.</li>
-        <li>Каждый HANDLE закрывается через <code>CloseHandle</code>.</li>
-      </ol>
-      <p>Проверка связывает процесс именно с executable, зарегистрированным для <code>discord://</code>, а не просто доверяет фиксированному имени <code>Discord.exe</code>.</p>
-      <h3><code>LoadDiscordSdk()</code></h3>
-      <p>Если DLL уже загружена, возвращается true. Иначе строится соседний путь <code>SKSE\Plugins\discord_game_sdk.dll</code>, проверяется файл и вызывается <code>LoadLibraryExW</code> с <code>LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS</code>. Это ограничивает и делает явным DLL search behavior.</p>
-      <h3><code>DiscordDelayHook</code></h3>
-      <p>CMake линкует import library с <code>/DELAYLOAD:discord_game_sdk.dll</code>. Поэтому Windows не обязана загрузить SDK при загрузке самого плагина. Переменная <code>__pfnDliNotifyHook2</code> подключает hook MSVC delay-load helper. На запрос именно Discord DLL hook возвращает уже загруженный module либо загружает соседний файл теми же безопасными flags.</p>
-      <div class="callout"><strong>Почему и явный <code>LoadDiscordSdk</code>, и hook:</strong> явная функция даёт контролируемую проверку и понятную ошибку до SDK-вызова; hook гарантирует правильный путь в момент разрешения delay-loaded imports.</div>
-    </section>
-
-    <section id="discord-client">
-      <h2>14. <code>DiscordPresenceClient</code></h2>
-      <h3>Владение и состояния</h3>
-      <p><code>core_</code> — <code>unique_ptr</code>, единственный владелец Discord core. <code>transportHealthy_</code> показывает, можно ли продолжать транспортные вызовы. Клиент активен только когда существуют оба условия.</p>
-      <p><code>sessionStartTimestamp_</code> — const field, инициализированный текущим Unix time при создании глобального координатора. Он не пересоздаётся при каждой activity, поэтому Discord timer показывает длительность текущего запуска.</p>
-      <h3><code>Initialize(config)</code></h3>
-      <ol>
-        <li>Сбрасывает transport health.</li>
-        <li>При <code>enabled=false</code> не загружает SDK.</li>
-        <li>Повторно проверяет Discord и локальную DLL.</li>
-        <li>Вызывает <code>discord::Core::Create(applicationId, DiscordCreateFlags_NoRequireDiscord, ...)</code>.</li>
-        <li>Временно оборачивает raw pointer в <code>unique_ptr candidate</code>, чтобы не потерять его при ошибке.</li>
-        <li>Перемещает candidate в <code>core_</code> только при <code>Result::Ok</code>.</li>
-        <li>Устанавливает SDK log hook начиная с warning.</li>
-        <li>Пишет Application ID и стабильный <code>session_start</code>.</li>
-      </ol>
-      <h3><code>RunCallbacks()</code></h3>
-      <p>Discord Game SDK завершает асинхронные операции только при регулярном вызове callbacks. Перед вызовом код снова проверяет процесс Discord. Любое SDK result кроме <code>Ok</code>, C++ exception или ошибка асинхронного callback окончательно отключает client.</p>
-      <p>Если есть <code>pendingActivitySignature_</code>, счётчик увеличивается. После 20 тиков × 500 мс = 10 секунд callback считается зависшим, integration отключается. Это ограничивает вечное состояние «запрос в полёте».</p>
-      <h3><code>UpdateActivity(payload)</code></h3>
-      <ol>
-        <li>Возвращает false, если client неактивен или другой update уже pending.</li>
-        <li>Ограничивает четыре текстовых поля по UTF-8 bytes.</li>
-        <li>Собирает сигнатуру из шести полей, разделяя их null-байтом.</li>
-        <li>Если сигнатура совпадает с последней подтверждённой, Discord не вызывается.</li>
-        <li>Создаёт <code>discord::Activity</code>, устанавливает type Playing и timestamp.</li>
-        <li>Заполняет только непустые поля.</li>
-        <li>Сохраняет pending signature и вызывает <code>ActivityManager().UpdateActivity</code>.</li>
-        <li>Callback при <code>Ok</code> переносит signature в last и пишет info; при ошибке помечает transport unhealthy.</li>
-      </ol>
-      <p>Null-разделители нужны, чтобы разные наборы полей не дали одинаковую concatenation. Без разделителя <code>["ab", "c"]</code> и <code>["a", "bc"]</code> обе превратились бы в <code>"abc"</code>.</p>
-      <h3>Почему last обновляется только в callback</h3>
-      <p>Постановка операции ещё не означает, что Discord её принял. <code>lastActivitySignature_</code> меняется только после <code>Result::Ok</code>; до этого значение находится в <code>pendingActivitySignature_</code>.</p>
-      <h3>Декодирование ошибок</h3>
-      <p><code>DescribeResult</code> содержит switch по всем известным результатам Discord SDK 3.2.1. Лог получает стабильное enum name, числовой code и человеческое explanation. <code>default</code> защищает от неизвестного значения новой/повреждённой версии SDK.</p>
-      <h3><code>Disable</code> и <code>DisableForResult</code></h3>
-      <p>Обе функции сбрасывают health, pending state и <code>core_</code>. После <code>core_.reset()</code> последующих SDK-вызовов не будет. Разница — готовый <code>discord::Result</code> логируется через полный decoder, а текстовая причина через общий <code>LogFailure</code>.</p>
-    </section>
-
-    <section id="coordinator">
-      <h2>15. <code>PresenceCoordinator</code> и event sinks</h2>
-      <h3>Почему coordinator владеет всем</h3>
-      <p>Он гарантирует общий lifecycle: config живёт дольше resolver, data provider живёт между polls, client имеет одного владельца, event sinks содержат ссылку на coordinator, scheduler останавливается вместе с ним.</p>
-      <h3><code>RegisterGameEventHandlers()</code></h3>
-      <p>Метод проверяет три обязательных сервиса: <code>RE::UI</code>, <code>ScriptEventSourceHolder</code> и <code>SKSE::TaskInterface</code>. Только после успешной проверки и инициализации Discord выставляет <code>active_=true</code>, кэширует формы, отправляет loading state, подписывает sinks и запускает thread. Такой порядок не оставляет частично зарегистрированный плагин после раннего отказа.</p>
-      <h3>Меню и loading state machine</h3>
-      <ul>
-        <li>Открытие <code>Main Menu</code>: <code>gameLoaded_=false</code>, <code>loading_=true</code>.</li>
-        <li>Открытие <code>Loading Menu</code>: loading включается.</li>
-        <li>Закрытие <code>Loading Menu</code> после сигнала game loaded: loading выключается и отправляется полный refresh.</li>
-        <li><code>OnGameLoaded</code>: <code>gameLoaded_=true</code>, <code>loading_=false</code>, немедленный refresh.</li>
-      </ul>
-      <h3><code>RefreshPresence(reason)</code></h3>
-      <p>Если игра не готова, делегирует loading state. Иначе читает snapshot, форматирует:</p>
-      <pre><code>details = difficulty
-state   = "lvl-&lt;level&gt; 💀-&lt;deaths|—&gt; &lt;stone&gt;"
-large   = первое совпавшее location rule или общий fallback
-small   = combat asset и target text только во время боя
-timer   = неизменный sessionStartTimestamp_</code></pre>
-      <p>После вызова client coordinator проверяет <code>IsActive()</code>. Если транспорт умер, <code>Stop()</code> выключает дальнейшую работу. Подробная snapshot-строка логируется только если <code>UpdateActivity</code> действительно поставил новый запрос.</p>
-      <h3><code>MenuEventSink</code> и <code>CombatEventSink</code></h3>
-      <p>Оба наследуются от <code>RE::BSTEventSink&lt;Event&gt;</code>. Их <code>ProcessEvent</code> проверяет null, вызывает coordinator, ловит все исключения и всегда возвращает <code>kContinue</code>. Это позволяет следующим Skyrim listeners получить событие даже после обработки данным плагином.</p>
-      <h3>Обработка исключений</h3>
-      <p><code>HandleException</code> используется на внешних/game-thread границах: ставит inactive и permanently stopped, просит thread остановиться, пишет critical и вызывает shutdown client. <code>HandleBackgroundException</code> вызывается из scheduler thread и намеренно не уничтожает Discord core там: он останавливает producer, а ресурс остаётся до безопасного завершения и уничтожения владельца.</p>
-    </section>
-
-    <section id="headers">
-      <h2>16. Заголовки и precompiled header</h2>
-      <h3><code>DragonbornPresence.h</code></h3>
-      <p>Экспортирует только три <code>noexcept</code> функции. Это минимальный API между <code>main.cpp</code> и основной реализацией. Внутренние классы в header не попадают, поэтому изменение их полей не требует менять пользователей модуля.</p>
-      <h3><code>AdditionalFunctions.h</code> и <code>discord_loader.h</code></h3>
-      <p>Содержат объявления функций и минимальные standard includes, необходимые для типов сигнатур. Header не должен рассчитывать, что другой header был подключён раньше.</p>
-      <h3><code>ScriptUtils.h</code></h3>
-      <p>Шаблон реализован в header, потому что компилятору нужна полная реализация для создания конкретных версий <code>Get...&lt;int&gt;</code> и других типов в месте использования.</p>
-      <h3><code>pch.h</code></h3>
-      <p>Подключает тяжёлый <code>SKSE/Impl/PCH.h</code> один раз в precompiled header и включает литералы вроде <code>"..."sv</code>. PCH уменьшает время компиляции, но не меняет runtime-поведение DLL.</p>
-      <h3><code>#pragma once</code></h3>
-      <p>Предотвращает повторную обработку одного header в пределах translation unit. Это защита от повторных объявлений, а не механизм runtime singleton.</p>
-    </section>
-
-    <section id="build-code">
-      <h2>17. CMake, зависимости, DLL, PDB и релиз</h2>
-      <h3>Основные настройки</h3>
-      <ul>
-        <li>CMake 4.2, C++23 обязателен.</li>
-        <li><code>FetchContent</code> фиксирует версии fmt 10.2.1, spdlog 1.13.0, rapidcsv 8.83, nlohmann/json 3.11.3 и CommonLibSSE-NG 3.7.0.</li>
-        <li>Discord Game SDK 3.2.1 скачивается ZIP-файлом в build directory, если header ещё отсутствует.</li>
-        <li>C++ wrapper исходники SDK собираются в статическую библиотеку <code>discord_cpp</code>.</li>
-        <li><code>add_commonlibsse_plugin</code> создаёт SKSE DLL и PluginDeclaration.</li>
-      </ul>
-      <h3>Почему некоторые зависимости выглядят неиспользуемыми</h3>
-      <p><code>fmt</code>, <code>spdlog</code> и <code>rapidcsv</code> также требуются/обнаруживаются CommonLibSSE. Проект явно подготавливает их до подключения CommonLib, чтобы версии и пути были определены стабильно.</p>
-      <h3>Линковка</h3>
-      <p>Plugin линкуется с <code>discord_cpp</code>, <code>delayimp</code> и <code>nlohmann_json</code>. Опция <code>/DELAYLOAD:discord_game_sdk.dll</code> откладывает загрузку runtime DLL. <code>/utf-8</code> заставляет MSVC читать исходники с русским текстом и emoji как UTF-8.</p>
-      <h3>PDB в Release</h3>
-      <p><code>MSVC_DEBUG_INFORMATION_FORMAT ProgramDatabase</code> и <code>/DEBUG:FULL</code> создают полный PDB даже для оптимизированного Release. <code>/OPT:REF</code> удаляет неиспользуемый код, <code>/OPT:ICF</code> объединяет одинаковые функции. PDB нужен для сопоставления адреса crash log с функцией и строкой; он не делает код debug-медленным и сам не предотвращает crash.</p>
-      <h3>Packaging и deploy</h3>
-      <p>После build CMake копирует DLL, PDB, SDK DLL и JSON в staging <code>_package/SKSE/Plugins</code>, создаёт <code>DragonbornPresence.zip</code>, а при заданном <code>DRAGONBORNPRESENCE_DEPLOY_DIR</code> копирует те же runtime-файлы прямо в мод MO2.</p>
-      <p><code>CMakePresets.json</code> фиксирует Visual Studio 18 2026, x64, build directory и локальный путь MO2. Presets <code>release</code> и <code>debug</code> собирают target <code>DragonbornPresence</code>.</p>
-      <h3>GitHub Release workflow</h3>
-      <p>Push тега <code>v*</code> запускает Windows runner, выполняет configure и Release build, проверяет ZIP и создаёт GitHub Release через <code>gh release create</code>. Workflow имеет <code>contents: write</code>, потому что без этого token не сможет опубликовать release.</p>
-    </section>
-
-    <section id="logging">
-      <h2>18. Логирование: от файла до диагностики</h2>
-      <p>Основной файл:</p>
-      <pre><code>%USERPROFILE%\Documents\My Games\Skyrim Special Edition\SKSE\DragonbornPresence.log</code></pre>
-      <h3>Уровни</h3>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Уровень</th><th>Когда используется</th><th>Что делать</th></tr></thead>
-          <tbody>
-            <tr><td><code>info</code></td><td>Нормальный запуск, config, найденные формы, SDK init, успешный Presence, изменившийся snapshot.</td><td>Сверять последовательность и значения.</td></tr>
-            <tr><td><code>warn</code></td><td>Неверное необязательное поле config, сломанный JSON description камня, SDK warning, задержка game-thread task.</td><td>Проверить данные; Skyrim ещё может работать нормально.</td></tr>
-            <tr><td><code>error</code></td><td>Discord недоступен, SDK operation failed, обязательная интеграция отключена.</td><td>Читать operation, code/name и explanation.</td></tr>
-            <tr><td><code>critical</code></td><td>Нет обязательного Skyrim/SKSE сервиса либо C++ exception достиг внешней границы.</td><td>Интеграция остановлена; нужен разбор причины и PDB при crash.</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <h3>Ключевые сообщения по порядку</h3>
-      <pre><code>DragonbornPresence 3.1.5 — plugin loaded.
-Config loaded.
-Registering game event handlers...
-Discord Game SDK initialized for application ...; session_start=...
-STB integration: deaths=1 difficulty=1 stones=19/19.
-Presence updated; session_start=...
-[game-loaded] level=... deaths=... stone='...' difficulty='...' location='...' large='...' combat='...'.</code></pre>
-      <p>Отсутствующая следующая строка локализует этап отказа. Например, есть <code>Registering...</code>, но нет <code>Discord Game SDK initialized</code> — проблема возникла в проверке Discord, загрузке DLL или <code>Core::Create</code>.</p>
-      <h3>Почему snapshot пишется после постановки update</h3>
-      <p>Подробный лог создаётся только когда payload отличается и новый запрос действительно queued. Poll без изменения данных не засоряет файл. Отдельная строка <code>Presence updated</code> появляется позже, когда callback подтвердил успех.</p>
-      <h3>Проверка таймера</h3>
-      <p>Все <code>session_start</code> в одном запуске обязаны совпадать. Изменение числа означает, что timestamp начали создавать на каждый refresh — это регрессия.</p>
-      <h3>Задержка главного потока</h3>
-      <pre><code>Discord task 'RunCallbacks/RefreshPresence' has been waiting on Skyrim's main thread
-for about 500 ms; 1 callback request coalesced. Only one task is queued...</code></pre>
-      <p>Это означает: scheduler жив, но Skyrim ещё не исполнил предыдущую задачу. Число coalesced — сколько дополнительных запросов не было добавлено благодаря bounded queue.</p>
-      <h3>Windows debugger fallback</h3>
-      <p>Если logger не удалось создать, писать в log невозможно. Ранний код использует <code>OutputDebugStringA</code>; такие сообщения видны в Visual Studio debugger или Sysinternals DebugView.</p>
+sleep 500 ms
+atomic pending false?
+  yes → AddTask ────────────────────────→ clear pending
+  no  → increment wait counter            PresenceCoordinator::Tick
+         warning at 500 ms and every 5 s   RunCallbacks
+                                           ReadPlayerSnapshot
+                                           UpdateActivity</code></pre>
+      <p>Scheduler не читает forms и не вызывает Discord core. Он только ставит задачу. Atomic flag гарантирует не более одной pending task: если Skyrim main thread задержан, новые тики объединяются, а память остаётся ограниченной.</p>
+      <p>На первом пропущенном тике записывается warning; затем он повторяется каждые 10 тиков. Combat events также coalesce в atomic flag и обрабатываются ближайшим общим tick.</p>
     </section>
 
     <section id="errors">
-      <h2>19. Ошибки и защитные границы</h2>
+      <h2>11. Ошибки и защитные границы</h2>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Ошибка</th><th>Где ловится</th><th>Результат</th></tr></thead>
+          <thead><tr><th>Граница</th><th>Поведение</th></tr></thead>
           <tbody>
-            <tr><td>Не открыть log</td><td><code>InitializeLogging</code></td><td>Debugger message, <code>SKSEPluginLoad=false</code>.</td></tr>
-            <tr><td>Discord не установлен/не запущен</td><td><code>IsDiscordRunning</code></td><td>Плагин не запускает Discord и прекращает загрузку/инициализацию.</td></tr>
-            <tr><td>Нет SDK DLL или неверная архитектура</td><td><code>LoadDiscordSdk</code></td><td>Win32 code с объяснением, integration disabled.</td></tr>
-            <tr><td>JSON config синтаксически сломан</td><td><code>ConfigLoader::Load</code></td><td>Error и новый default <code>Config</code>.</td></tr>
-            <tr><td>Отдельное поле неверного типа</td><td>Read helper</td><td>Warning, default только для этого поля.</td></tr>
-            <tr><td>Форма STB отсутствует</td><td><code>StbDataProvider</code></td><td>Fallback-текст; отсутствие отражается в init log.</td></tr>
-            <tr><td>Discord result не Ok</td><td><code>DiscordPresenceClient</code></td><td>Decoded error, core reset, повторных вызовов нет.</td></tr>
-            <tr><td>Update callback завис</td><td><code>RunCallbacks</code></td><td>После 10 секунд client отключается.</td></tr>
-            <tr><td>C++ exception в sink/task</td><td>Внешняя catch boundary</td><td>Critical, permanently stopped, исключение не выходит в Skyrim.</td></tr>
-            <tr><td>Exception scheduler thread</td><td><code>HandleBackgroundException</code></td><td>Producer остановлен; SDK не уничтожается из background thread.</td></tr>
+            <tr><td><code>SKSEPluginLoad</code></td><td>Ловит все исключения, пишет critical/debug output и возвращает <code>false</code>.</td></tr>
+            <tr><td>Публичный facade</td><td>Переводит исключение в <code>HandleException</code>; функции остаются <code>noexcept</code>.</td></tr>
+            <tr><td>Menu/combat sinks</td><td>Ловят исключение до возврата в Skyrim и останавливают интеграцию.</td></tr>
+            <tr><td>Main-thread task</td><td>Ловит исключение, останавливает scheduler и coordinator.</td></tr>
+            <tr><td>Scheduler thread</td><td>Останавливает producer, но не уничтожает Discord core на фоновом потоке.</td></tr>
+            <tr><td>Discord callback/result</td><td>Transport становится inactive; повторных SDK-вызовов нет.</td></tr>
           </tbody>
         </table>
       </div>
-      <h3>Почему catch есть в нескольких местах</h3>
-      <p>Это не одинаковое дублирование. Каждая внешняя граница должна быть <code>noexcept</code> по поведению: SKSE entry point, SKSE messages, event sinks, queued lambda, scheduler lambda и Discord callback вызываются внешней системой. Исключение нельзя позволить пройти через чужой ABI/callback stack.</p>
-      <h3>Почему после transport error нет retry</h3>
-      <p>Текущий контракт выбирает fail closed: состояние SDK после ошибки может быть неизвестно, повторные вызовы могут зависнуть или повторно ошибаться, а Presence не стоит риска для Skyrim. Для восстановления нужен полный перезапуск игры.</p>
+      <p>Политика — fail closed для Presence и fail safe для Skyrim: после неизвестного состояния transport интеграция не пытается автоматически восстановиться внутри текущего процесса игры.</p>
     </section>
 
-    <section id="changes">
-      <h2>20. Примеры безопасных изменений</h2>
-      <div class="callout warning"><strong>Перед изменением:</strong> создайте отдельную ветку, соберите Release с PDB, запустите Skyrim через SKSE, воспроизведите изменённый путь и проверьте log. Примеры показывают точки изменения, но названия форм и Discord Asset keys должны существовать в текущем STB/Discord Application.</div>
+    <section id="tests">
+      <h2>12. Автоматические тесты и CI</h2>
+      <pre><code>cmake --preset vs2026-tests
+cmake --build --preset tests
+ctest --preset tests</code></pre>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>CTest target</th><th>Проверяемый контракт</th></tr></thead>
+          <tbody>
+            <tr><td><code>DragonbornPresenceCoreTests</code></td><td>UTF-8, безопасный byte limit, difficulty labels, ASCII match и first-match location rules.</td></tr>
+            <tr><td><code>DragonbornPresenceApplicationTests</code></td><td>Dependency calls, start/stop, loading/game transitions, polling, combat coalescing, inactive transport и permanent failure.</td></tr>
+            <tr><td><code>DragonbornPresenceAdapterTests</code></td><td>CP1251 conversion, defaults, valid JSON, invalid field fallback, malformed/root-invalid config и ordered location rules.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Тестовые цели не собирают SKSE plugin и не линкуют Discord SDK или Skyrim runtime. <code>.github/workflows/ci.yml</code> запускает их на Windows runner для push в <code>dev</code>, pull request и manual dispatch. UI/RE/SKSE integration окончательно проверяется Release-сборкой и runtime smoke test в игре.</p>
+    </section>
 
-      <details open>
-        <summary>Пример A: добавить или переупорядочить изображение локации без C++</summary>
-        <div>
-          <p>Измените только <code>config/DragonbornPresence.json</code> и поставьте специальное правило выше общего:</p>
-          <pre><code>{
-  "cell": "MySpecialInteriorCell",
-  "image": "my_special_asset",
-  "text": "Особое место"
-}</code></pre>
-          <p>Почему этого достаточно: <code>ConfigLoader</code> уже понимает <code>cell</code>, а resolver перебирает правила. После build JSON автоматически копируется в MO2. Полностью перезапустите Skyrim.</p>
-          <p>Проверка: snapshot log должен содержать ожидаемые <code>location='...'</code> и <code>large='my_special_asset'</code>.</p>
-        </div>
-      </details>
-
-      <details>
-        <summary>Пример B: изменить формат строки state</summary>
-        <div>
-          <p>Точка изменения — <code>PresenceCoordinator::RefreshPresence</code>:</p>
-          <pre><code>const std::string stateText = std::format(
-    "Ур. {} | Смерти: {} | {}",
-    snapshot.level,
-    deathsText,
-    snapshot.stone);</code></pre>
-          <p>Не переносите форматирование в <code>DiscordPresenceClient</code>: client должен оставаться универсальным транспортом. <code>LimitForDiscord</code> продолжит применять лимит 127 UTF-8 bytes.</p>
-          <p>Проверка: загрузить сохранение, увидеть новый state в Discord и одну новую snapshot-запись в log.</p>
-        </div>
-      </details>
-
-      <details>
-        <summary>Пример C: добавить новый индекс сложности STB</summary>
-        <div>
-          <ol>
-            <li>Добавить именованное значение в <code>model::Difficulty</code>.</li>
-            <li>Добавить case в <code>StbDataProvider::DifficultyName</code>.</li>
-            <li>Не менять <code>ReadSelectedDifficulty</code>: он уже читает int и передаёт его mapper.</li>
-          </ol>
-          <pre><code>enum class Difficulty : int {
-    // существующие значения...
-    kNewMode = 5,
-};
-
-case model::Difficulty::kNewMode:
-    return "Новый режим";</code></pre>
-          <p>Проверка: реально выбрать значение 5 в STB и убедиться, что details изменился. Не подставляйте 5 только в C++ debugger без проверки источника Papyrus.</p>
-        </div>
-      </details>
-
-      <details>
-        <summary>Пример D: добавить новый камень</summary>
-        <div>
-          <p>Добавьте строку в compile-time <code>kStoneDefinitions</code>:</p>
-          <pre><code>StoneDefinition{"MyStoneDescriptionSpell", "Новый камень"},</code></pre>
-          <p>На <code>kDataLoaded</code> provider найдёт spell, разберёт его description один раз и затем проверит <code>player-&gt;HasSpell</code> на каждом snapshot.</p>
-          <p>Проверка: init log должен увеличить denominator и показать найденный spell; после получения камня state должен измениться. Если spell не найден, будет fallback «не выбран», а found count окажется меньше total.</p>
-        </div>
-      </details>
-
-      <details>
-        <summary>Пример E: изменить частоту обновления</summary>
-        <div>
-          <p>Базовый tick задаёт <code>kDiscordCallbackInterval</code>. Например, одна секунда:</p>
-          <pre><code>constexpr std::chrono::milliseconds kDiscordCallbackInterval{1000};</code></pre>
-          <p>Но эта константа влияет сразу на три смысла: частоту <code>RunCallbacks</code>, частоту Presence polling и вычисление 10-секундного callback timeout/warning times. При изменении проверьте, что производные тики всё ещё дают желаемое время.</p>
-          <p>Более чистый способ разделить частоты — оставить Discord callbacks 500 мс и увеличить <code>kPresencePollIntervalInCallbackTicks</code>, например до 2. Тогда callbacks остаются быстрыми, а снимок читается раз в секунду.</p>
-        </div>
-      </details>
-
-      <details>
-        <summary>Пример F: добавить новое поле в JSON</summary>
-        <div>
-          <p>Допустим, нужен настраиваемый текст loading:</p>
-          <ol>
-            <li>Добавить <code>std::string loadingText = "Загрузка";</code> в <code>model::Config</code>.</li>
-            <li>Выбрать JSON-путь, например <code>discord.loading_text</code>.</li>
-            <li>В <code>ConfigLoader::Load</code> вызвать существующий <code>ReadString</code>.</li>
-            <li>В <code>SendLoadingPresence</code> использовать <code>config_.loadingText</code>.</li>
-            <li>Добавить поле в <code>config/DragonbornPresence.json</code>.</li>
-          </ol>
-          <p>Почему нужны все шаги: model задаёт default, loader валидирует внешний ввод, coordinator применяет значение, shipped JSON документирует рабочую настройку.</p>
-        </div>
-      </details>
-
-      <details>
-        <summary>Пример G: добавить диагностическую запись</summary>
-        <div>
-          <pre><code>SKSE::log::info(
-    "Resolved display position: worldspace='{}' location='{}' cell='{}'.",
-    worldspaceName,
-    locationName,
-    cellName);</code></pre>
-          <p>Не ставьте такую запись в polling path на постоянной основе: она будет выполняться два раза в секунду даже без изменений. Для постоянного лога используйте существующий принцип «логировать только изменившийся Activity» либо уровень debug с отдельной настройкой logger.</p>
-        </div>
-      </details>
-
-      <details>
-        <summary>Пример H: добавить новый Discord small asset state</summary>
-        <div>
-          <p>Это сквозное изменение, поэтому одной строки недостаточно:</p>
-          <ol>
-            <li>Добавить default asset key в <code>model::Config</code>.</li>
-            <li>Добавить поле в JSON и parser.</li>
-            <li>Добавить состояние в <code>PlayerSnapshot</code> и прочитать его в <code>StbDataProvider</code>.</li>
-            <li>Определить precedence рядом с combat в <code>RefreshPresence</code>.</li>
-            <li>Передать выбранные <code>smallImage/smallText</code> в существующий payload.</li>
-            <li>Загрузить Asset key в Discord Application.</li>
-          </ol>
-          <p>Явно решите precedence. Например, combat должен перекрывать новое состояние или наоборот. Не размазывайте выбор по provider и client: provider сообщает факты, coordinator принимает display-решение, client только отправляет.</p>
-        </div>
-      </details>
+    <section id="build">
+      <h2>13. Сборка, deploy и релиз</h2>
+      <pre><code>cmake --preset vs2026
+cmake --build --preset release</code></pre>
+      <p>Production target линкует CommonLibSSE-NG, Discord Game SDK, spdlog, nlohmann/json и delayimp. Release создаёт оптимизированную DLL с PDB, копирует runtime-файлы в заданный preset-каталог MO2 и упаковывает <code>build/vs2026/DragonbornPresence.zip</code>.</p>
+      <p><code>.github/workflows/release.yml</code> запускается для тегов <code>v*</code>, проверяет соответствие tag и CMake version, собирает Release ZIP и публикует GitHub Release. Оба workflow используют <code>actions/checkout@v5</code>.</p>
+      <div class="callout"><strong>Разделение проверок:</strong> CI быстро доказывает engine-independent контракты. Release build доказывает совместимость всех headers, symbols и link dependencies. Запуск через SKSE доказывает runtime integration.</div>
     </section>
 
     <section id="invariants">
-      <h2>21. Инварианты: что нельзя случайно сломать</h2>
+      <h2>14. Инварианты, которые нельзя ломать</h2>
       <ul class="checklist">
-        <li><strong>Исключения не выходят в Skyrim.</strong> Любой новый внешний callback получает собственную catch boundary.</li>
-        <li><strong>Игровые данные читаются в game thread.</strong> Scheduler только ставит задачу.</li>
-        <li><strong>В очереди не больше одной polling task.</strong> Не удалять coalescing без другой bounded-модели.</li>
-        <li><strong>Только один UpdateActivity in flight.</strong> Pending signature блокирует второй запрос.</li>
-        <li><strong>Timestamp стабилен весь запуск.</strong> Не вычислять current time внутри <code>UpdateActivity</code> или refresh.</li>
-        <li><strong>Последний payload подтверждается callback.</strong> Не записывать last signature до <code>Result::Ok</code>.</li>
-        <li><strong>UTF-8 режется только по границе code point.</strong> Не заменять на простой <code>substr(0, 127)</code>.</li>
-        <li><strong>Discord не устанавливается и не запускается.</strong> Loader только проверяет и безопасно отказывает.</li>
-        <li><strong>После SDK failure нет повторных вызовов.</strong> Сначала health false, затем core reset.</li>
-        <li><strong>Event sink возвращает <code>kContinue</code>.</strong> Другие плагины должны получить событие.</li>
-        <li><strong>Config имеет defaults.</strong> Новое поле должно быть безопасно при отсутствии/ошибочном типе.</li>
-        <li><strong>Более точные location rules идут раньше общих.</strong> Resolver использует first match.</li>
+        <li><strong>Никаких RE/SKSE/Discord типов во внутренних слоях.</strong> Только core-модели и application-порты.</li>
+        <li><strong>Игровые данные и Discord core обрабатываются в Skyrim main thread.</strong> Scheduler только планирует.</li>
+        <li><strong>Не более одной pending main-thread task.</strong> Задержка не создаёт неограниченную очередь.</li>
+        <li><strong>Исключения не пересекают callback или DLL boundary.</strong> Каждая внешняя точка имеет catch guard.</li>
+        <li><strong>Runtime adapter уничтожается первым.</strong> Его thread не переживает coordinator и adapters.</li>
+        <li><strong>Первое правило локации побеждает.</strong> Порядок 438 JSON rules является поведением.</li>
+        <li><strong>Session timestamp стабилен весь запуск.</strong> Presence update его не пересоздаёт.</li>
+        <li><strong>Нет скрытого восстановления Discord.</strong> Плагин не скачивает, не устанавливает и не запускает клиент или SDK.</li>
+        <li><strong>Игровой namespace — <code>SkyrimTrueBeliever</code>.</strong> Второй универсальный <code>skyrim</code> adapter не создаётся.</li>
       </ul>
-      <h3>Частые ошибочные подходы</h3>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Не делать</th><th>Почему</th><th>Вместо этого</th></tr></thead>
-          <tbody>
-            <tr><td>Вызывать Discord прямо из combat event.</td><td>Дублирует poll и может создать burst запросов.</td><td>Поставить atomic request и объединить в следующий poll.</td></tr>
-            <tr><td>Хранить <code>string_view</code> на локальную строку.</td><td>После выхода из функции view станет dangling.</td><td>Хранить <code>std::string</code> либо view на долгоживущий config.</td></tr>
-            <tr><td>Считать отсутствие deaths равным 0.</td><td>Скрывает сломанную интеграцию STB.</td><td>Сохранять <code>optional&lt;int&gt;</code> и показывать <code>—</code>.</td></tr>
-            <tr><td>Загружать DLL по одному имени.</td><td>Непредсказуемый search path и риск чужой DLL.</td><td>Строить абсолютный соседний путь и использовать <code>LoadLibraryExW</code>.</td></tr>
-            <tr><td>Логировать каждый poll.</td><td>Большой шум и I/O дважды в секунду.</td><td>Логировать только observable change или ошибку.</td></tr>
-            <tr><td>Продолжать SDK-вызовы после ошибки.</td><td>Состояние транспорта неизвестно.</td><td>Fail closed до перезапуска Skyrim.</td></tr>
-          </tbody>
-        </table>
-      </div>
     </section>
 
-    <section id="reading-route">
-      <h2>22. Рекомендуемый маршрут изучения</h2>
+    <section id="route">
+      <h2>15. Рекомендуемый маршрут чтения</h2>
       <ol class="steps">
-        <li>Откройте <code>src/main.cpp</code> рядом с разделом 8 и проследите только happy path.</li>
-        <li>В <code>DragonbornPresence.cpp</code> прочитайте <code>model</code>; выпишите владельцев каждой строки и указателя.</li>
-        <li>Проследите один <code>RefreshPresence</code> назад до <code>ReadPlayerSnapshot</code> и вперёд до Discord callback.</li>
-        <li>Нарисуйте состояния <code>loading_</code>, <code>gameLoaded_</code>, <code>active_</code>.</li>
-        <li>Пройдите scheduler: кто меняет каждый atomic и в каком потоке.</li>
-        <li>Сломайте локальную копию одного необязательного JSON-поля и сопоставьте warning с loader-кодом.</li>
-        <li>Добавьте одно тестовое location rule без C++, соберите и подтвердите <code>large='...'</code> в log.</li>
-        <li>Только после этого меняйте формат Presence или источники STB.</li>
+        <li><code>src/main.cpp</code> — вход и SKSE messages.</li>
+        <li><code>src/DragonbornPresence.cpp</code> — concrete adapters, lifetime и facade.</li>
+        <li><code>application/ports/*.h</code> — разрешённые операции внешнего мира.</li>
+        <li><code>PresenceCoordinator.h/.cpp</code> — state machine и Presence construction.</li>
+        <li><code>core/*.h/.cpp</code> — чистые модели и правила.</li>
+        <li><code>StbRuntimeAdapter</code> — events, scheduler и main-thread dispatch.</li>
+        <li><code>StbGameDataSource</code>, <code>PapyrusValueReader</code>, <code>StbStringEncoding</code> — STB data boundary.</li>
+        <li><code>DiscordSdkLoader</code> и <code>DiscordPresenceClient</code> — transport boundary.</li>
+        <li><code>tests/*.cpp</code> — исполняемые примеры application и core contracts.</li>
       </ol>
-      <h3>Контрольные вопросы</h3>
-      <ul>
-        <li>Почему deaths — optional, а level — обычный int?</li>
-        <li>Почему timestamp является полем client, а не локальной переменной refresh?</li>
-        <li>Чем pending signature отличается от last signature?</li>
-        <li>Почему scheduler не вызывает <code>ReadPlayerSnapshot</code> напрямую?</li>
-        <li>Что произойдёт, если два location rules совпадут?</li>
-        <li>Где должна находиться новая бизнес-логика отображения: provider, coordinator или Discord client?</li>
-        <li>Какая запись доказывает, что update поставлен, а какая — что Discord его подтвердил?</li>
-      </ul>
-      <div class="callout success"><strong>Если вы можете ответить:</strong> вы понимаете основные границы ответственности, владение состоянием и путь данных этого плагина. Следующий шаг — сделать одно маленькое изменение из раздела 20 и проверить его в игре по log.</div>
     </section>
 
-    <footer>STB DragonbornPresence 3.1.5 · учебник по текущему исходному коду · только GitHub Pages · GPL-3.0</footer>
+    <footer>STB DragonbornPresence 3.1.5 · архитектура текущей ветки dev · GPL-3.0</footer>
   </main>
 </div>
 </body>
