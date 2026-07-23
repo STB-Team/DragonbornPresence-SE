@@ -109,12 +109,12 @@ src/
 Текущее состояние:
 
 - рабочая ветка — `dev`, публикация выполняется только в `origin/dev`;
-- блоки B1–B8 завершены;
-- `StbGameDataSource` вынесен в `adapters/SkyrimTrueBeliever`;
-- Discord client и SDK loader находятся в `adapters/discord`;
+- блоки B1–B9 завершены;
+- Discord infrastructure находится в `adapters/discord`;
+- `PresenceCoordinator` зависит от `ILogger`, concrete `SkseLogger` находится в `adapters/SkyrimTrueBeliever`;
 - единственный исполняемый gate на время переноса — полная Release-сборка без ошибок.
 
-Текущий активный блок: **B9 — изолировать application logging**.
+Текущий активный блок: **B10 — разделить coordinator и Skyrim runtime внутри монолита**.
 
 ## Маршрут миграции
 
@@ -246,7 +246,7 @@ Loader остаётся внутренней инфраструктурой Disc
 
 Commit: `refactor: move Discord SDK loader into adapter`.
 
-### B9. Изолировать application logging
+### B9. Изолировать application logging — завершён
 
 Добавить application port `ILogger` и SKSE-реализацию во внешнем слое. Через порт проходят только сообщения orchestration/use-case слоя. STB и Discord adapters продолжают самостоятельно логировать свои технические ошибки.
 
@@ -258,7 +258,7 @@ Commit: `refactor: move Discord SDK loader into adapter`.
 - тексты критических сообщений и политика безопасного отключения сохранены;
 - Release-сборка успешна.
 
-Планируемый commit: `refactor: inject application logger port`.
+Commit: `refactor: inject application logger port`.
 
 ### B10. Разделить coordinator и Skyrim runtime внутри монолита
 

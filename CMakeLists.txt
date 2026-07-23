@@ -110,6 +110,7 @@ set(DRAGONBORNPRESENCE_SOURCES
     src/adapters/config/JsonConfigProvider.cpp
     src/adapters/discord/DiscordPresenceClient.cpp
     src/adapters/discord/DiscordSdkLoader.cpp
+    src/adapters/SkyrimTrueBeliever/SkseLogger.cpp
     src/adapters/SkyrimTrueBeliever/StbGameDataSource.cpp
     src/AdditionalFunctions.cpp
 )
@@ -122,6 +123,8 @@ set(DRAGONBORNPRESENCE_HEADERS
     include/DragonbornPresence/application/ports/IPresenceClient.h
     include/DragonbornPresence/adapters/discord/DiscordPresenceClient.h
     include/DragonbornPresence/adapters/discord/DiscordSdkLoader.h
+    include/DragonbornPresence/application/ports/ILogger.h
+    include/DragonbornPresence/adapters/SkyrimTrueBeliever/SkseLogger.h
     include/DragonbornPresence/adapters/SkyrimTrueBeliever/StbGameDataSource.h
     include/ScriptUtils.h
     include/pch.h

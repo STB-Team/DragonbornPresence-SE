@@ -12,6 +12,8 @@
 #include "DragonbornPresence/adapters/SkyrimTrueBeliever/StbGameDataSource.h"
 #include "DragonbornPresence/application/ports/IPresenceClient.h"
 #include "DragonbornPresence/adapters/discord/DiscordPresenceClient.h"
+#include "DragonbornPresence/application/ports/ILogger.h"
+#include "DragonbornPresence/adapters/SkyrimTrueBeliever/SkseLogger.h"
 
 #include <atomic>
 #include <chrono>
@@ -97,10 +99,12 @@ namespace DragonbornPresence
                 PresenceCoordinator(
                     ::DragonbornPresence::application::ports::IConfigProvider &configProvider,
                     ::DragonbornPresence::application::ports::IGameDataSource &gameDataSource,
-                    ::DragonbornPresence::application::ports::IPresenceClient &presenceClient) noexcept
+                    ::DragonbornPresence::application::ports::IPresenceClient &presenceClient,
+                    ::DragonbornPresence::application::ports::ILogger &logger) noexcept
                     : configProvider_(configProvider),
                       gameDataSource_(gameDataSource),
                       presenceClient_(presenceClient),
+                      logger_(logger),
                       menuEventSink_(*this),
                       combatEventSink_(*this)
                 {
@@ -114,11 +118,13 @@ namespace DragonbornPresence
                     callbackThread_.request_stop();
                     try
                     {
-                        SKSE::log::critical(
+                        logger_.Critical(std::format(
                             "DragonbornPresence exception in '{}': {} The integration was "
                             "stopped; Skyrim can continue normally.",
                             context,
-                            details ? details : "unknown exception");
+                            details
+                                ? details
+                                : "unknown exception"));
                     }
                     catch (...)
                     {
@@ -142,10 +148,10 @@ namespace DragonbornPresence
                 /// Initializes integrations, publishes loading state, and registers event sinks.
                 void RegisterGameEventHandlers()
                 {
-                    SKSE::log::info("Registering game event handlers...");
+                    logger_.Info("Registering game event handlers...");
                     if (permanentlyStopped_)
                     {
-                        SKSE::log::error(
+                        logger_.Error(
                             "DragonbornPresence registration was skipped because an earlier "
                             "fatal error permanently stopped this plugin instance.");
                         return;
@@ -156,13 +162,13 @@ namespace DragonbornPresence
                     taskInterface_ = SKSE::GetTaskInterface();
                     if (!ui || !eventSource || !taskInterface_)
                     {
-                        SKSE::log::critical(
+                        logger_.Critical(std::format(
                             "DragonbornPresence cannot start: UI={}, ScriptEventSourceHolder={}, "
                             "SKSE TaskInterface={}. At least one required Skyrim/SKSE service is "
                             "unavailable. No event sinks or background tasks were registered.",
                             ui != nullptr,
                             eventSource != nullptr,
-                            taskInterface_ != nullptr);
+                            taskInterface_ != nullptr));
                         return;
                     }
 
@@ -185,7 +191,7 @@ namespace DragonbornPresence
                 {
                     if (!active_)
                         return;
-                    SKSE::log::info("Game loaded — refreshing STB presence data.");
+                    logger_.Info("Game loaded — refreshing STB presence data.");
                     gameLoaded_ = true;
                     loading_ = false;
                     RefreshPresence(core::RefreshReason::kGameLoaded);
@@ -302,7 +308,7 @@ namespace DragonbornPresence
                     if (!activityChanged)
                         return;
 
-                    SKSE::log::info(
+                    logger_.Info(std::format(
                         "[{}] level={} deaths={} stone='{}' difficulty='{}' location='{}' "
                         "large='{}' combat='{}'.",
                         core::ToLogLabel(reason),
@@ -312,7 +318,7 @@ namespace DragonbornPresence
                         snapshot.difficulty,
                         snapshot.location.displayName,
                         largeAsset.image,
-                        snapshot.combatText);
+                        snapshot.combatText));
                 }
 
                 /// Updates the loading state and publishes the corresponding presence.
@@ -353,7 +359,7 @@ namespace DragonbornPresence
                                     constants::kPendingTaskWarningRepeatTicks ==
                                 0;
                         if (firstWarning || repeatedWarning) {
-                            SKSE::log::warn(
+                            logger_.Warning(std::format(
                                 "Discord task 'RunCallbacks/RefreshPresence' has "
                                 "been waiting on Skyrim's main thread for about "
                                 "{} ms; {} callback request{} coalesced. Only one "
@@ -361,7 +367,7 @@ namespace DragonbornPresence
                                 pendingTicks *
                                     constants::kDiscordCallbackInterval.count(),
                                 pendingTicks,
-                                pendingTicks == 1 ? "" : "s");
+                                pendingTicks == 1 ? "" : "s"));
                         }
                         continue;
                     }
@@ -424,11 +430,11 @@ namespace DragonbornPresence
                     permanentlyStopped_ = true;
                     try
                     {
-                        SKSE::log::critical(
+                        logger_.Critical(std::format(
                             "DragonbornPresence scheduler stopped: {} The Discord SDK core "
                             "will remain idle and be released after the scheduler thread joins; "
                             "Skyrim can continue normally.",
-                            details ? details : "unknown scheduler error");
+                            details ? details : "unknown scheduler error"));
                     }
                     catch (...)
                     {
@@ -448,6 +454,13 @@ namespace DragonbornPresence
                 /// The application coordinator publishes core payloads without depending on
                 /// Discord SDK types or the concrete transport implementation.
                 ::DragonbornPresence::application::ports::IPresenceClient &presenceClient_;
+
+                /// Required application logger owned by the composition root.
+                ///
+                /// The coordinator reports diagnostics without depending on SKSE or another
+                /// concrete logging backend.
+                ::DragonbornPresence::application::ports::ILogger &logger_;
+
                 core::Config config_;
                 MenuEventSink menuEventSink_;
                 CombatEventSink combatEventSink_;
@@ -516,11 +529,13 @@ namespace DragonbornPresence
         adapters::config::JsonConfigProvider g_configProvider;
         adapters::SkyrimTrueBeliever::StbGameDataSource g_gameDataSource;
         adapters::discord::DiscordPresenceClient g_presenceClient;
+        adapters::SkyrimTrueBeliever::SkseLogger g_logger;
 
         runtime::PresenceCoordinator g_presenceCoordinator(
             g_configProvider,
             g_gameDataSource,
-            g_presenceClient);
+            g_presenceClient,
+            g_logger);
 
     } // namespace
 
