@@ -33,6 +33,6 @@ AND displayName contains match</code></pre><p>Первое полное совп
 <section id="schema"><h2>7. <code>schema_version</code></h2><p>Поддерживаемая версия задаётся <code>core::kSupportedConfigSchemaVersion = 1</code>.</p><div class="table-wrap"><table><thead><tr><th>Input</th><th>Результат</th></tr></thead><tbody><tr><td><code>1</code></td><td>Документ загружается.</td></tr><tr><td>Поле отсутствует</td><td>Legacy-документ трактуется как schema 1; записывается warning.</td></tr><tr><td>Не integer</td><td>Весь документ отклоняется, используются defaults.</td></tr><tr><td>Любая неподдерживаемая версия</td><td>Весь документ отклоняется, используются defaults.</td></tr></tbody></table></div><p>Отказ от частичного чтения future schema защищает приложение от интерпретации новых полей со старыми semantics.</p><p><a href="https://github.com/STB-Team/DragonbornPresence-SE/blob/master/src/adapters/config/JsonConfigProvider.cpp">Открыть JsonConfigProvider.cpp</a></p></section>
 
 <nav class="page-nav" aria-label="Переходы"><a href="code-entry.html"><small>Назад</small>Точка входа</a><a href="code-game.html"><small>Далее</small>Skyrim True Believer</a></nav>
-<footer>DragonbornPresence 3.1.8 · актуальная архитектура · глава 2 из 7</footer>
+<footer>DragonbornPresence 4.0.0 · актуальная архитектура · глава 2 из 7</footer>
 </main></div></body>
 </html>

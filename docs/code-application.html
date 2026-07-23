@@ -47,6 +47,6 @@ callbackTaskPending == true
 <section id="errors"><h2>7. Остановка без разрушения Skyrim</h2><p>Exception на внешней границе вызывает runtime handler:</p><ol class="steps"><li>атомарно прекращает производство новых задач;</li><li>просит coordinator остановить Presence;</li><li>пишет context-specific critical log;</li><li>оставляет Skyrim продолжать работу.</li></ol><p>Background handler не уничтожает Discord core из scheduler thread. Окончательная очистка выполняется безопасным main-thread/application path и destructor order.</p></section>
 
 <nav class="page-nav" aria-label="Переходы"><a href="code-discord.html"><small>Назад</small>Discord transport</a><a href="code-build.html"><small>Далее</small>Сборка и CI</a></nav>
-<footer>DragonbornPresence 3.1.8 · актуальная архитектура · глава 5 из 7</footer>
+<footer>DragonbornPresence 4.0.0 · актуальная архитектура · глава 5 из 7</footer>
 </main></div></body>
 </html>

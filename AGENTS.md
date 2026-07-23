@@ -23,7 +23,6 @@ DragonbornPresence — нативный SKSE-плагин только для т
 2. `CMakeLists.txt` и `CMakePresets.json`;
 3. `README.md`;
 4. `docs/architecture.html`;
-5. `CLEAN_ARCHITECTURE_MIGRATION.md` как историю уже завершённого переноса.
 
 Версия проекта задаётся только строкой `project(... VERSION ...)` в `CMakeLists.txt`. Перед релизом синхронно обновляются CHANGELOG, README и страницы документации, содержащие номер версии.
 

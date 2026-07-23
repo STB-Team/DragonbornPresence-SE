@@ -38,6 +38,6 @@ virtual core::PlayerSnapshot ReadPlayerSnapshot() = 0;</code></pre><p>Applicatio
 <section id="encoding"><h2>7. Кодировки строк STB</h2><p><code>StbStringEncoding.cpp</code> преобразует legacy CP1251 через два WinAPI-прохода:</p><pre><code>CP1251 bytes → UTF-16 → UTF-8</code></pre><p><code>FromGameString</code> сначала принимает уже корректный UTF-8 без преобразования и только иначе вызывает <code>Cp1251ToUtf8</code>. Null, пустая строка или ошибка WinAPI дают пустую owned строку.</p><div class="callout"><strong>Граница:</strong> WinAPI-кодировка относится к STB adapter, а общая проверка и безопасное ограничение UTF-8 относятся к core.</div></section>
 
 <nav class="page-nav" aria-label="Переходы"><a href="code-foundation.html"><small>Назад</small>Core и JSON</a><a href="code-discord.html"><small>Далее</small>Discord transport</a></nav>
-<footer>DragonbornPresence 3.1.8 · актуальная архитектура · глава 3 из 7</footer>
+<footer>DragonbornPresence 4.0.0 · актуальная архитектура · глава 3 из 7</footer>
 </main></div></body>
 </html>

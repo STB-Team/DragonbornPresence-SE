@@ -33,6 +33,6 @@ StbRuntimeAdapter(coordinator, logger)</code></pre><p><code>PresenceCoordinator<
 <section id="lifetime"><h2>5. Почему порядок объектов важен</h2><p>C++ уничтожает объекты static storage в обратном порядке. <code>StbRuntimeAdapter</code> объявлен последним и поэтому уничтожается первым. Его <code>std::jthread</code> останавливается и присоединяется до уничтожения coordinator, logger, game data source и Discord client.</p><div class="callout"><strong>Инвариант:</strong> scheduler не должен пережить объекты, на которые он хранит non-owning references.</div><p>Не переносите concrete adapters в <code>main.cpp</code> и не меняйте порядок глобальных объектов без повторной проверки shutdown path.</p></section>
 
 <nav class="page-nav" aria-label="Переходы"><a href="architecture.html"><small>Назад</small>Обзор архитектуры</a><a href="code-foundation.html"><small>Далее</small>Core и JSON</a></nav>
-<footer>DragonbornPresence 3.1.8 · актуальная архитектура · глава 1 из 7</footer>
+<footer>DragonbornPresence 4.0.0 · актуальная архитектура · глава 1 из 7</footer>
 </main></div></body>
 </html>
