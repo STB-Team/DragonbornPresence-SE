@@ -113,11 +113,10 @@ set(DRAGONBORNPRESENCE_SOURCES
     src/adapters/SkyrimTrueBeliever/SkseLogger.cpp
     src/adapters/SkyrimTrueBeliever/StbGameDataSource.cpp
     src/adapters/SkyrimTrueBeliever/StbRuntimeAdapter.cpp
-    src/AdditionalFunctions.cpp
+    src/adapters/SkyrimTrueBeliever/StbStringEncoding.cpp
 )
 set(DRAGONBORNPRESENCE_HEADERS
     include/DragonbornPresence.h
-    include/AdditionalFunctions.h
     include/DragonbornPresence/application/ports/IConfigProvider.h
     include/DragonbornPresence/application/ports/IGameDataSource.h
     include/DragonbornPresence/adapters/config/JsonConfigProvider.h
@@ -126,10 +125,11 @@ set(DRAGONBORNPRESENCE_HEADERS
     include/DragonbornPresence/adapters/discord/DiscordSdkLoader.h
     include/DragonbornPresence/application/ports/ILogger.h
     include/DragonbornPresence/adapters/SkyrimTrueBeliever/SkseLogger.h
+    include/DragonbornPresence/adapters/SkyrimTrueBeliever/PapyrusValueReader.h
+    include/DragonbornPresence/adapters/SkyrimTrueBeliever/StbStringEncoding.h
     include/DragonbornPresence/application/PresenceCoordinator.h
     include/DragonbornPresence/adapters/SkyrimTrueBeliever/StbGameDataSource.h
     include/DragonbornPresence/adapters/SkyrimTrueBeliever/StbRuntimeAdapter.h
-    include/ScriptUtils.h
     include/pch.h
 )
 set(DRAGONBORNPRESENCE_RESOURCES

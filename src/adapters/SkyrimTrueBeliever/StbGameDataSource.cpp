@@ -1,9 +1,9 @@
 #include "DragonbornPresence/adapters/SkyrimTrueBeliever/StbGameDataSource.h"
 
-#include "AdditionalFunctions.h"
+#include "DragonbornPresence/adapters/SkyrimTrueBeliever/PapyrusValueReader.h"
+#include "DragonbornPresence/adapters/SkyrimTrueBeliever/StbStringEncoding.h"
 #include "DragonbornPresence/core/Difficulty.h"
 #include "DragonbornPresence/core/TextUtils.h"
-#include "ScriptUtils.h"
 
 #include <SKSE/SKSE.h>
 
@@ -234,7 +234,7 @@ namespace DragonbornPresence::adapters::SkyrimTrueBeliever
     std::string StbGameDataSource::ReadSelectedDifficulty() const
     {
         const auto difficulty =
-            ScriptUtils::GetFirstAliasScriptPropertyOrVariable<int>(
+            PapyrusValueReader::GetFirstAliasScriptPropertyOrVariable<int>(
                 runtimeData_.difficultyQuest,
                 kDifficultyScriptName.data(),
                 kDifficultyPropertyName.data());
