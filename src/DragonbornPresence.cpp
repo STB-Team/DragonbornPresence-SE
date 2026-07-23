@@ -30,64 +30,68 @@ namespace DragonbornPresence
     namespace
     {
 
-        namespace constants
+        namespace application_constants
+        {
+
+            constexpr std::uint8_t kPresencePollIntervalInCallbackTicks = 1;
+            constexpr std::string_view kLoadingText = "Загрузка";
+            constexpr std::string_view kUnknownDeathsText = "—";
+
+        } // namespace application_constants
+
+        namespace runtime_constants
         {
 
             constexpr std::chrono::milliseconds kDiscordCallbackInterval{500};
-            constexpr std::uint8_t kPresencePollIntervalInCallbackTicks = 1;
             constexpr std::uint32_t kPendingTaskWarningTicks = 1;
             constexpr std::uint32_t kPendingTaskWarningRepeatTicks = 10;
             constexpr std::string_view kMainMenuName = "Main Menu";
             constexpr std::string_view kLoadingMenuName = "Loading Menu";
-            constexpr std::string_view kLoadingText = "Загрузка";
-            constexpr std::string_view kUnknownDeathsText = "—";
 
-        } // namespace constants
+        } // namespace runtime_constants
 
         namespace runtime
         {
 
-            class PresenceCoordinator;
+            class StbRuntimeAdapter;
 
-            /// Adapts Skyrim menu events to the application-level presence coordinator.
-            class MenuEventSink final : public RE::BSTEventSink<RE::MenuOpenCloseEvent>
+            class MenuEventSink final
+                : public RE::BSTEventSink<RE::MenuOpenCloseEvent>
             {
             public:
-                /// Binds the sink to the coordinator that owns its lifecycle.
-                explicit MenuEventSink(PresenceCoordinator &coordinator) noexcept
-                    : coordinator_(coordinator)
+                explicit MenuEventSink(
+                    StbRuntimeAdapter &runtimeAdapter) noexcept
+                    : runtimeAdapter_(runtimeAdapter)
                 {
                 }
 
-                /// Forwards valid menu events and always allows later sinks to run.
                 RE::BSEventNotifyControl ProcessEvent(
                     const RE::MenuOpenCloseEvent *event,
                     RE::BSTEventSource<RE::MenuOpenCloseEvent> *) override;
 
             private:
-                PresenceCoordinator &coordinator_;
+                StbRuntimeAdapter &runtimeAdapter_;
             };
 
-            /// Adapts Skyrim combat events to the application-level presence coordinator.
-            class CombatEventSink final : public RE::BSTEventSink<RE::TESCombatEvent>
+            class CombatEventSink final
+                : public RE::BSTEventSink<RE::TESCombatEvent>
             {
             public:
-                /// Binds the sink to the coordinator that owns its lifecycle.
-                explicit CombatEventSink(PresenceCoordinator &coordinator) noexcept
-                    : coordinator_(coordinator)
+                explicit CombatEventSink(
+                    StbRuntimeAdapter &runtimeAdapter) noexcept
+                    : runtimeAdapter_(runtimeAdapter)
                 {
                 }
 
-                /// Forwards valid combat events and always allows later sinks to run.
                 RE::BSEventNotifyControl ProcessEvent(
                     const RE::TESCombatEvent *event,
                     RE::BSTEventSource<RE::TESCombatEvent> *) override;
 
             private:
-                PresenceCoordinator &coordinator_;
+                StbRuntimeAdapter &runtimeAdapter_;
             };
 
-            /// Coordinates configuration, game data, Discord transport, and Skyrim events.
+            /// Coordinates configuration, game snapshots, Presence, and state transitions.
             class PresenceCoordinator final
             {
             public:
@@ -104,18 +108,18 @@ namespace DragonbornPresence
                     : configProvider_(configProvider),
                       gameDataSource_(gameDataSource),
                       presenceClient_(presenceClient),
-                      logger_(logger),
-                      menuEventSink_(*this),
-                      combatEventSink_(*this)
+                      logger_(logger)
                 {
                 }
 
                 /// Stops all plugin work after an exception reaches an external game callback.
-                void HandleException(std::string_view context, const char *details) noexcept
+                void HandleException(
+                    std::string_view context,
+                    const char *details) noexcept
                 {
                     active_ = false;
                     permanentlyStopped_ = true;
-                    callbackThread_.request_stop();
+
                     try
                     {
                         logger_.Critical(std::format(
@@ -129,6 +133,7 @@ namespace DragonbornPresence
                     catch (...)
                     {
                     }
+
                     presenceClient_.Shutdown(
                         "an internal DragonbornPresence exception occurred; see the previous "
                         "critical log entry");
@@ -145,45 +150,36 @@ namespace DragonbornPresence
                     config_ = configProvider_.Load();
                 }
 
-                /// Initializes integrations, publishes loading state, and registers event sinks.
-                void RegisterGameEventHandlers()
+                /// Initializes game data and the Presence transport.
+                ///
+                /// Returns true only when the application is ready to receive game signals
+                /// and periodic ticks.
+                [[nodiscard]] bool Start()
                 {
-                    logger_.Info("Registering game event handlers...");
                     if (permanentlyStopped_)
                     {
                         logger_.Error(
                             "DragonbornPresence registration was skipped because an earlier "
                             "fatal error permanently stopped this plugin instance.");
-                        return;
-                    }
 
-                    auto *ui = RE::UI::GetSingleton();
-                    auto *eventSource = RE::ScriptEventSourceHolder::GetSingleton();
-                    taskInterface_ = SKSE::GetTaskInterface();
-                    if (!ui || !eventSource || !taskInterface_)
-                    {
-                        logger_.Critical(std::format(
-                            "DragonbornPresence cannot start: UI={}, ScriptEventSourceHolder={}, "
-                            "SKSE TaskInterface={}. At least one required Skyrim/SKSE service is "
-                            "unavailable. No event sinks or background tasks were registered.",
-                            ui != nullptr,
-                            eventSource != nullptr,
-                            taskInterface_ != nullptr));
-                        return;
+                        return false;
                     }
 
                     if (!presenceClient_.Initialize(config_))
-                        return;
+                        return false;
 
                     active_ = true;
                     gameDataSource_.Initialize();
                     SendLoadingPresence();
-                    if (!active_)
-                        return;
 
-                    ui->AddEventSink<RE::MenuOpenCloseEvent>(&menuEventSink_);
-                    eventSource->AddEventSink<RE::TESCombatEvent>(&combatEventSink_);
-                    StartCallbackThread();
+                    return active_;
+                }
+
+                /// Stops future application work without directly controlling runtime threads.
+                void Stop() noexcept
+                {
+                    active_ = false;
+                    permanentlyStopped_ = true;
                 }
 
                 /// Marks the game ready and immediately publishes the complete player state.
@@ -191,71 +187,110 @@ namespace DragonbornPresence
                 {
                     if (!active_)
                         return;
-                    logger_.Info("Game loaded — refreshing STB presence data.");
+
+                    logger_.Info(
+                        "Game loaded — refreshing STB presence data.");
+
                     gameLoaded_ = true;
                     loading_ = false;
                     RefreshPresence(core::RefreshReason::kGameLoaded);
                 }
 
-                /// Applies menu transitions to the loading and game-ready state machine.
-                void HandleMenuEvent(const RE::MenuOpenCloseEvent &event)
+                /// Marks the current playable game as unavailable.
+                void OnMainMenuOpened()
                 {
                     if (!active_)
                         return;
-                    if (event.menuName == constants::kMainMenuName && event.opening)
+
+                    gameLoaded_ = false;
+                    SetLoading(true);
+                }
+
+                /// Applies a loading-menu transition without depending on Skyrim event types.
+                void OnLoadingChanged(bool isLoading)
+                {
+                    if (!active_)
+                        return;
+
+                    if (isLoading)
                     {
-                        gameLoaded_ = false;
                         SetLoading(true);
                     }
-                    else if (event.menuName == constants::kLoadingMenuName)
+                    else if (gameLoaded_)
                     {
-                        if (event.opening)
-                        {
-                            SetLoading(true);
-                        }
-                        else if (gameLoaded_)
-                        {
-                            SetLoading(false);
-                        }
+                        SetLoading(false);
                     }
                 }
 
-                /// Coalesces combat changes into the next 500-millisecond polling task.
-                void HandleCombatEvent(const RE::TESCombatEvent &event)
+                /// Coalesces an engine-independent combat signal into the next tick.
+                void RequestCombatRefresh(
+                    bool involvesPlayer,
+                    bool combatEnded)
                 {
                     if (!active_ || !gameLoaded_ || loading_)
                         return;
 
-                    const bool involvesPlayer =
-                        (event.actor && event.actor->IsPlayerRef()) ||
-                        (event.targetActor && event.targetActor->IsPlayerRef());
                     const bool mayEndCombat =
-                        event.newState.get() == RE::ACTOR_COMBAT_STATE::kNone && lastCombatState_;
+                        combatEnded && lastCombatState_;
+
                     if (involvesPlayer || mayEndCombat)
                     {
                         combatRefreshRequested_ = true;
                     }
                 }
 
-            private:
-                /// Stops all future Presence work after a Discord failure.
-                void Stop() noexcept
+                /// Processes transport callbacks and publishes the next Presence state.
+                ///
+                /// Must be invoked on Skyrim's main thread. Returns false after the
+                /// application permanently stops and no further ticks should be scheduled.
+                [[nodiscard]] bool Tick()
                 {
-                    active_ = false;
-                    permanentlyStopped_ = true;
-                    callbackThread_.request_stop();
+                    if (!active_)
+                        return false;
+
+                    if (!presenceClient_.RunCallbacks())
+                    {
+                        Stop();
+                        return false;
+                    }
+
+                    if (++presencePollTicks_ >=
+                        application_constants::
+                            kPresencePollIntervalInCallbackTicks)
+                    {
+                        presencePollTicks_ = 0;
+
+                        if (gameLoaded_ && !loading_)
+                        {
+                            const auto reason =
+                                combatRefreshRequested_.exchange(false)
+                                    ? core::RefreshReason::kCombat
+                                    : core::RefreshReason::kPoll;
+
+                            RefreshPresence(reason);
+                        }
+                        else
+                        {
+                            // Retry the loading activity after an earlier in-flight update
+                            // completes without queuing multiple callbacks.
+                            SendLoadingPresence();
+                        }
+                    }
+
+                    return active_;
                 }
 
+            private:
                 /// Sends the stable loading activity used before a playable save is ready.
                 void SendLoadingPresence()
                 {
                     presenceClient_.UpdateActivity({
                         {},
-                        constants::kLoadingText,
+                        application_constants::kLoadingText,
                         config_.largeImage,
                         config_.largeText,
                         config_.loadingImage,
-                        constants::kLoadingText,
+                        application_constants::kLoadingText,
                     });
                     if (!presenceClient_.IsActive())
                         Stop();
@@ -275,7 +310,7 @@ namespace DragonbornPresence
                     const core::PlayerSnapshot snapshot = gameDataSource_.ReadPlayerSnapshot();
                     const std::string deathsText = snapshot.deaths
                                                        ? std::to_string(*snapshot.deaths)
-                                                       : std::string(constants::kUnknownDeathsText);
+                                                       : std::string(application_constants::kUnknownDeathsText);
                     const std::string detailsText = snapshot.difficulty;
                     const std::string stateText = std::format(
                         "lvl-{} 💀-{} {}",
@@ -335,111 +370,6 @@ namespace DragonbornPresence
                     }
                 }
 
-                /// Starts the detached Discord callback and 500-millisecond polling loop once.
-                void StartCallbackThread()
-                {
-                    if (callbackThread_.joinable())
-                        return;
-
-                    callbackThread_ = std::jthread([this](std::stop_token stopToken) noexcept
-                                                   {
-            try {
-                while (!stopToken.stop_requested()) {
-                    std::this_thread::sleep_for(constants::kDiscordCallbackInterval);
-                    if (stopToken.stop_requested()) break;
-
-                    if (callbackTaskPending_.exchange(true)) {
-                        const auto pendingTicks =
-                            callbackTaskPendingTicks_.fetch_add(1) + 1;
-                        const bool firstWarning =
-                            pendingTicks == constants::kPendingTaskWarningTicks;
-                        const bool repeatedWarning =
-                            pendingTicks > constants::kPendingTaskWarningTicks &&
-                            (pendingTicks - constants::kPendingTaskWarningTicks) %
-                                    constants::kPendingTaskWarningRepeatTicks ==
-                                0;
-                        if (firstWarning || repeatedWarning) {
-                            logger_.Warning(std::format(
-                                "Discord task 'RunCallbacks/RefreshPresence' has "
-                                "been waiting on Skyrim's main thread for about "
-                                "{} ms; {} callback request{} coalesced. Only one "
-                                "task is queued, so memory use remains bounded.",
-                                pendingTicks *
-                                    constants::kDiscordCallbackInterval.count(),
-                                pendingTicks,
-                                pendingTicks == 1 ? "" : "s"));
-                        }
-                        continue;
-                    }
-                    callbackTaskPendingTicks_ = 0;
-
-                    if (!taskInterface_) {
-                        HandleBackgroundException(
-                            "SKSE TaskInterface became unavailable");
-                        return;
-                    }
-                    taskInterface_->AddTask([this]() noexcept {
-                        callbackTaskPendingTicks_ = 0;
-                        callbackTaskPending_ = false;
-                        if (!active_) return;
-
-                        try {
-                            if (!presenceClient_.RunCallbacks())
-                            {
-                                Stop();
-                                return;
-                            }
-                            if (++presencePollTicks_ >=
-                                constants::kPresencePollIntervalInCallbackTicks) {
-                                presencePollTicks_ = 0;
-                                if (gameLoaded_ && !loading_) {
-                                    const auto reason =
-                                        combatRefreshRequested_.exchange(false)
-                                        ? core::RefreshReason::kCombat
-                                        : core::RefreshReason::kPoll;
-                                    RefreshPresence(reason);
-                                } else {
-                                    // Retry the loading activity after an earlier
-                                    // in-flight update completes, without queuing
-                                    // more than one Discord callback.
-                                    SendLoadingPresence();
-                                }
-                            }
-                        } catch (const std::exception& error) {
-                            HandleException(
-                                "Discord main-thread task",
-                                error.what());
-                        } catch (...) {
-                            HandleUnknownException("Discord main-thread task");
-                        }
-                    });
-                }
-            } catch (const std::exception& error) {
-                HandleBackgroundException(error.what());
-            } catch (...) {
-                HandleBackgroundException(
-                    "unknown exception in the scheduler thread");
-            } });
-                }
-
-                /// Stops producer work without destroying the SDK from the background thread.
-                void HandleBackgroundException(const char *details) noexcept
-                {
-                    active_ = false;
-                    callbackThread_.request_stop();
-                    permanentlyStopped_ = true;
-                    try
-                    {
-                        logger_.Critical(std::format(
-                            "DragonbornPresence scheduler stopped: {} The Discord SDK core "
-                            "will remain idle and be released after the scheduler thread joins; "
-                            "Skyrim can continue normally.",
-                            details ? details : "unknown scheduler error"));
-                    }
-                    catch (...)
-                    {
-                    }
-                }
                 /// Required configuration dependency owned by the composition root.
                 ::DragonbornPresence::application::ports::IConfigProvider &configProvider_;
 
@@ -462,11 +392,6 @@ namespace DragonbornPresence
                 ::DragonbornPresence::application::ports::ILogger &logger_;
 
                 core::Config config_;
-                MenuEventSink menuEventSink_;
-                CombatEventSink combatEventSink_;
-                const SKSE::TaskInterface *taskInterface_ = nullptr;
-                std::atomic<bool> callbackTaskPending_{false};
-                std::atomic<std::uint32_t> callbackTaskPendingTicks_{0};
                 std::atomic<bool> combatRefreshRequested_{false};
                 std::atomic<bool> active_{false};
                 std::atomic<bool> permanentlyStopped_{false};
@@ -474,6 +399,272 @@ namespace DragonbornPresence
                 bool loading_ = true;
                 bool gameLoaded_ = false;
                 bool lastCombatState_ = false;
+            };
+
+            /// Adapts Skyrim services, events, and scheduling to application operations.
+            class StbRuntimeAdapter final
+            {
+            public:
+                StbRuntimeAdapter(
+                    PresenceCoordinator &coordinator,
+                    ::DragonbornPresence::application::ports::ILogger &logger) noexcept
+                    : coordinator_(coordinator),
+                      logger_(logger),
+                      menuEventSink_(*this),
+                      combatEventSink_(*this)
+                {
+                }
+
+                /// Initializes required Skyrim services and starts application processing.
+                void RegisterGameEventHandlers()
+                {
+                    logger_.Info(
+                        "Registering game event handlers...");
+
+                    auto *ui = RE::UI::GetSingleton();
+                    auto *eventSource =
+                        RE::ScriptEventSourceHolder::GetSingleton();
+
+                    taskInterface_ = SKSE::GetTaskInterface();
+
+                    if (!ui || !eventSource || !taskInterface_)
+                    {
+                        logger_.Critical(std::format(
+                            "DragonbornPresence cannot start: UI={}, "
+                            "ScriptEventSourceHolder={}, SKSE TaskInterface={}. "
+                            "At least one required Skyrim/SKSE service is unavailable. "
+                            "No event sinks or background tasks were registered.",
+                            ui != nullptr,
+                            eventSource != nullptr,
+                            taskInterface_ != nullptr));
+
+                        return;
+                    }
+
+                    if (!coordinator_.Start())
+                        return;
+
+                    ui->AddEventSink<RE::MenuOpenCloseEvent>(
+                        &menuEventSink_);
+
+                    eventSource->AddEventSink<RE::TESCombatEvent>(
+                        &combatEventSink_);
+
+                    StartCallbackThread();
+                }
+
+                /// Forwards the game-loaded lifecycle signal to the application.
+                void OnGameLoaded()
+                {
+                    coordinator_.OnGameLoaded();
+                }
+
+                /// Translates a Skyrim menu event into engine-independent signals.
+                void HandleMenuEvent(
+                    const RE::MenuOpenCloseEvent &event)
+                {
+                    if (event.menuName ==
+                            runtime_constants::kMainMenuName &&
+                        event.opening)
+                    {
+                        coordinator_.OnMainMenuOpened();
+                    }
+                    else if (
+                        event.menuName ==
+                        runtime_constants::kLoadingMenuName)
+                    {
+                        coordinator_.OnLoadingChanged(
+                            event.opening);
+                    }
+                }
+
+                /// Translates a Skyrim combat event into plain booleans.
+                void HandleCombatEvent(
+                    const RE::TESCombatEvent &event)
+                {
+                    const bool involvesPlayer =
+                        (event.actor &&
+                         event.actor->IsPlayerRef()) ||
+                        (event.targetActor &&
+                         event.targetActor->IsPlayerRef());
+
+                    const bool combatEnded =
+                        event.newState.get() ==
+                        RE::ACTOR_COMBAT_STATE::kNone;
+
+                    coordinator_.RequestCombatRefresh(
+                        involvesPlayer,
+                        combatEnded);
+                }
+
+                /// Stops runtime production and application work after callback failure.
+                void HandleException(
+                    std::string_view context,
+                    const char *details) noexcept
+                {
+                    callbackThread_.request_stop();
+                    coordinator_.HandleException(
+                        context,
+                        details);
+                }
+
+                void HandleUnknownException(
+                    std::string_view context) noexcept
+                {
+                    HandleException(
+                        context,
+                        "unknown non-standard C++ exception");
+                }
+
+            private:
+                void StartCallbackThread()
+                {
+                    if (callbackThread_.joinable())
+                        return;
+
+                    callbackThread_ = std::jthread(
+                        [this](std::stop_token stopToken) noexcept
+                        {
+                            try
+                            {
+                                while (!stopToken.stop_requested())
+                                {
+                                    std::this_thread::sleep_for(
+                                        runtime_constants::
+                                            kDiscordCallbackInterval);
+
+                                    if (stopToken.stop_requested())
+                                        break;
+
+                                    if (callbackTaskPending_.exchange(true))
+                                    {
+                                        const auto pendingTicks =
+                                            callbackTaskPendingTicks_
+                                                .fetch_add(1) +
+                                            1;
+
+                                        const bool firstWarning =
+                                            pendingTicks ==
+                                            runtime_constants::
+                                                kPendingTaskWarningTicks;
+
+                                        const bool repeatedWarning =
+                                            pendingTicks >
+                                                runtime_constants::
+                                                    kPendingTaskWarningTicks &&
+                                            (pendingTicks -
+                                             runtime_constants::
+                                                 kPendingTaskWarningTicks) %
+                                                    runtime_constants::
+                                                        kPendingTaskWarningRepeatTicks ==
+                                                0;
+
+                                        if (firstWarning ||
+                                            repeatedWarning)
+                                        {
+                                            logger_.Warning(std::format(
+                                                "Discord task "
+                                                "'RunCallbacks/RefreshPresence' has "
+                                                "been waiting on Skyrim's main thread "
+                                                "for about {} ms; {} callback request{} "
+                                                "coalesced. Only one task is queued, so "
+                                                "memory use remains bounded.",
+                                                pendingTicks *
+                                                    runtime_constants::
+                                                        kDiscordCallbackInterval
+                                                            .count(),
+                                                pendingTicks,
+                                                pendingTicks == 1
+                                                    ? ""
+                                                    : "s"));
+                                        }
+
+                                        continue;
+                                    }
+
+                                    callbackTaskPendingTicks_ = 0;
+
+                                    if (!taskInterface_)
+                                    {
+                                        HandleBackgroundException(
+                                            "SKSE TaskInterface became unavailable");
+                                        return;
+                                    }
+
+                                    taskInterface_->AddTask(
+                                        [this]() noexcept
+                                        {
+                                            callbackTaskPendingTicks_ = 0;
+                                            callbackTaskPending_ = false;
+
+                                            try
+                                            {
+                                                if (!coordinator_.Tick())
+                                                {
+                                                    callbackThread_.request_stop();
+                                                }
+                                            }
+                                            catch (
+                                                const std::exception &error)
+                                            {
+                                                HandleException(
+                                                    "Discord main-thread task",
+                                                    error.what());
+                                            }
+                                            catch (...)
+                                            {
+                                                HandleUnknownException(
+                                                    "Discord main-thread task");
+                                            }
+                                        });
+                                }
+                            }
+                            catch (const std::exception &error)
+                            {
+                                HandleBackgroundException(
+                                    error.what());
+                            }
+                            catch (...)
+                            {
+                                HandleBackgroundException(
+                                    "unknown exception in the scheduler thread");
+                            }
+                        });
+                }
+
+                /// Stops producer work without destroying Discord core on this thread.
+                void HandleBackgroundException(
+                    const char *details) noexcept
+                {
+                    callbackThread_.request_stop();
+                    coordinator_.Stop();
+
+                    try
+                    {
+                        logger_.Critical(std::format(
+                            "DragonbornPresence scheduler stopped: {} "
+                            "The Discord SDK core will remain idle and be released "
+                            "after the scheduler thread joins; Skyrim can continue "
+                            "normally.",
+                            details
+                                ? details
+                                : "unknown scheduler error"));
+                    }
+                    catch (...)
+                    {
+                    }
+                }
+
+                PresenceCoordinator &coordinator_;
+                ::DragonbornPresence::application::ports::ILogger &logger_;
+
+                MenuEventSink menuEventSink_;
+                CombatEventSink combatEventSink_;
+
+                const SKSE::TaskInterface *taskInterface_ = nullptr;
+                std::atomic<bool> callbackTaskPending_{false};
+                std::atomic<std::uint32_t>
+                    callbackTaskPendingTicks_{0};
                 std::jthread callbackThread_;
             };
 
@@ -485,15 +676,15 @@ namespace DragonbornPresence
                 try
                 {
                     if (event)
-                        coordinator_.HandleMenuEvent(*event);
+                        runtimeAdapter_.HandleMenuEvent(*event);
                 }
                 catch (const std::exception &error)
                 {
-                    coordinator_.HandleException("menu event handler", error.what());
+                    runtimeAdapter_.HandleException("menu event handler", error.what());
                 }
                 catch (...)
                 {
-                    coordinator_.HandleUnknownException("menu event handler");
+                    runtimeAdapter_.HandleUnknownException("menu event handler");
                 }
                 return RE::BSEventNotifyControl::kContinue;
             }
@@ -506,15 +697,15 @@ namespace DragonbornPresence
                 try
                 {
                     if (event)
-                        coordinator_.HandleCombatEvent(*event);
+                        runtimeAdapter_.HandleCombatEvent(*event);
                 }
                 catch (const std::exception &error)
                 {
-                    coordinator_.HandleException("combat event handler", error.what());
+                    runtimeAdapter_.HandleException("combat event handler", error.what());
                 }
                 catch (...)
                 {
-                    coordinator_.HandleUnknownException("combat event handler");
+                    runtimeAdapter_.HandleUnknownException("combat event handler");
                 }
                 return RE::BSEventNotifyControl::kContinue;
             }
@@ -523,9 +714,8 @@ namespace DragonbornPresence
 
         /// Selects and owns concrete infrastructure adapters for the plugin lifetime.
         ///
-        /// Dependencies are declared before PresenceCoordinator because it stores
-        /// non-owning references to them. Destruction occurs in reverse order, so the
-        /// coordinator is destroyed before every adapter it references.
+        /// The runtime adapter is declared last so its scheduler thread is stopped and
+        /// joined before the coordinator and the coordinator's dependencies are destroyed.
         adapters::config::JsonConfigProvider g_configProvider;
         adapters::SkyrimTrueBeliever::StbGameDataSource g_gameDataSource;
         adapters::discord::DiscordPresenceClient g_presenceClient;
@@ -535,6 +725,10 @@ namespace DragonbornPresence
             g_configProvider,
             g_gameDataSource,
             g_presenceClient,
+            g_logger);
+
+        runtime::StbRuntimeAdapter g_runtimeAdapter(
+            g_presenceCoordinator,
             g_logger);
 
     } // namespace
@@ -561,17 +755,17 @@ namespace DragonbornPresence
     {
         try
         {
-            g_presenceCoordinator.RegisterGameEventHandlers();
+            g_runtimeAdapter.RegisterGameEventHandlers();
         }
         catch (const std::exception &error)
         {
-            g_presenceCoordinator.HandleException(
+            g_runtimeAdapter.HandleException(
                 "game event registration",
                 error.what());
         }
         catch (...)
         {
-            g_presenceCoordinator.HandleUnknownException("game event registration");
+            g_runtimeAdapter.HandleUnknownException("game event registration");
         }
     }
 
@@ -580,15 +774,15 @@ namespace DragonbornPresence
     {
         try
         {
-            g_presenceCoordinator.OnGameLoaded();
+            g_runtimeAdapter.OnGameLoaded();
         }
         catch (const std::exception &error)
         {
-            g_presenceCoordinator.HandleException("game-load handler", error.what());
+            g_runtimeAdapter.HandleException("game-load handler", error.what());
         }
         catch (...)
         {
-            g_presenceCoordinator.HandleUnknownException("game-load handler");
+            g_runtimeAdapter.HandleUnknownException("game-load handler");
         }
     }
 
