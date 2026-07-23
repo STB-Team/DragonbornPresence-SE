@@ -12,6 +12,7 @@
 #include "DragonbornPresence/application/ports/IConfigProvider.h"
 #include "DragonbornPresence/application/ports/IGameDataSource.h"
 #include "DragonbornPresence/adapters/SkyrimTrueBeliever/StbGameDataSource.h"
+#include "DragonbornPresence/application/ports/IPresenceClient.h"
 #include "discord_loader.h"
 #include "discord.h"
 
@@ -182,10 +183,11 @@ namespace DragonbornPresence
 
             /// Owns the Discord Game SDK connection and suppresses duplicate activities.
             class DiscordPresenceClient final
+                : public ::DragonbornPresence::application::ports::IPresenceClient
             {
             public:
                 /// Creates the Discord SDK core when presence is enabled and available.
-                [[nodiscard]] bool Initialize(const core::Config &config)
+                [[nodiscard]] bool Initialize(const core::Config &config) override
                 {
                     transportHealthy_ = false;
                     if (!config.enabled)
@@ -273,7 +275,7 @@ namespace DragonbornPresence
                 }
 
                 /// Runs pending callbacks and disables the integration on any transport failure.
-                [[nodiscard]] bool RunCallbacks()
+                [[nodiscard]] bool RunCallbacks() override
                 {
                     if (!IsActive())
                         return false;
@@ -334,7 +336,7 @@ namespace DragonbornPresence
                     return true;
                 }
 
-                [[nodiscard]] bool IsActive() const noexcept
+                [[nodiscard]] bool IsActive() const noexcept override
                 {
                     return core_ && transportHealthy_;
                 }
@@ -342,7 +344,7 @@ namespace DragonbornPresence
                 /// Submits at most one activity update at a time.
                 ///
                 /// Returns true when a new Discord update was queued.
-                bool UpdateActivity(const core::PresencePayload &payload)
+                bool UpdateActivity(const core::PresencePayload &payload) override
                 {
                     if (!IsActive() || !pendingActivitySignature_.empty())
                         return false;
@@ -459,7 +461,7 @@ namespace DragonbornPresence
                 }
 
                 /// Releases the SDK and prevents all future Discord calls.
-                void Shutdown(std::string_view reason) noexcept
+                void Shutdown(std::string_view reason) noexcept override
                 {
                     Disable(reason);
                 }
@@ -588,16 +590,18 @@ namespace DragonbornPresence
             class PresenceCoordinator final
             {
             public:
-                /// Constructs the coordinator with all external data dependencies.
+                /// Constructs the coordinator with all external dependencies.
                 ///
-                /// Both dependencies are required and stored as non-owning references. The
+                /// All dependencies are required and stored as non-owning references. The
                 /// composition root must keep their concrete implementations alive for at
                 /// least as long as this coordinator.
                 PresenceCoordinator(
                     ::DragonbornPresence::application::ports::IConfigProvider &configProvider,
-                    ::DragonbornPresence::application::ports::IGameDataSource &gameDataSource) noexcept
+                    ::DragonbornPresence::application::ports::IGameDataSource &gameDataSource,
+                    ::DragonbornPresence::application::ports::IPresenceClient &presenceClient) noexcept
                     : configProvider_(configProvider),
                       gameDataSource_(gameDataSource),
+                      presenceClient_(presenceClient),
                       menuEventSink_(*this),
                       combatEventSink_(*this)
                 {
@@ -620,7 +624,7 @@ namespace DragonbornPresence
                     catch (...)
                     {
                     }
-                    discordClient_.Shutdown(
+                    presenceClient_.Shutdown(
                         "an internal DragonbornPresence exception occurred; see the previous "
                         "critical log entry");
                 }
@@ -663,7 +667,7 @@ namespace DragonbornPresence
                         return;
                     }
 
-                    if (!discordClient_.Initialize(config_))
+                    if (!presenceClient_.Initialize(config_))
                         return;
 
                     active_ = true;
@@ -740,7 +744,7 @@ namespace DragonbornPresence
                 /// Sends the stable loading activity used before a playable save is ready.
                 void SendLoadingPresence()
                 {
-                    discordClient_.UpdateActivity({
+                    presenceClient_.UpdateActivity({
                         {},
                         constants::kLoadingText,
                         config_.largeImage,
@@ -748,7 +752,7 @@ namespace DragonbornPresence
                         config_.loadingImage,
                         constants::kLoadingText,
                     });
-                    if (!discordClient_.IsActive())
+                    if (!presenceClient_.IsActive())
                         Stop();
                 }
 
@@ -783,7 +787,7 @@ namespace DragonbornPresence
                     const auto largeAsset = assetResolver.Resolve(snapshot.location);
 
                     lastCombatState_ = snapshot.inCombat;
-                    const bool activityChanged = discordClient_.UpdateActivity({
+                    const bool activityChanged = presenceClient_.UpdateActivity({
                         detailsText,
                         stateText,
                         largeAsset.image,
@@ -791,7 +795,7 @@ namespace DragonbornPresence
                         smallImage,
                         smallText,
                     });
-                    if (!discordClient_.IsActive())
+                    if (!presenceClient_.IsActive())
                     {
                         Stop();
                         return;
@@ -875,7 +879,8 @@ namespace DragonbornPresence
                         if (!active_) return;
 
                         try {
-                            if (!discordClient_.RunCallbacks()) {
+                            if (!presenceClient_.RunCallbacks())
+                            {
                                 Stop();
                                 return;
                             }
@@ -939,8 +944,12 @@ namespace DragonbornPresence
                 /// exposes only core-owned snapshots.
                 ::DragonbornPresence::application::ports::IGameDataSource &gameDataSource_;
 
+                /// Required Presence transport owned by the composition root.
+                ///
+                /// The application coordinator publishes core payloads without depending on
+                /// Discord SDK types or the concrete transport implementation.
+                ::DragonbornPresence::application::ports::IPresenceClient &presenceClient_;
                 core::Config config_;
-                integration::DiscordPresenceClient discordClient_;
                 MenuEventSink menuEventSink_;
                 CombatEventSink combatEventSink_;
                 const SKSE::TaskInterface *taskInterface_ = nullptr;
@@ -1004,13 +1013,15 @@ namespace DragonbornPresence
         ///
         /// Dependencies are declared before PresenceCoordinator because it stores
         /// non-owning references to them. Destruction occurs in reverse order, so the
-        /// coordinator is destroyed before either adapter.
+        /// coordinator is destroyed before every adapter it references.
         adapters::config::JsonConfigProvider g_configProvider;
         adapters::SkyrimTrueBeliever::StbGameDataSource g_gameDataSource;
+        integration::DiscordPresenceClient g_presenceClient;
 
         runtime::PresenceCoordinator g_presenceCoordinator(
             g_configProvider,
-            g_gameDataSource);
+            g_gameDataSource,
+            g_presenceClient);
 
     } // namespace
 

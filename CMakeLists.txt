@@ -118,6 +118,7 @@ set(DRAGONBORNPRESENCE_HEADERS
     include/DragonbornPresence/application/ports/IConfigProvider.h
     include/DragonbornPresence/application/ports/IGameDataSource.h
     include/DragonbornPresence/adapters/config/JsonConfigProvider.h
+    include/DragonbornPresence/application/ports/IPresenceClient.h
     include/DragonbornPresence/adapters/SkyrimTrueBeliever/StbGameDataSource.h
     include/ScriptUtils.h
     include/discord_loader.h

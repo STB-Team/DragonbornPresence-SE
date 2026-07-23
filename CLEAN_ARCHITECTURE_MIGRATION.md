@@ -109,12 +109,12 @@ src/
 Текущее состояние:
 
 - рабочая ветка — `dev`, публикация выполняется только в `origin/dev`;
-- блоки B1–B5 завершены;
+- блоки B1–B6 завершены;
 - `StbGameDataSource` вынесен в `adapters/SkyrimTrueBeliever`;
-- `IPresenceClient.h` уже создан как заготовка следующего блока, но ещё не подключён к координатору и не считается завершённым;
+- `PresenceCoordinator` зависит от `IPresenceClient`, а concrete Discord client выбирается в composition root;
 - единственный исполняемый gate на время переноса — полная Release-сборка без ошибок.
 
-Текущий активный блок: **B6 — внедрить output port Presence**.
+Текущий активный блок: **B7 — извлечь Discord Presence adapter**.
 
 ## Маршрут миграции
 
@@ -178,7 +178,7 @@ Commits:
 
 Commit: `refactor: extract Skyrim True Believer game adapter`.
 
-### B6. Внедрить output port Presence
+### B6. Внедрить output port Presence — завершён
 
 Создать и подключить `application::ports::IPresenceClient`.
 
@@ -196,7 +196,7 @@ Commit: `refactor: extract Skyrim True Believer game adapter`.
 - нет изменения payload, deduplication, callback timeout и session timestamp;
 - Release-сборка успешна.
 
-Планируемый commit: `refactor: inject presence client port`.
+Commit: `refactor: inject presence client port`.
 
 ### B7. Извлечь Discord Presence adapter
 
