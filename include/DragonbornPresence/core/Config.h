@@ -12,6 +12,7 @@ namespace DragonbornPresence::core
     using ApplicationId = std::int64_t;
 
     inline constexpr ApplicationId kDefaultApplicationId = 1527543892151373937;
+    inline constexpr std::int64_t kSupportedConfigSchemaVersion = 1;
 
     struct Config
     {

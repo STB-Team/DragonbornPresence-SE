@@ -27,3 +27,21 @@ jobs:
 
       - name: Запуск тестов
         run: ctest --preset tests
+
+  plugin:
+    name: Production SKSE plugin
+    runs-on: windows-2025-vs2026
+
+    steps:
+      - name: Получение исходного кода
+        uses: actions/checkout@v5
+
+      - name: Настройка production-сборки
+        run: cmake --preset vs2026
+
+      - name: Сборка Release-плагина
+        run: cmake --build --preset release
+
+      - name: Проверка Release-архива
+        shell: pwsh
+        run: ./scripts/Validate-ReleaseArchive.ps1 -ArchivePath "build/vs2026/DragonbornPresence.zip"

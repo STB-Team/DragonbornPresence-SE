@@ -55,6 +55,9 @@ namespace DragonbornPresence::adapters::config
                         return config;
                     }
 
+                    if (!HasSupportedSchemaVersion(root))
+                        return config;
+
                     if (const auto *discordConfig = FindObject(root, "discord", "discord"))
                     {
                         ReadBool(*discordConfig, "enabled", config.enabled, "discord");
@@ -91,6 +94,42 @@ namespace DragonbornPresence::adapters::config
             }
 
         private:
+            /// Accepts the current schema and legacy documents that predate the field.
+            ///
+            /// An explicit invalid or unsupported version rejects the whole document so
+            /// a future schema cannot be partially interpreted with obsolete semantics.
+            [[nodiscard]] static bool HasSupportedSchemaVersion(
+                const nlohmann::json &root)
+            {
+                const auto value = root.find("schema_version");
+                if (value == root.end())
+                {
+                    spdlog::warn(
+                        "Config: 'schema_version' is missing; treating the document as "
+                        "legacy schema {}.",
+                        core::kSupportedConfigSchemaVersion);
+                    return true;
+                }
+
+                if (!value->is_number_integer())
+                {
+                    spdlog::warn(
+                        "Config: 'schema_version' must be an integer; using defaults.");
+                    return false;
+                }
+
+                if (*value != core::kSupportedConfigSchemaVersion)
+                {
+                    spdlog::warn(
+                        "Config schema {} is unsupported; expected {}; using defaults.",
+                        value->dump(),
+                        core::kSupportedConfigSchemaVersion);
+                    return false;
+                }
+
+                return true;
+            }
+
             /// Returns an object-valued child or reports a type mismatch.
             [[nodiscard]] static const nlohmann::json *FindObject(
                 const nlohmann::json &parent,

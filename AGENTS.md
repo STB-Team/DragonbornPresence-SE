@@ -42,6 +42,7 @@ src/DragonbornPresence.cpp                composition root и публичный
 src/main.cpp                              SKSE entry point
 tests/                                    Catch2 tests
 config/DragonbornPresence.json            shipped runtime configuration
+scripts/                                  release artifact validation
 docs/                                     GitHub Pages documentation
 .github/workflows/                        CI и release workflows
 ```
@@ -293,7 +294,7 @@ build/vs2026/Release/DragonbornPresence.pdb
 build/vs2026/DragonbornPresence.zip
 ```
 
-Preset также развёртывает DLL, PDB, Discord SDK и JSON в настроенный каталог MO2.
+Общий preset не развёртывает файлы в MO2. Локальный deploy задаётся только в ignored `CMakeUserPresets.json` через собственные configure/build presets.
 
 Debug не считается доказательством готовности релиза.
 
@@ -321,7 +322,7 @@ ctest --preset tests
 
 - `DragonbornPresenceCoreTests` — UTF-8, difficulty и location rules;
 - `DragonbornPresenceApplicationTests` — coordinator lifecycle, payload, transitions, coalescing и failures;
-- `DragonbornPresenceAdapterTests` — JSON и CP1251/UTF-8.
+- `DragonbornPresenceAdapterTests` — JSON defaults/schema validation и CP1251/UTF-8.
 
 Тестировать observable contract, а не текст исходников или детали реализации.
 
@@ -378,7 +379,7 @@ ctest --preset tests
 - перед commit проверять `git diff --check`;
 - после push подтверждать CI и чистый worktree.
 
-CI workflow проверяет test preset. Release workflow запускается тегом `v*`, собирает конфигурацию Release и публикует `DragonbornPresence.zip`.
+CI workflow отдельно запускает test preset и production Release build со строгой проверкой ZIP. Release workflow проверяет tag/CMake version, запускает тесты, собирает Release, валидирует manifest и только затем публикует `DragonbornPresence.zip`.
 
 ## Definition of Done
 

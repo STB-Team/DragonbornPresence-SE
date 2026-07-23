@@ -1,348 +1,38 @@
 <!doctype html>
 <html lang="ru">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Построчный разбор main.cpp, публичных заголовков и точки входа SKSE-плагина DragonbornPresence.">
-<title>Точка входа и заголовки — код DragonbornPresence</title>
-<link rel="stylesheet" href="site.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Актуальный разбор SKSE entry point, публичного фасада и composition root DragonbornPresence.">
+  <title>Точка входа и composition root — DragonbornPresence</title>
+  <link rel="stylesheet" href="site.css">
 </head>
-<body class="code-page">
-<div class="layout">
-  <aside aria-label="Навигация по разбору кода">
-    <div class="brand"><strong>Полный разбор кода</strong><span>1 из 7 · вход и API</span></div>
-    <nav>
-      <a href="architecture.html">Обзор архитектуры</a>
-      <a href="code-entry.html">1. Точка входа</a>
-      <a href="code-foundation.html">2. Модели и JSON</a>
-      <a href="code-game.html">3. Skyrim и Papyrus</a>
-      <a href="code-discord.html">4. Discord и Windows</a>
-      <a href="code-application.html">5. Координатор</a>
-      <a href="code-build.html">6. Сборка и релиз</a>
-      <a href="code-recipes.html">7. Примеры изменений</a>
-      <span class="nav-title">Эта страница</span>
-      <a href="#translation-unit">Translation unit</a>
-      <a href="#logging">InitializeLogging</a>
-      <a href="#entry-failure">LogEntryPointFailure</a>
-      <a href="#messages">OnSkseMessage</a>
-      <a href="#plugin-load">SKSEPluginLoad</a>
-      <a href="#public-header">DragonbornPresence.h</a>
-      <a href="#small-headers">Остальные заголовки</a>
-      <a href="#constructs">Конструкции C++</a>
-    </nav>
-  </aside>
+<body class="code-page"><div class="layout">
+<aside aria-label="Навигация по учебнику"><div class="brand"><strong>Архитектурный учебник</strong><span>1 из 7 · вход</span></div><nav>
+  <a href="architecture.html">Обзор</a><a href="code-entry.html" aria-current="page">1. Точка входа</a><a href="code-foundation.html">2. Core и JSON</a><a href="code-game.html">3. Skyrim True Believer</a><a href="code-discord.html">4. Discord</a><a href="code-application.html">5. Application и runtime</a><a href="code-build.html">6. Сборка и CI</a><a href="code-recipes.html">7. Рецепты изменений</a><a href="source-walkthrough.html">Карта исходников</a>
+  <span class="nav-title">Эта страница</span><a href="#entry">SKSEPluginLoad</a><a href="#messages">SKSE messages</a><a href="#facade">Публичный фасад</a><a href="#composition">Composition root</a><a href="#lifetime">Lifetime</a>
+</nav></aside>
+<main>
+<header class="hero"><p class="breadcrumbs"><a href="index.html">Документация</a> / <a href="architecture.html">Архитектура</a> / Точка входа</p><p class="eyebrow">src/main.cpp · src/DragonbornPresence.cpp</p><h1>Вход в плагин и связывание зависимостей</h1><p class="lead">Два небольших translation unit отделяют ABI SKSE от application-кода: <code>main.cpp</code> принимает внешние lifecycle-сигналы, а <code>DragonbornPresence.cpp</code> владеет concrete adapters.</p><div class="badges"><span class="badge">SKSEPluginLoad</span><span class="badge">noexcept facade</span><span class="badge">composition root</span><span class="badge">deterministic lifetime</span></div></header>
 
-  <main>
-    <header class="hero">
-      <p class="breadcrumbs"><a href="index.html">Документация</a> / <a href="architecture.html">Код плагина</a> / Точка входа</p>
-      <p class="eyebrow">Файл за файлом · строки 1–146</p>
-      <h1><code>main.cpp</code> и публичные заголовки</h1>
-      <p class="lead">Как Windows и SKSE входят в DLL, где появляется лог, почему конфигурация читается до игровых событий и какие исключения запрещено выпускать наружу.</p>
-      <div class="badges"><span class="badge">src/main.cpp</span><span class="badge">include/*.h</span><span class="badge">SKSE lifecycle</span><span class="badge">C++ ABI</span></div>
-      <details class="mobile-toc">
-        <summary>Оглавление и другие главы</summary>
-        <nav>
-          <a href="architecture.html">Обзор</a><a href="code-foundation.html">Следующая глава</a>
-          <a href="#translation-unit">Начало файла</a><a href="#logging">Логирование</a>
-          <a href="#messages">SKSE-сообщения</a><a href="#plugin-load">Загрузка DLL</a>
-          <a href="#public-header">Публичный API</a><a href="#constructs">Синтаксис C++</a>
-        </nav>
-      </details>
-    </header>
+<section id="entry"><h2>1. <code>SKSEPluginLoad</code></h2><p><code>src/main.cpp</code> выполняет только bootstrap:</p><ol class="steps"><li>создаёт файловый spdlog sink в каталоге SKSE log;</li><li>инициализирует SKSE через <code>SKSE::Init</code>;</li><li>проверяет Discord Desktop до загрузки Discord SDK;</li><li>вызывает <code>DragonbornPresence::LoadConfig()</code>;</li><li>регистрирует listener SKSE Messaging Interface;</li><li>возвращает <code>false</code> при любом незавершённом обязательном шаге.</li></ol><p>Функция обёрнута в <code>try/catch</code>. Исключение не пересекает ABI-границу SKSE, а Skyrim получает понятный отказ загрузки плагина.</p><p><a href="https://github.com/STB-Team/DragonbornPresence-SE/blob/master/src/main.cpp">Открыть актуальный main.cpp</a></p></section>
 
-    <section id="coverage">
-      <h2>Что покрыто</h2>
-      <p><span class="coverage-ok">Полное покрытие:</span> все четыре функции <code>main.cpp</code>, все include и namespace-блоки, публичный API <code>DragonbornPresence.h</code>, объявления строковых и Discord helper-функций, <code>pch.h</code>.</p>
-      <p><a href="https://github.com/STB-Team/DragonbornPresence-SE/blob/master/src/main.cpp">Открыть реальный main.cpp</a></p>
-    </section>
+<section id="messages"><h2>2. Lifecycle через SKSE messages</h2><div class="table-wrap"><table><thead><tr><th>Сообщение</th><th>Вызов фасада</th><th>Смысл</th></tr></thead><tbody><tr><td><code>kPostLoadGame</code></td><td><code>OnGameLoaded()</code></td><td>Публикация первого gameplay snapshot после загрузки сохранения.</td></tr><tr><td><code>kDataLoaded</code></td><td><code>RegisterGameEventHandlers()</code></td><td>Формы, UI, event sources и task interface уже доступны.</td></tr></tbody></table></div><p><code>main.cpp</code> не читает <code>PlayerCharacter</code>, не строит Presence и не создаёт Discord Activity. Он только переводит сообщения SKSE в три функции фасада.</p></section>
 
-    <section id="translation-unit">
-      <h2>1. Строки 1–16: из чего начинается translation unit</h2>
-      <pre><code>#include &lt;SKSE/SKSE.h&gt;
-#include &lt;spdlog/sinks/basic_file_sink.h&gt;
-#include &lt;Windows.h&gt;
-
-#include "DragonbornPresence.h"
-#include "discord_loader.h"
-
-extern "C" IMAGE_DOS_HEADER __ImageBase;
-
-namespace {</code></pre>
-      <div class="table-wrap">
-        <table class="line-notes">
-          <thead><tr><th>Строки</th><th>Что происходит</th><th>Почему</th></tr></thead>
-          <tbody>
-            <tr><td>1</td><td><code>SKSE/SKSE.h</code> даёт точку входа, MessagingInterface, PluginDeclaration и logging facade.</td><td>Без типов SKSE сигнатуры ниже не скомпилируются.</td></tr>
-            <tr><td>2</td><td>Подключается конкретный файловый sink spdlog.</td><td>Общий SKSE header не обязан раскрывать этот класс.</td></tr>
-            <tr><td>3</td><td>WinAPI: <code>GetModuleFileNameW</code>, <code>OutputDebugStringA</code>, <code>MAX_PATH</code>, <code>HMODULE</code>.</td><td>Ранний запуск зависит от Windows, а не от переносимого API.</td></tr>
-            <tr><td>5–6</td><td>Собственные контракты основной подсистемы и Windows loader.</td><td><code>main.cpp</code> знает только публичные функции, не внутренние классы.</td></tr>
-            <tr><td>8–12</td><td>Точечные standard headers: exceptions, filesystem, format, ownership, string.</td><td>Каждый тип должен иметь явный источник; это уменьшает скрытые зависимости.</td></tr>
-            <tr><td>14</td><td>Объявляется linker symbol текущего PE image.</td><td>По его адресу можно найти путь именно DLL.</td></tr>
-            <tr><td>16</td><td>Открывается анонимный namespace.</td><td>Три helper-функции получают internal linkage и не экспортируются из DLL.</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="construct">
-        <h4>Что такое translation unit</h4>
-        <p>После обработки <code>#include</code> препроцессором компилятор видит один большой текст — translation unit. Каждый <code>.cpp</code> компилируется отдельно в object file, затем linker соединяет object files и библиотеки в DLL.</p>
-      </div>
-      <div class="construct">
-        <h4><code>#include &lt;...&gt;</code> и <code>#include "..."</code></h4>
-        <p>Угловые скобки обычно ищут системные/настроенные include directories. Кавычки сначала ищут рядом с текущим файлом, затем в include paths. Это соглашение, а окончательный алгоритм задаёт компилятор.</p>
-      </div>
-      <div class="construct">
-        <h4><code>extern "C"</code></h4>
-        <p>C++ кодирует типы аргументов в имени символа — name mangling. C linkage просит использовать C-совместимое имя. Здесь функция не создаётся: объявляется символ <code>__ImageBase</code>, который предоставляет MSVC linker.</p>
-      </div>
-    </section>
-
-    <section id="logging">
-      <h2>2. <code>InitializeLogging()</code>, строки 18–54</h2>
-      <pre><code>[[nodiscard]] bool InitializeLogging() noexcept
-{
-    try {
-        const auto logPath = SKSE::log::log_directory().value_or(
-            []() { /* fallback path */ }()) /
-            "DragonbornPresence.log";
-
-        auto sink = std::make_shared&lt;spdlog::sinks::basic_file_sink_mt&gt;(
-            logPath.string(), true);
-        auto log = std::make_shared&lt;spdlog::logger&gt;("global", std::move(sink));
-        log-&gt;set_level(spdlog::level::info);
-        log-&gt;flush_on(spdlog::level::info);
-        spdlog::set_default_logger(std::move(log));
-        return true;
-    } catch (...) {
-        /* debugger fallback */
-        return false;
-    }
-}</code></pre>
-      <h3 class="symbol-heading">Сигнатура</h3>
-      <ul>
-        <li><code>[[nodiscard]]</code> предупреждает, если caller проигнорирует bool. Здесь результат определяет, можно ли продолжать загрузку.</li>
-        <li><code>bool</code>: <code>true</code> — logger готов; <code>false</code> — запуск должен остановиться.</li>
-        <li><code>noexcept</code>: функция обещает не выпустить исключение к SKSE loader. Обещание выполняется двумя catch-блоками.</li>
-      </ul>
-      <h3 class="symbol-heading">Строки 21–33: выбор пути</h3>
-      <p><code>SKSE::log::log_directory()</code> возвращает optional path. <code>value_or(fallback)</code> берёт значение optional либо вычисленный запасной путь. Оператор <code>/</code> у <code>std::filesystem::path</code> добавляет компонент пути с корректным Windows separator.</p>
-      <p>Fallback реализован немедленно вызываемой lambda:</p>
-      <pre><code>[]() {
-    wchar_t buffer[MAX_PATH]{};
-    const DWORD length = GetModuleFileNameW(
-        reinterpret_cast&lt;HMODULE&gt;(&amp;__ImageBase), buffer, MAX_PATH);
-    if (length == 0 || length &gt;= MAX_PATH) {
-        return std::filesystem::current_path();
-    }
-    return std::filesystem::path(buffer).parent_path();
-}()</code></pre>
-      <div class="table-wrap">
-        <table class="line-notes">
-          <thead><tr><th>Выражение</th><th>Пояснение</th></tr></thead>
-          <tbody>
-            <tr><td><code>[]()</code></td><td>Lambda без capture и аргументов.</td></tr>
-            <tr><td>Последние <code>()</code></td><td>Lambda вызывается сразу; результат передаётся в <code>value_or</code>.</td></tr>
-            <tr><td><code>wchar_t buffer[MAX_PATH]{}</code></td><td>Стековый массив wide chars; <code>{}</code> заполняет нулями.</td></tr>
-            <tr><td><code>&amp;__ImageBase</code></td><td>Адрес внутри текущей DLL.</td></tr>
-            <tr><td><code>reinterpret_cast&lt;HMODULE&gt;</code></td><td>Низкоуровневое переосмысление адреса как Windows module handle.</td></tr>
-            <tr><td><code>length == 0</code></td><td>WinAPI не смог получить путь.</td></tr>
-            <tr><td><code>length &gt;= MAX_PATH</code></td><td>Буфер недостаточен или строка обрезана; использовать её опасно.</td></tr>
-            <tr><td><code>parent_path()</code></td><td>Удаляет имя <code>DragonbornPresence.dll</code>, оставляет каталог.</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="callout warning"><strong>Тонкость:</strong> аргумент <code>value_or</code> вычисляется до вызова функции, даже если optional заполнен. Поэтому fallback lambda всё равно вызывается. Для старта плагина стоимость несущественна, но это полезно знать о eager evaluation.</div>
-      <h3 class="symbol-heading">Строки 35–41: создание logger</h3>
-      <ul>
-        <li><code>std::make_shared</code> выделяет объект и control block shared ownership.</li>
-        <li><code>basic_file_sink_mt</code>: <code>mt</code> означает thread-safe sink; сообщения могут идти из game и scheduler threads.</li>
-        <li>Второй аргумент <code>true</code> означает truncate? В spdlog для этого конструктора он является <code>truncate</code>; текущий код открывает файл с переданным значением. При чтении поведения ориентируйтесь на API версии 1.13.0.</li>
-        <li><code>std::move(sink)</code> передаёт shared pointer в logger без лишнего увеличения/уменьшения ownership count в локальном объекте.</li>
-        <li><code>set_level(info)</code> отбрасывает debug/trace.</li>
-        <li><code>flush_on(info)</code> сбрасывает буфер для info и более серьёзных сообщений, чтобы данные пережили возможный crash.</li>
-        <li><code>set_default_logger</code> делает logger доступным через logging facade.</li>
-      </ul>
-      <h3 class="symbol-heading">Строки 42–53: два вида исключений</h3>
-      <p><code>catch (const std::exception&amp; error)</code> сохраняет диагностический <code>error.what()</code>. <code>catch (...)</code> ловит всё остальное, включая исключения, не наследующиеся от <code>std::exception</code>. Logger ещё может быть нерабочим, поэтому используется <code>OutputDebugStringA</code>.</p>
-      <p><a href="https://github.com/STB-Team/DragonbornPresence-SE/blob/master/src/main.cpp#L18-L54">Реальный блок в GitHub</a></p>
-    </section>
-
-    <section id="entry-failure">
-      <h2>3. <code>LogEntryPointFailure()</code>, строки 56–67</h2>
-      <pre><code>void LogEntryPointFailure(const char* details) noexcept
-{
-    try {
-        SKSE::log::critical(
-            "DragonbornPresence entry-point failure: {} ...",
-            details ? details : "unknown error.");
-    } catch (...) {
-        OutputDebugStringA(
-            "DragonbornPresence: entry-point failure; plugin stopped.\n");
-    }
-}</code></pre>
-      <div class="table-wrap">
-        <table class="line-notes">
-          <thead><tr><th>Блок</th><th>Смысл</th></tr></thead>
-          <tbody>
-            <tr><td>Параметр</td><td><code>const char*</code> — pointer на C-string; функция не меняет символы.</td></tr>
-            <tr><td>Ternary</td><td><code>details ? details : ...</code> не разыменовывает null pointer и выбирает fallback.</td></tr>
-            <tr><td><code>critical</code></td><td>Ошибка произошла до регистрации нормальной игровой работы.</td></tr>
-            <tr><td>Внутренний catch</td><td>Даже formatter/logger может бросить; второй канал диагностики не зависит от файла.</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p>Функция не останавливает код сама: caller после неё возвращает <code>false</code>. Разделение позволяет всем ранним веткам иметь одинаковый текст ошибки.</p>
-    </section>
-
-    <section id="messages">
-      <h2>4. <code>OnSkseMessage()</code>, строки 69–88</h2>
-      <pre><code>void OnSkseMessage(SKSE::MessagingInterface::Message* message) noexcept
-{
-    if (!message) {
-        LogEntryPointFailure("SKSE delivered a null messaging event.");
-        return;
-    }
-
-    using MI = SKSE::MessagingInterface;
-    switch (message-&gt;type) {
-    case MI::kDataLoaded:
-        DragonbornPresence::RegisterGameEventHandlers();
-        break;
-    case MI::kNewGame:
-    case MI::kPostLoadGame:
-        DragonbornPresence::OnGameLoaded();
-        break;
-    default:
-        break;
-    }
-}</code></pre>
-      <h3 class="symbol-heading">Pointer и guard clause</h3>
-      <p>SKSE передаёт pointer, поэтому теоретически значение может быть null. <code>if (!message)</code> — guard clause: аварийный случай обрабатывается в начале, основная логика остаётся без вложенности. <code>message-&gt;type</code> допустим только после этой проверки.</p>
-      <h3 class="symbol-heading"><code>using MI = ...</code></h3>
-      <p>Локальный type alias сокращает длинное имя. Он не создаёт новый тип и не выделяет память.</p>
-      <h3 class="symbol-heading">Объединённые case labels</h3>
-      <p><code>kNewGame</code> не содержит <code>break</code> и намеренно проваливается в <code>kPostLoadGame</code>. Оба события запускают одну логику. Это не случайный fallthrough: между labels нет statement.</p>
-      <h3 class="symbol-heading">Почему <code>kDataLoaded</code> отдельно</h3>
-      <p>На стадии initial DLL load игровые data forms ещё могут быть не готовы. После <code>kDataLoaded</code> можно искать forms STB и регистрировать UI/combat sinks. Новая игра или loaded save сообщает, что уже нужен полный player snapshot.</p>
-      <h3 class="symbol-heading"><code>default</code></h3>
-      <p>Плагину не нужны остальные SKSE messages. Явный no-op делает выбор закрытым и не пишет лишний лог при каждом событии.</p>
-    </section>
-
-    <section id="plugin-load">
-      <h2>5. <code>SKSEPluginLoad()</code>, строки 92–146</h2>
-      <pre><code>SKSEPluginLoad(const SKSE::LoadInterface* skse)
-{
-    try {
-        if (!skse) return false;
-        SKSE::Init(skse);
-        if (!InitializeLogging()) return false;
-        // Discord availability
-        // plugin declaration and version
-        DragonbornPresence::LoadConfig();
-        // messaging listener
-        return true;
-    } catch (...) {
-        LogEntryPointFailure(...);
-        return false;
-    }
-}</code></pre>
-      <h3 class="symbol-heading">Что скрывает макрос <code>SKSEPluginLoad</code></h3>
-      <p>CommonLibSSE определяет корректную экспортируемую сигнатуру плагина. Исходно это выглядит как функция без вручную написанного return type, потому что макрос подставляет нужные declarations/attributes. SKSE находит экспорт по ожидаемому ABI.</p>
-      <div class="table-wrap">
-        <table class="line-notes">
-          <thead><tr><th>Строки</th><th>Действие</th><th>Почему порядок важен</th></tr></thead>
-          <tbody>
-            <tr><td>94–100</td><td>Проверяется <code>skse</code>.</td><td>До <code>SKSE::Init</code> logging facade и интерфейсы ещё нельзя считать готовыми.</td></tr>
-            <tr><td>102</td><td><code>SKSE::Init(skse)</code>.</td><td>CommonLib сохраняет SKSE интерфейсы для дальнейших вызовов.</td></tr>
-            <tr><td>103</td><td>Инициализируется log.</td><td>Все последующие отказы должны попасть в файл.</td></tr>
-            <tr><td>105–112</td><td>Проверяется запущенный Discord.</td><td>Текущий контракт отказывается загружать плагин без клиента до SDK initialization.</td></tr>
-            <tr><td>114–124</td><td>Читается PluginDeclaration и версия.</td><td>Версия генерируется CMake/CommonLib и не дублируется строковым literal.</td></tr>
-            <tr><td>126</td><td>Загружается JSON config.</td><td>К моменту <code>kDataLoaded</code> coordinator уже имеет настройки.</td></tr>
-            <tr><td>128–137</td><td>Получается MessagingInterface и регистрируется listener.</td><td>Без listener плагин никогда не узнает, когда data/forms готовы.</td></tr>
-            <tr><td>138</td><td><code>true</code>.</td><td>Только полностью завершённая ранняя инициализация считается успехом.</td></tr>
-            <tr><td>139–145</td><td>Две catch-ветки.</td><td>Любое исключение превращается в log и <code>false</code>, а не пересекает SKSE ABI.</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <h3 class="symbol-heading">Ранние возвраты</h3>
-      <p>Каждый обязательный prerequisite использует <code>return false</code> сразу. В результате невозможно случайно зарегистрировать listener после неуспешного logger или считать plugin loaded без MessagingInterface.</p>
-      <h3 class="symbol-heading">Почему Discord проверяется ещё раз позже</h3>
-      <p>Между <code>SKSEPluginLoad</code> и <code>kDataLoaded</code> проходит время. Discord может завершиться, поэтому <code>DiscordPresenceClient::Initialize</code> повторяет проверку непосредственно перед SDK creation.</p>
-      <div class="callout danger"><strong>Нельзя:</strong> бросать исключение из этой функции, возвращать true после частичной регистрации или читать <code>PlayerCharacter</code> здесь. Это слишком ранняя стадия Skyrim.</div>
-    </section>
-
-    <section id="public-header">
-      <h2>6. <code>include/DragonbornPresence.h</code></h2>
-      <pre><code>#pragma once
-#include &lt;RE/Skyrim.h&gt;
-#include &lt;SKSE/SKSE.h&gt;
-
-namespace DragonbornPresence {
-void LoadConfig() noexcept;
+<section id="facade"><h2>3. Публичный фасад</h2><p><code>include/DragonbornPresence.h</code> экспортирует минимальный контракт:</p><pre><code>void LoadConfig() noexcept;
 void RegisterGameEventHandlers() noexcept;
-void OnGameLoaded() noexcept;
-}</code></pre>
-      <h3 class="symbol-heading">Почему здесь только три функции</h3>
-      <p>Header — внешний контракт translation unit. <code>main.cpp</code> не знает о <code>PresenceCoordinator</code>, <code>StbDataProvider</code> или Discord core. Это скрывает внутреннее устройство и сокращает compile dependencies.</p>
-      <h3 class="symbol-heading">Объявление и определение</h3>
-      <p>Строка <code>void LoadConfig() noexcept;</code> объявляет сигнатуру и заканчивается <code>;</code>. Тело находится в <code>DragonbornPresence.cpp</code>. Linker соединяет callsite с определением.</p>
-      <h3 class="symbol-heading">Namespace</h3>
-      <p><code>DragonbornPresence::LoadConfig</code> не конфликтует с возможной одноимённой функцией другого плагина или библиотеки. Namespace — compile-time организация имён, не runtime object.</p>
-      <h3 class="symbol-heading"><code>#pragma once</code></h3>
-      <p>Компилятор включает header один раз на translation unit. Это защищает объявления от многократной обработки через цепочку include.</p>
-    </section>
+void OnGameLoaded() noexcept;</code></pre><p>Определения находятся в <code>src/DragonbornPresence.cpp</code>. Каждая функция добавляет собственный exception boundary и передаёт работу уже созданному coordinator или runtime adapter. RE/SKSE-типы в публичный заголовок не попадают.</p></section>
 
-    <section id="small-headers">
-      <h2>7. Остальные маленькие заголовки</h2>
-      <h3><code>AdditionalFunctions.h</code></h3>
-      <pre><code>std::string Cp1251ToUtf8(const char* str);
-bool IsValidUtf8(std::string_view str);</code></pre>
-      <p>Первая функция возвращает владеющую строку, потому что создаёт новые байты. Вторая принимает невладеющий view, потому что только читает существующую последовательность.</p>
-      <h3><code>discord_loader.h</code></h3>
-      <pre><code>namespace DragonbornPresence::detail {
-[[nodiscard]] bool IsDiscordRunning(std::string* failureReason = nullptr) noexcept;
-[[nodiscard]] bool LoadDiscordSdk(std::string* failureReason = nullptr) noexcept;
-}</code></pre>
-      <ul>
-        <li><code>detail</code> сообщает: это техническая часть, не основная бизнес-модель.</li>
-        <li><code>std::string* failureReason = nullptr</code> — необязательный output parameter. Caller может получить подробность либо передать ничего.</li>
-        <li><code>[[nodiscard]]</code> требует обратить внимание на успех/ошибку.</li>
-        <li><code>noexcept</code> обязателен для ранней системной проверки.</li>
-      </ul>
-      <h3><code>pch.h</code></h3>
-      <pre><code>#pragma once
-#include "SKSE/Impl/PCH.h"
-using namespace std::literals;</code></pre>
-      <p>Precompiled header заранее компилирует тяжёлые CommonLib declarations. <code>using namespace std::literals</code> делает доступными suffixes стандартных литералов. PCH ускоряет сборку, но не добавляет отдельный runtime-модуль.</p>
-    </section>
+<section id="composition"><h2>4. Composition root</h2><p>Конкретные объекты создаются в порядке зависимостей:</p><pre><code>JsonConfigProvider
+StbGameDataSource
+DiscordPresenceClient
+SkseLogger
+PresenceCoordinator(config, gameData, presence, logger)
+StbRuntimeAdapter(coordinator, logger)</code></pre><p><code>PresenceCoordinator</code> получает ссылки только на четыре application ports. Он не знает имён concrete classes. Замена внешнего транспорта или источника данных не требует менять application state machine.</p><p><a href="https://github.com/STB-Team/DragonbornPresence-SE/blob/master/src/DragonbornPresence.cpp">Открыть актуальный composition root</a></p></section>
 
-    <section id="constructs">
-      <h2>8. Справочник конструкций языка с этой страницы</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Конструкция</th><th>Смысл</th><th>Риск/правило</th></tr></thead>
-          <tbody>
-            <tr><td><code>const T*</code></td><td>Pointer на объект, который нельзя менять через этот pointer.</td><td>Сам pointer может быть null.</td></tr>
-            <tr><td><code>T&amp;</code></td><td>Reference на существующий объект, обычно не null.</td><td>Жизнь объекта должна быть длиннее reference.</td></tr>
-            <tr><td><code>auto</code></td><td>Компилятор выводит тип из initializer.</td><td>Не скрывать важную ownership-семантику.</td></tr>
-            <tr><td><code>const auto</code></td><td>Выведенный тип нельзя переназначить через переменную.</td><td>Вложенный объект не обязательно immutable.</td></tr>
-            <tr><td><code>std::move</code></td><td>Приведение к rvalue, разрешающее transfer ресурсов.</td><td>После move объект валиден, но его значение обычно unspecified.</td></tr>
-            <tr><td><code>try/catch</code></td><td>Перехватывает C++ exceptions.</td><td>Не ловит аппаратный crash вроде access violation в обычной модели C++.</td></tr>
-            <tr><td><code>noexcept</code></td><td>Контракт «исключение наружу не выйдет».</td><td>Если исключение всё же выйдет, вызывается <code>std::terminate</code>.</td></tr>
-            <tr><td><code>namespace {}</code></td><td>Internal linkage имён в текущем translation unit.</td><td>Типы/функции недоступны другим <code>.cpp</code>.</td></tr>
-            <tr><td><code>switch/case</code></td><td>Ветвление по целочисленному/enum значению.</td><td>Нужен <code>break</code>, если fallthrough не задуман.</td></tr>
-            <tr><td><code>?:</code></td><td>Ternary expression выбирает одно из двух значений.</td><td>Не усложнять вложенными ternary.</td></tr>
-            <tr><td><code>[](){ }()</code></td><td>Немедленно вызванная lambda.</td><td>Удобна для локального вычисления со своими переменными.</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
+<section id="lifetime"><h2>5. Почему порядок объектов важен</h2><p>C++ уничтожает объекты static storage в обратном порядке. <code>StbRuntimeAdapter</code> объявлен последним и поэтому уничтожается первым. Его <code>std::jthread</code> останавливается и присоединяется до уничтожения coordinator, logger, game data source и Discord client.</p><div class="callout"><strong>Инвариант:</strong> scheduler не должен пережить объекты, на которые он хранит non-owning references.</div><p>Не переносите concrete adapters в <code>main.cpp</code> и не меняйте порядок глобальных объектов без повторной проверки shutdown path.</p></section>
 
-    <nav class="page-nav" aria-label="Переход между главами">
-      <a href="architecture.html"><small>Назад</small>Обзор архитектуры</a>
-      <a href="code-foundation.html"><small>Далее</small>Модели, строки и JSON</a>
-    </nav>
-    <footer>Полный разбор DragonbornPresence 3.1.8 · глава 1 из 7</footer>
-  </main>
-</div>
-</body>
+<nav class="page-nav" aria-label="Переходы"><a href="architecture.html"><small>Назад</small>Обзор архитектуры</a><a href="code-foundation.html"><small>Далее</small>Core и JSON</a></nav>
+<footer>DragonbornPresence 3.1.8 · актуальная архитектура · глава 1 из 7</footer>
+</main></div></body>
 </html>

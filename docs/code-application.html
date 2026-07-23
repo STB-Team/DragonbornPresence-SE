@@ -1,118 +1,52 @@
 <!doctype html>
 <html lang="ru">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Полный разбор PresenceCoordinator, event sinks, scheduler, atomics и публичных обёрток DragonbornPresence."><title>Координатор и потоки — код DragonbornPresence</title><link rel="stylesheet" href="site.css"></head>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Актуальный разбор PresenceCoordinator, application ports, Skyrim event sinks и scheduler DragonbornPresence.">
+  <title>Application и runtime — DragonbornPresence</title>
+  <link rel="stylesheet" href="site.css">
+</head>
 <body class="code-page"><div class="layout">
-<aside aria-label="Навигация по разбору кода"><div class="brand"><strong>Полный разбор кода</strong><span>5 из 7 · orchestration</span></div><nav><a href="architecture.html">Обзор</a><a href="code-entry.html">1. Точка входа</a><a href="code-foundation.html">2. Модели и JSON</a><a href="code-game.html">3. Skyrim и Papyrus</a><a href="code-discord.html">4. Discord и Windows</a><a href="code-application.html">5. Координатор</a><a href="code-build.html">6. Сборка</a><a href="code-recipes.html">7. Примеры</a><span class="nav-title">Эта страница</span><a href="#sinks">Event sinks</a><a href="#owner">Владелец</a><a href="#exceptions">Исключения</a><a href="#registration">Регистрация</a><a href="#state-machine">Меню и бой</a><a href="#refresh">Refresh</a><a href="#scheduler">Scheduler</a><a href="#fields">Поля</a><a href="#sink-bodies">ProcessEvent</a><a href="#wrappers">Обёртки</a></nav></aside>
-<main><header class="hero"><p class="breadcrumbs"><a href="index.html">Документация</a> / <a href="architecture.html">Код</a> / Координатор</p><p class="eyebrow">DragonbornPresence.cpp · строки 1112–1551</p><h1>Координатор, события и два потока</h1><p class="lead">Где соединяются config, Skyrim и Discord; как устроена state machine загрузки; почему background thread только планирует задачи и как atomics удерживают очередь ограниченной.</p><div class="badges"><span class="badge">PresenceCoordinator</span><span class="badge">BSTEventSink</span><span class="badge">std::jthread</span><span class="badge">std::atomic</span></div><details class="mobile-toc"><summary>Оглавление и другие главы</summary><nav><a href="code-discord.html">Предыдущая</a><a href="code-build.html">Следующая</a><a href="#registration">Запуск</a><a href="#state-machine">Состояния</a><a href="#refresh">Presence</a><a href="#scheduler">Потоки</a><a href="#fields">Поля</a><a href="#wrappers">Границы</a></nav></details></header>
+<aside aria-label="Навигация по учебнику"><div class="brand"><strong>Архитектурный учебник</strong><span>5 из 7 · orchestration</span></div><nav>
+  <a href="architecture.html">Обзор</a><a href="code-entry.html">1. Точка входа</a><a href="code-foundation.html">2. Core и JSON</a><a href="code-game.html">3. Skyrim True Believer</a><a href="code-discord.html">4. Discord</a><a href="code-application.html" aria-current="page">5. Application и runtime</a><a href="code-build.html">6. Сборка и CI</a><a href="code-recipes.html">7. Рецепты изменений</a><a href="source-walkthrough.html">Карта исходников</a>
+  <span class="nav-title">Эта страница</span><a href="#ports">Порты</a><a href="#coordinator">Coordinator</a><a href="#states">Состояния</a><a href="#refresh">Refresh</a><a href="#events">Event sinks</a><a href="#scheduler">Scheduler</a><a href="#errors">Ошибки</a>
+</nav></aside>
+<main>
+<header class="hero"><p class="breadcrumbs"><a href="index.html">Документация</a> / <a href="architecture.html">Архитектура</a> / Application</p><p class="eyebrow">application · StbRuntimeAdapter</p><h1>Координатор, события и граница потоков</h1><p class="lead"><code>PresenceCoordinator</code> принимает решения без RE и Discord types. <code>StbRuntimeAdapter</code> переводит Skyrim events и планирует один bounded main-thread callback.</p><div class="badges"><span class="badge">4 ports</span><span class="badge">state machine</span><span class="badge">event translation</span><span class="badge">bounded queue</span></div></header>
 
-<section id="coverage"><h2>Покрытие</h2><p><span class="coverage-ok">Разобраны все блоки:</span> 2 sink-класса, constructor и 13 методов coordinator, 16 его полей, обе реализации ProcessEvent, глобальный coordinator и 3 публичные noexcept-обёртки.</p><p><a href="https://github.com/STB-Team/DragonbornPresence-SE/blob/master/src/DragonbornPresence.cpp#L1112-L1551">Открыть реальный application layer</a></p></section>
+<section id="ports"><h2>1. Четыре application ports</h2><div class="table-wrap"><table><thead><tr><th>Порт</th><th>Операции</th><th>Concrete adapter</th></tr></thead><tbody><tr><td><code>IConfigProvider</code></td><td>Получить complete <code>Config</code>.</td><td><code>JsonConfigProvider</code></td></tr><tr><td><code>IGameDataSource</code></td><td>Initialize STB data и прочитать snapshot.</td><td><code>StbGameDataSource</code></td></tr><tr><td><code>IPresenceClient</code></td><td>Initialize, callbacks, update, shutdown.</td><td><code>DiscordPresenceClient</code></td></tr><tr><td><code>ILogger</code></td><td>Info, warning, error, critical.</td><td><code>SkseLogger</code></td></tr></tbody></table></div><p>References в constructor обязательны и non-owning. Composition root гарантирует lifetime concrete objects.</p></section>
 
-<section id="sinks"><h2>1. Forward declaration и event sink-классы</h2>
-<pre><code>class PresenceCoordinator;
+<section id="coordinator"><h2>2. Запуск coordinator</h2><p>Lifecycle разделён на этапы:</p><ol class="steps"><li><code>LoadConfig()</code> читает JSON до регистрации runtime;</li><li><code>Start()</code> инициализирует game data source и Presence transport;</li><li><code>OnGameLoaded()</code> отмечает доступное сохранение и публикует первый snapshot;</li><li><code>Tick()</code> обслуживает callbacks и периодический refresh;</li><li><code>Stop()</code> необратимо выключает текущий экземпляр.</li></ol><p>Флаг <code>permanentlyStopped_</code> не позволяет случайно перезапустить coordinator после transport failure.</p><p><a href="https://github.com/STB-Team/DragonbornPresence-SE/blob/master/src/application/PresenceCoordinator.cpp">Открыть PresenceCoordinator.cpp</a></p></section>
 
-class MenuEventSink final
-    : public RE::BSTEventSink&lt;RE::MenuOpenCloseEvent&gt; { ... };
+<section id="states"><h2>3. Loading и gameplay states</h2><p><code>loading_</code> и <code>gameLoaded_</code> используются только на main thread. Правила:</p><ul><li>до playable save публикуется стабильный loading payload;</li><li>открытие Loading Menu немедленно возвращает loading payload;</li><li>закрытие Loading Menu после загрузки вызывает gameplay refresh;</li><li>Main Menu сбрасывает признак загруженной игры;</li><li>gameplay snapshot не отправляется, пока loading active.</li></ul><p>Application state не хранится в event sink: sink только сообщает изменение coordinator.</p></section>
 
-class CombatEventSink final
-    : public RE::BSTEventSink&lt;RE::TESCombatEvent&gt; { ... };</code></pre>
-<p>Forward declaration сообщает, что тип существует, до его полного определения. Этого достаточно для reference member <code>PresenceCoordinator&amp;</code>, но не для хранения coordinator по value.</p>
-<p>Public inheritance реализует интерфейс Skyrim observer. <code>final</code> запрещает дальнейшее наследование. Constructor принимает reference и записывает его member initializer list. Reference гарантирует обязательную связь, но sink не владеет coordinator.</p>
-<p><code>ProcessEvent(... ) override</code> заставляет compiler проверить совпадение с virtual signature базового класса. Второй параметр source не используется, поэтому в определении у него нет имени.</p>
-</section>
+<section id="refresh"><h2>4. Формирование Presence</h2><p><code>RefreshPresence(reason)</code> выполняет один полный путь:</p><pre><code>ReadPlayerSnapshot
+  → deaths fallback
+  → LocationAssetResolver
+  → details/state strings
+  → combat small asset
+  → PresencePayload
+  → IPresenceClient::UpdateActivity</code></pre><p>Текущий контракт:</p><ul><li><code>details</code> — сложность STB;</li><li><code>state</code> — уровень, смерти и камень;</li><li>large asset — первое matching location rule;</li><li>small asset — только loading или combat.</li></ul><p>Подробный snapshot логируется только после принятого нового payload, поэтому неизменный polling не засоряет log.</p></section>
 
-<section id="owner"><h2>2. <code>PresenceCoordinator</code> как composition root</h2>
-<pre><code>PresenceCoordinator() noexcept
-    : menuEventSink_(*this), combatEventSink_(*this)
-{}</code></pre>
-<p>Coordinator создаёт adapters и передаёт им reference на себя. <code>*this</code> — текущий объект. На стадии initializer list объект ещё строится, но reference только сохраняется; constructors sinks не вызывают методы coordinator.</p>
-<p>Порядок фактической инициализации определяется порядком объявления fields, а не порядком в initializer list. В коде provider/client объявлены до sinks, затем sinks — это согласовано.</p>
-</section>
+<section id="events"><h2>5. Skyrim event sinks</h2><p><code>StbRuntimeAdapter</code> владеет двумя вложенными sinks:</p><div class="table-wrap"><table><thead><tr><th>Sink</th><th>RE input</th><th>Application signal</th></tr></thead><tbody><tr><td><code>MenuEventSink</code></td><td><code>MenuOpenCloseEvent</code></td><td><code>OnMainMenuOpened()</code> или <code>OnLoadingChanged(bool)</code></td></tr><tr><td><code>CombatEventSink</code></td><td><code>TESCombatEvent</code></td><td><code>RequestCombatRefresh(involvesPlayer, combatEnded)</code></td></tr></tbody></table></div><p>Каждый <code>ProcessEvent</code> проверяет null, перехватывает все исключения и всегда возвращает <code>kContinue</code>. RE-event не пересекает application boundary.</p><p><a href="https://github.com/STB-Team/DragonbornPresence-SE/blob/master/src/adapters/SkyrimTrueBeliever/StbRuntimeAdapter.cpp">Открыть StbRuntimeAdapter.cpp</a></p></section>
 
-<section id="exceptions"><h2>3. <code>HandleException</code>, <code>HandleUnknownException</code> и <code>Stop</code></h2>
-<h3><code>HandleException(context, details)</code></h3><ol><li><code>active_=false</code> закрывает новые work paths.</li><li><code>permanentlyStopped_=true</code> запрещает повторную регистрацию.</li><li><code>callbackThread_.request_stop()</code> ставит stop request.</li><li>Critical log строится внутри собственного try.</li><li>Discord client получает shutdown reason.</li></ol>
-<p>Параметр <code>details</code> nullable; ternary выбирает fallback. <code>context</code> — view, потому что callers передают literals.</p>
-<h3><code>HandleUnknownException</code></h3><p>Не дублирует state transitions: делегирует общей функции со стабильным текстом.</p>
-<h3><code>Stop()</code></h3><p>Private короткий метод используется после Discord failure. Он выключает coordinator и thread, но не повторяет transport log: client уже записал конкретную причину.</p>
-</section>
+<section id="scheduler"><h2>6. Один scheduler, одна pending task</h2><p>Background <code>std::jthread</code> не вызывает Skyrim forms или Discord SDK. Он только раз в 500 мс пытается поставить main-thread task через <code>SKSE::TaskInterface</code>.</p><pre><code>scheduler thread                 Skyrim main thread
+----------------                ------------------
+callbackTaskPending == false
+  → exchange(true)
+  → AddTask ------------------→ clear pending
+                                 PresenceCoordinator::Tick
+                                 RunCallbacks
+                                 ReadPlayerSnapshot
+                                 UpdateActivity
+callbackTaskPending == true
+  → увеличить wait counter
+  → warning at 500 ms / 5 s</code></pre><p>Combat events используют отдельный atomic request flag и объединяются ближайшим общим tick. Event storm не создаёт очередь из тысяч задач.</p></section>
 
-<section id="registration"><h2>4. Загрузка config и регистрация, строки 1182–1223</h2>
-<h3><code>LoadConfig()</code></h3><pre><code>config_ = configuration::ConfigLoader::Load();</code></pre><p>Возвращаемый Config move-assigns в member. Метод сам не ловит exception: публичная wrapper в конце файла создаёт единую boundary.</p>
-<h3><code>RegisterGameEventHandlers()</code></h3>
-<div class="table-wrap"><table class="line-notes"><thead><tr><th>Строки</th><th>Почему</th></tr></thead><tbody>
-<tr><td>1191</td><td>Первая trace-точка стадии DataLoaded.</td></tr><tr><td>1192–1197</td><td>После fatal error этот экземпляр не пытается стартовать повторно.</td></tr><tr><td>1199–1201</td><td>Получаются UI singleton, combat event source и SKSE task interface.</td></tr><tr><td>1202–1211</td><td>Все три обязательны до любого registration; log содержит три booleans.</td></tr><tr><td>1213</td><td>Discord client должен полностью инициализироваться.</td></tr><tr><td>1215</td><td>Только после prerequisites ставится active.</td></tr><tr><td>1216</td><td>Forms ищутся после DataLoaded.</td></tr><tr><td>1217–1218</td><td>Loading Activity отправляется; client может отключиться, тогда дальнейшая registration запрещена.</td></tr><tr><td>1220–1221</td><td>Sinks регистрируются в двух разных event sources.</td></tr><tr><td>1222</td><td>Scheduler запускается последним, когда все dependencies готовы.</td></tr>
-</tbody></table></div>
-<div class="callout success"><strong>Transactional ordering:</strong> сначала проверка, потом создание client/data, затем registration и thread. Чем позже side effect, тем меньше partially initialized состояния.</div>
-</section>
+<section id="errors"><h2>7. Остановка без разрушения Skyrim</h2><p>Exception на внешней границе вызывает runtime handler:</p><ol class="steps"><li>атомарно прекращает производство новых задач;</li><li>просит coordinator остановить Presence;</li><li>пишет context-specific critical log;</li><li>оставляет Skyrim продолжать работу.</li></ol><p>Background handler не уничтожает Discord core из scheduler thread. Окончательная очистка выполняется безопасным main-thread/application path и destructor order.</p></section>
 
-<section id="state-machine"><h2>5. Game loaded, menu и combat state machine</h2>
-<h3><code>OnGameLoaded()</code></h3><p>Inactive → no-op. Иначе info, <code>gameLoaded_=true</code>, <code>loading_=false</code>, немедленный refresh с причиной <code>kGameLoaded</code>.</p>
-<h3><code>HandleMenuEvent()</code></h3>
-<div class="table-wrap"><table><thead><tr><th>Событие</th><th>Переход</th><th>Результат</th></tr></thead><tbody><tr><td>Main Menu opening</td><td><code>gameLoaded=false</code>, <code>SetLoading(true)</code></td><td>Loading Activity, player data больше не публикуется.</td></tr><tr><td>Loading Menu opening</td><td><code>SetLoading(true)</code></td><td>Loading Activity.</td></tr><tr><td>Loading Menu closing и gameLoaded</td><td><code>SetLoading(false)</code></td><td>Refresh <code>loading-finished</code>.</td></tr><tr><td>Другое меню</td><td>Нет перехода</td><td>No-op.</td></tr></tbody></table></div>
-<p>Сравнение <code>event.menuName == string_view</code> использует содержимое имени, не pointer identity.</p>
-<h3><code>HandleCombatEvent()</code></h3><ol><li>Игнорирует inactive, not loaded и loading.</li><li>Проверяет, является ли actor или targetActor player.</li><li>Отдельно обнаруживает возможное завершение боя: new state None и прошлый snapshot был combat.</li><li>Ставит atomic <code>combatRefreshRequested_=true</code>.</li></ol>
-<p>Event не читает полный snapshot и не вызывает Discord. Несколько событий схлопываются в один bool.</p>
-<h3><code>SetLoading(bool)</code></h3><p>Сначала записывает field. True отправляет loading Activity. False отправляет полный refresh только если gameLoaded. Это centralizes side effects смены loading.</p>
-</section>
-
-<section id="refresh"><h2>6. Loading Activity и полный <code>RefreshPresence</code></h2>
-<h3><code>SendLoadingPresence()</code></h3><pre><code>discordClient_.UpdateActivity({
-    {}, kLoadingText,
-    config_.largeImage, config_.largeText,
-    config_.loadingImage, kLoadingText,
-});</code></pre><p>Braced aggregate создаёт <code>ActivityPayload</code> в порядке полей. Empty details, state «Загрузка», общий large и loading small. Return queued/not queued не нужен. После вызова client health проверяется обязательно.</p>
-<h3><code>RefreshPresence(reason)</code></h3>
-<div class="table-wrap"><table class="line-notes"><thead><tr><th>Блок</th><th>Разбор</th></tr></thead><tbody>
-<tr><td>1292</td><td>Inactive guard.</td></tr><tr><td>1293–1296</td><td>Loading/not loaded никогда не читает player snapshot.</td></tr><tr><td>1298</td><td>Value snapshot создаётся одним provider call.</td></tr><tr><td>1299–1301</td><td>Optional deaths превращается в число или dash.</td></tr><tr><td>1302</td><td>Details = difficulty; копия в local string удерживает lifetime.</td></tr><tr><td>1303–1307</td><td>State форматирует level, deaths, stone.</td></tr><tr><td>1308–1313</td><td>Small asset/text либо combat, либо empty views.</td></tr><tr><td>1314–1317</td><td>Короткоживущий resolver использует текущий config и position.</td></tr><tr><td>1319</td><td>Прошлое combat state обновляется фактическим snapshot.</td></tr><tr><td>1320–1327</td><td>Payload отправляется client.</td></tr><tr><td>1328–1331</td><td>Transport failure останавливает coordinator.</td></tr><tr><td>1332</td><td>Duplicate/pending Activity не пишет подробный snapshot log.</td></tr><tr><td>1334–1344</td><td>Queued change логирует причину и все диагностические значения.</td></tr>
-</tbody></table></div>
-<p><code>activityChanged</code> означает «новая операция поставлена», не «callback уже успешен». Подтверждение приходит позже отдельной строкой client.</p>
-</section>
-
-<section id="scheduler"><h2>7. <code>StartCallbackThread()</code>, строки 1359–1441</h2>
-<h3>Однократный запуск</h3><p><code>callbackThread_.joinable()</code> true, если field уже связан с thread. Ранний return не создаёт второй scheduler.</p>
-<h3>Создание <code>std::jthread</code></h3><pre><code>callbackThread_ = std::jthread(
-    [this](std::stop_token stopToken) noexcept { ... });</code></pre><p>jthread автоматически передаёт stop token callable, если сигнатура его принимает. Lambda захватывает coordinator pointer.</p>
-<h3>Цикл producer</h3><ol><li>Пока stop не requested — sleep 500 мс.</li><li>После sleep повторно проверяется stop.</li><li><code>callbackTaskPending_.exchange(true)</code> атомарно ставит флаг и возвращает прежнее значение.</li><li>Если прежнее true, задача уже queued: увеличить wait ticks, иногда warning, continue.</li><li>Если прежнее false, сбросить wait ticks и поставить ровно одну SKSE task.</li></ol>
-<h3>Warning arithmetic</h3><pre><code>firstWarning = pendingTicks == 1;
-repeatedWarning = pendingTicks &gt; 1 &amp;&amp;
-    (pendingTicks - 1) % 10 == 0;</code></pre><p>Modulo выбирает ticks 11, 21, 31… после первого. Milliseconds = ticks × 500. Ternary добавляет plural suffix к английскому слову request.</p>
-<h3>Почему <code>exchange</code>, а не load/store</h3><p>Два отдельных шага «прочитать false; записать true» не атомарны вместе. Exchange делает check-and-set одной atomic operation.</p>
-<h3>Queued main-thread lambda</h3><pre><code>taskInterface_-&gt;AddTask([this]() noexcept {
-    callbackTaskPendingTicks_ = 0;
-    callbackTaskPending_ = false;
-    if (!active_) return;
-    // RunCallbacks, poll, refresh
-});</code></pre><p>Флаг освобождается в начале исполнения, не в момент queueing. Затем:</p><ol><li><code>RunCallbacks</code>; failure → Stop.</li><li>Увеличить poll ticks.</li><li>При threshold сбросить counter.</li><li>Если loaded и не loading, atomic <code>combatRefreshRequested_.exchange(false)</code> выбирает reason combat/poll.</li><li>Иначе повторно предложить loading Activity после завершения предыдущего pending callback.</li></ol>
-<h3>Две exception boundaries</h3><p>Внутренняя защищает main-thread task и вызывает полноценный <code>HandleException</code>. Внешняя защищает scheduler loop и вызывает <code>HandleBackgroundException</code>.</p>
-<h3><code>HandleBackgroundException</code></h3><p>Ставит inactive, stop request, permanently stopped и critical log. Не вызывает <code>discordClient_.Shutdown</code> из background thread, чтобы destructor SDK core не исполнился там.</p>
-<div class="callout danger"><strong>Основной thread invariant:</strong> scheduler не вызывает Skyrim getters и Discord core. Он только считает время и добавляет lambda через TaskInterface.</div>
-</section>
-
-<section id="fields"><h2>8. Все поля coordinator</h2>
-<div class="table-wrap"><table><thead><tr><th>Поле</th><th>Поток/роль</th></tr></thead><tbody>
-<tr><td><code>Config config_</code></td><td>Загружается до events, затем читается game thread.</td></tr><tr><td><code>StbDataProvider</code></td><td>Кэш forms и snapshots game thread.</td></tr><tr><td><code>DiscordPresenceClient</code></td><td>SDK ownership; вызывается game thread.</td></tr><tr><td><code>MenuEventSink</code></td><td>Adapter UI events.</td></tr><tr><td><code>CombatEventSink</code></td><td>Adapter combat events.</td></tr><tr><td><code>taskInterface_</code></td><td>Невладеющий SKSE service pointer.</td></tr><tr><td><code>callbackTaskPending_</code></td><td>Atomic bridge scheduler ↔ task.</td></tr><tr><td><code>callbackTaskPendingTicks_</code></td><td>Atomic delay counter.</td></tr><tr><td><code>combatRefreshRequested_</code></td><td>Atomic coalescing event flag.</td></tr><tr><td><code>active_</code></td><td>Atomic общий gate двух потоков.</td></tr><tr><td><code>permanentlyStopped_</code></td><td>Atomic запрет повторного старта.</td></tr><tr><td><code>presencePollTicks_</code></td><td>Game-thread counter.</td></tr><tr><td><code>loading_</code></td><td>Game-thread state.</td></tr><tr><td><code>gameLoaded_</code></td><td>Game-thread state.</td></tr><tr><td><code>lastCombatState_</code></td><td>Game-thread observed state.</td></tr><tr><td><code>callbackThread_</code></td><td>RAII scheduler + stop token.</td></tr>
-</tbody></table></div>
-<p>Не каждое bool должно быть atomic. Последние три bool используются только на game thread event/task paths. Atomic нужен там, где значение пересекает thread boundary.</p>
-</section>
-
-<section id="sink-bodies"><h2>9. Реальные <code>ProcessEvent</code>, строки 1477–1505</h2>
-<p>Обе функции одинаково устроены: try, null check, forward; catch standard и unknown; всегда <code>kContinue</code>.</p><pre><code>try {
-    if (event) coordinator_.HandleMenuEvent(*event);
-} catch (const std::exception&amp; error) {
-    coordinator_.HandleException("menu event handler", error.what());
-} catch (...) {
-    coordinator_.HandleUnknownException("menu event handler");
-}
-return RE::BSEventNotifyControl::kContinue;</code></pre>
-<p><code>*event</code> превращает проверенный pointer в reference. <code>kContinue</code> не забирает событие у остальных registered sinks.</p>
-</section>
-
-<section id="wrappers"><h2>10. Глобальный объект и публичные обёртки</h2>
-<pre><code>application::PresenceCoordinator g_presenceCoordinator;</code></pre><p>Объект находится в анонимном namespace: один экземпляр на DLL, не exported. Его constructor выполняется при инициализации static storage, timestamp Discord client также создаётся один раз.</p>
-<h3><code>LoadConfig</code>, <code>RegisterGameEventHandlers</code>, <code>OnGameLoaded</code></h3><p>Каждая public function:</p><ol><li>объявлена <code>noexcept</code>;</li><li>вызывает один method глобального coordinator;</li><li>ловит <code>std::exception</code> с конкретным context;</li><li>ловит unknown;</li><li>не возвращает exception в <code>main.cpp</code>/SKSE.</li></ol>
-<p>Это намеренное повторение на трёх ABI/event boundaries. Generic wrapper template сократил бы несколько строк, но усложнил бы beginner readability и context labels.</p>
-</section>
-
-<section id="constructs"><h2>11. Конструкции многопоточности</h2><div class="table-wrap"><table><thead><tr><th>Конструкция</th><th>Гарантия</th><th>Не гарантирует</th></tr></thead><tbody><tr><td><code>std::atomic&lt;bool&gt;</code></td><td>Нет data race на одном значении.</td><td>Не делает целую группу полей общей транзакцией.</td></tr><tr><td><code>exchange</code></td><td>Atomic read-and-write.</td><td>Не ждёт исполнения SKSE task.</td></tr><tr><td><code>std::jthread</code></td><td>RAII join и stop source.</td><td>Thread не останавливается мгновенно; код должен проверять token.</td></tr><tr><td><code>sleep_for</code></td><td>Не выполняет busy spin.</td><td>Пробуждение не точно real-time.</td></tr><tr><td><code>AddTask</code></td><td>Работа попадёт в очередь SKSE main thread.</td><td>Не гарантирует немедленное исполнение.</td></tr><tr><td><code>noexcept lambda</code></td><td>Исключение не должно выйти.</td><td>Требует внутренних catch, иначе terminate.</td></tr></tbody></table></div></section>
-
-<nav class="page-nav" aria-label="Переход между главами"><a href="code-discord.html"><small>Назад</small>Discord и Windows</a><a href="code-build.html"><small>Далее</small>Сборка и релиз</a></nav><footer>Полный разбор DragonbornPresence 3.1.8 · глава 5 из 7</footer>
-</main></div></body></html>
+<nav class="page-nav" aria-label="Переходы"><a href="code-discord.html"><small>Назад</small>Discord transport</a><a href="code-build.html"><small>Далее</small>Сборка и CI</a></nav>
+<footer>DragonbornPresence 3.1.8 · актуальная архитектура · глава 5 из 7</footer>
+</main></div></body>
+</html>

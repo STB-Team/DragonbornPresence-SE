@@ -48,7 +48,7 @@
 
     <section id="code-guide" class="guide-banner">
       <h2>Изучаете разработку плагина?</h2>
-      <p>Отдельная <a href="architecture.html"><strong>карта текущего исходного кода</strong></a> объясняет clean architecture, application-порты, адаптеры Skyrim True Believer и Discord, жизненный цикл SKSE, потоки, обработку ошибок, тесты, CMake и инварианты.</p>
+      <p>Начните с <a href="architecture.html"><strong>обзора текущей архитектуры</strong></a>, затем пройдите <a href="code-entry.html"><strong>семь практических глав</strong></a> или откройте <a href="source-walkthrough.html"><strong>карту актуальных файлов</strong></a>. Материалы объясняют application-порты, адаптеры Skyrim True Believer и Discord, lifecycle SKSE, потоки, тесты, CMake и инварианты.</p>
     </section>
 
     <section id="contract">
@@ -124,7 +124,7 @@ docs/                                    — веб-документация
 
     <section id="config">
       <h2>Рабочий JSON</h2>
-      <p><code>D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence\SKSE\Plugins\DragonbornPresence.json</code></p>
+      <p><code>&lt;корень мода MO2&gt;\SKSE\Plugins\DragonbornPresence.json</code></p>
       <pre><code>{
   "schema_version": 1,
   "discord": {
@@ -141,7 +141,8 @@ docs/                                    — веб-документация
     "location_images": []
   }
 }</code></pre>
-      <div class="callout warning">После сборки исходный JSON из <code>config</code> копируется в MO2 вместе с DLL. Изменение JSON применяется игрой только после полного перезапуска Skyrim.</div>
+      <p><code>schema_version</code> проверяется до остальных полей. Версия <code>1</code> поддерживается; отсутствующее поле считается legacy schema 1, а неверная или неподдерживаемая версия возвращает полный default config.</p>
+      <div class="callout warning">JSON копируется в MO2 только локальным user preset с настроенным deploy-каталогом. Изменение JSON применяется игрой после полного перезапуска Skyrim.</div>
     </section>
 
     <section id="locations">
@@ -164,17 +165,17 @@ docs/                                    — веб-документация
           </tbody>
         </table>
       </div>
-      <p>Проверка идёт сверху вниз; первое полное совпадение останавливает поиск. В текущем конфиге 438 правил.</p>
+      <p>Проверка идёт сверху вниз; первое полное совпадение останавливает поиск. В текущем конфиге 439 правил.</p>
     </section>
 
     <section id="build">
-      <h2>Сборка и автокопирование</h2>
+      <h2>Сборка и локальное развёртывание</h2>
       <p>Visual Studio 2026, CMake 4.2+, генератор <code>Visual Studio 18 2026</code>, <code>x64</code>, toolset <code>v145</code>.</p>
       <pre><code>cmake --preset vs2026
 cmake --build --preset release</code></pre>
-      <p>Пресет развёртывает DLL, PDB, Discord SDK и JSON в <code>D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence\SKSE\Plugins</code>.</p>
+      <p>Общий preset переносим и не содержит MO2 path. Локальный путь задаётся в ignored <code>CMakeUserPresets.json</code>; presets <code>vs2026-local</code> и <code>release-local</code> развёртывают runtime-файлы в выбранный мод.</p>
       <pre><code>ZIP:
-D:\Dev\STB-Discord-Integration\DragonbornPresence-SE\build\vs2026\DragonbornPresence.zip</code></pre>
+build/vs2026/DragonbornPresence.zip</code></pre>
       <p>Архив содержит корневой каталог <code>SKSE</code> и устанавливается напрямую через MO2 без FOMOD.</p>
     </section>
 
@@ -183,7 +184,7 @@ D:\Dev\STB-Discord-Integration\DragonbornPresence-SE\build\vs2026\DragonbornPres
       <pre><code>cmake --preset vs2026-tests
 cmake --build --preset tests
 ctest --preset tests</code></pre>
-      <p>Три CTest-цели проверяют core-правила, state machine <code>PresenceCoordinator</code>, JSON-конфигурацию и CP1251/UTF-8 adapter. Workflow <code>.github/workflows/ci.yml</code> запускает их для каждого push в <code>dev</code>, pull request и ручного запуска.</p>
+      <p>Три CTest-цели проверяют core, application, JSON schema и кодировки. Отдельный CI job собирает production SKSE-плагин и запускает строгую проверку ZIP manifest.</p>
       <div class="callout">Тесты не заменяют runtime smoke test: после изменения RE/SKSE adapter нужна Release-сборка и проверка через SKSE в текущей сборке STB.</div>
     </section>
 
@@ -205,7 +206,7 @@ Presence updated; session_start=1784380000.</code></pre>
       <h2>Релиз 3.1.8</h2>
       <pre><code>git tag -a v3.1.8 -m "DragonbornPresence 3.1.8"
 git push origin v3.1.8</code></pre>
-      <p>Workflow на <code>windows-2025-vs2026</code> собирает Release и прикрепляет готовый <code>DragonbornPresence.zip</code>.</p>
+      <p>Workflow проверяет соответствие тега CMake-версии, запускает все тесты, собирает Release, проверяет точный ZIP manifest и только затем публикует архив.</p>
       <div class="callout">Для следующего релиза сначала обновить версию в <code>CMakeLists.txt</code>, затем создать новый тег.</div>
     </section>
 

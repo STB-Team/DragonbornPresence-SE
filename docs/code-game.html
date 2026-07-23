@@ -1,171 +1,43 @@
 <!doctype html>
 <html lang="ru">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Полный разбор StbDataProvider, Skyrim forms, PlayerSnapshot и шаблонов ScriptUtils DragonbornPresence.">
-<title>Skyrim и Papyrus — код DragonbornPresence</title><link rel="stylesheet" href="site.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Актуальный разбор Skyrim True Believer adapter, форм STB, Papyrus и кодировок DragonbornPresence.">
+  <title>Skyrim True Believer adapter — DragonbornPresence</title>
+  <link rel="stylesheet" href="site.css">
 </head>
 <body class="code-page"><div class="layout">
-<aside aria-label="Навигация по разбору кода"><div class="brand"><strong>Полный разбор кода</strong><span>3 из 7 · игровые данные</span></div><nav>
-<a href="architecture.html">Обзор архитектуры</a><a href="code-entry.html">1. Точка входа</a><a href="code-foundation.html">2. Модели и JSON</a><a href="code-game.html">3. Skyrim и Papyrus</a><a href="code-discord.html">4. Discord и Windows</a><a href="code-application.html">5. Координатор</a><a href="code-build.html">6. Сборка и релиз</a><a href="code-recipes.html">7. Примеры</a>
-<span class="nav-title">Эта страница</span><a href="#provider">StbDataProvider</a><a href="#initialize">Initialize</a><a href="#snapshot">Snapshot</a><a href="#stone-name">ParseStoneName</a><a href="#difficulty">Сложность</a><a href="#stone">Выбор камня</a><a href="#position">Позиция</a><a href="#script-utils">ScriptUtils</a><a href="#templates">Шаблоны C++</a>
+<aside aria-label="Навигация по учебнику"><div class="brand"><strong>Архитектурный учебник</strong><span>3 из 7 · игра</span></div><nav>
+  <a href="architecture.html">Обзор</a><a href="code-entry.html">1. Точка входа</a><a href="code-foundation.html">2. Core и JSON</a><a href="code-game.html" aria-current="page">3. Skyrim True Believer</a><a href="code-discord.html">4. Discord</a><a href="code-application.html">5. Application и runtime</a><a href="code-build.html">6. Сборка и CI</a><a href="code-recipes.html">7. Рецепты изменений</a><a href="source-walkthrough.html">Карта исходников</a>
+  <span class="nav-title">Эта страница</span><a href="#boundary">Граница adapter</a><a href="#initialize">Initialize</a><a href="#snapshot">Snapshot</a><a href="#combat">Бой</a><a href="#location">Локация</a><a href="#papyrus">Papyrus</a><a href="#encoding">CP1251</a>
 </nav></aside>
-<main><header class="hero">
-<p class="breadcrumbs"><a href="index.html">Документация</a> / <a href="architecture.html">Код</a> / Skyrim и Papyrus</p>
-<p class="eyebrow">DragonbornPresence.cpp · строки 509–686 · ScriptUtils.h</p><h1>Чтение данных Skyrim и STB</h1>
-<p class="lead">Кто владеет формами, когда допустим lookup, как строится независимый снимок игрока и каким образом C++ добирается до property внутри Papyrus alias.</p>
-<div class="badges"><span class="badge">RE::TESForm</span><span class="badge">PlayerCharacter</span><span class="badge">Papyrus VM</span><span class="badge">templates</span></div>
-<details class="mobile-toc"><summary>Оглавление и другие главы</summary><nav><a href="code-foundation.html">Предыдущая</a><a href="code-discord.html">Следующая</a><a href="#initialize">Поиск forms</a><a href="#snapshot">Снимок</a><a href="#position">Локация</a><a href="#script-utils">Papyrus</a><a href="#templates">C++ templates</a></nav></details>
-</header>
+<main>
+<header class="hero"><p class="breadcrumbs"><a href="index.html">Документация</a> / <a href="architecture.html">Архитектура</a> / STB adapter</p><p class="eyebrow">adapters/SkyrimTrueBeliever</p><h1>Чтение Skyrim и данных сборки STB</h1><p class="lead"><code>StbGameDataSource</code> — единственный источник gameplay snapshot. Здесь заканчиваются RE-указатели, Papyrus VM и строки игрового движка.</p><div class="badges"><span class="badge">IGameDataSource</span><span class="badge">STB.esp</span><span class="badge">Papyrus VM</span><span class="badge">owned snapshot</span></div></header>
 
-<section id="coverage"><h2>Покрытие</h2><p><span class="coverage-ok">Разобраны все блоки:</span> класс <code>StbDataProvider</code>, его 7 методов и 2 поля; весь 98-строчный <code>ScriptUtils.h</code>, включая constraints, VM handles, lock, property/variable lookup и type conversion.</p><p><a href="https://github.com/STB-Team/DragonbornPresence-SE/blob/master/src/DragonbornPresence.cpp#L509-L686">StbDataProvider</a> · <a href="https://github.com/STB-Team/DragonbornPresence-SE/blob/master/include/ScriptUtils.h">ScriptUtils.h</a></p></section>
+<section id="boundary"><h2>1. Почему adapter называется <code>SkyrimTrueBeliever</code></h2><p>Интеграция опирается на конкретный <code>STB.esp</code>, его Form ID, Editor IDs, alias script и standing-stone description spells. Универсального <code>skyrim</code> adapter в проекте нет.</p><p><code>StbGameDataSource</code> реализует <code>application::ports::IGameDataSource</code>:</p><pre><code>virtual void Initialize() = 0;
+virtual core::PlayerSnapshot ReadPlayerSnapshot() = 0;</code></pre><p>Application видит только эти две операции и не включает <code>RE/Skyrim.h</code>.</p></section>
 
-<section id="provider"><h2>1. Ответственность <code>StbDataProvider</code></h2>
-<p>Provider — адаптер между нестабильным игровым миром и обычными C++ values. Он делает два типа работы:</p>
-<ul><li><strong>Один раз:</strong> ищет формы STB, разбирает имена камней и кэширует pointers.</li><li><strong>Каждый refresh:</strong> читает короткоживущие значения и возвращает <code>PlayerSnapshot</code>.</li></ul>
-<p>Provider не знает о Discord fields и не отправляет Activity. Это позволяет проверять смысл игровых данных отдельно от транспорта.</p>
-<div class="callout warning"><strong>Ownership:</strong> pointers <code>TESGlobal*</code>, <code>TESQuest*</code>, <code>SpellItem*</code>, <code>PlayerCharacter*</code> принадлежат Skyrim. Плагин их не создаёт и никогда не вызывает <code>delete</code>.</div>
-</section>
+<section id="initialize"><h2>2. Кэширование STB forms</h2><p><code>Initialize()</code> вызывается после <code>kDataLoaded</code>, когда <code>TESDataHandler</code> и plugin forms доступны. Метод один раз находит:</p><ul><li>global смертей <code>aaMZgv_NowDeath</code>;</li><li>quest сложности из <code>STB.esp</code>;</li><li>description spell каждого поддерживаемого камня.</li></ul><p>Указатели non-owning: формами владеет Skyrim. Отсутствующая форма остаётся null и позже даёт fallback. Adapter никогда не удаляет RE objects.</p></section>
 
-<section id="initialize"><h2>2. <code>Initialize()</code>, строки 515–548</h2>
-<pre><code>auto* dataHandler = RE::TESDataHandler::GetSingleton();
-if (!dataHandler) {
-    SKSE::log::error("STB integration: TESDataHandler is unavailable.");
-    return;
-}
+<section id="snapshot"><h2>3. <code>ReadPlayerSnapshot()</code></h2><p>На каждом application poll создаётся новый owned snapshot:</p><pre><code>PlayerCharacter
+  → level
+  → deaths global
+  → selected stone
+  → Papyrus difficulty
+  → LocationContext
+  → combat state and target text
+  → core::PlayerSnapshot</code></pre><p>Если player singleton отсутствует, возвращается default snapshot. Имя игрока намеренно не читается: оно не входит в текущий Presence-контракт и не должно создавать лишнюю строку каждые 500 мс.</p><p><a href="https://github.com/STB-Team/DragonbornPresence-SE/blob/master/src/adapters/SkyrimTrueBeliever/StbGameDataSource.cpp">Открыть StbGameDataSource.cpp</a></p></section>
 
-runtimeData_.deaths = RE::TESForm::LookupByEditorID&lt;RE::TESGlobal&gt;(...);
-runtimeData_.difficultyQuest = dataHandler-&gt;LookupForm&lt;RE::TESQuest&gt;(...);</code></pre>
-<div class="table-wrap"><table class="line-notes"><thead><tr><th>Строки</th><th>Разбор</th></tr></thead><tbody>
-<tr><td>517</td><td>Singleton возвращает общий data registry Skyrim. <code>auto*</code> выводит pointer type.</td></tr>
-<tr><td>518–521</td><td>Null guard. Без registry lookup невозможен; provider остаётся с null defaults.</td></tr>
-<tr><td>523–524</td><td>Template argument <code>TESGlobal</code> требует форму правильного runtime-типа по Editor ID.</td></tr>
-<tr><td>525–527</td><td>Quest ищется по local Form ID плюс plugin name. CommonLib учитывает load order.</td></tr>
-<tr><td>529–530</td><td>Старый stone cache очищается; capacity резервируется под все definitions.</td></tr>
-<tr><td>531–538</td><td>Для каждой compile-time definition ищется spell и сразу вычисляется display name.</td></tr>
-<tr><td>540–547</td><td>Init summary: bool найденности pointers и count найденных spells через ranges.</td></tr>
-</tbody></table></div>
-<h3>Почему два разных lookup</h3><p>Global и spells имеют стабильные Editor IDs, поэтому используются глобальные <code>LookupByEditorID</code>. Quest задан числовым ID внутри конкретного plugin — нужен <code>TESDataHandler::LookupForm(formId, pluginName)</code>.</p>
-<h3>Aggregate initialization</h3><pre><code>runtimeData_.stones.push_back({
-    descriptionSpell,
-    ParseStoneName(descriptionSpell, definition.fallbackName),
-});</code></pre>
-<p>Braced list заполняет поля <code>StoneRuntimeData</code> по порядку объявления. Временная string перемещается в vector element.</p>
-<h3><code>std::ranges::count_if</code></h3><p>Алгоритм принимает range целиком и predicate lambda. <code>const auto&amp; stone</code> избегает копирования. Результат — число элементов с ненулевым spell pointer.</p>
-</section>
+<section id="combat"><h2>4. Combat target</h2><p>Когда игрок находится в бою, adapter пытается получить текущую цель и копирует её имя и уровень в <code>lastCombatTarget_</code>. Если Skyrim временно теряет target handle, последняя корректная цель сохраняет стабильную подсказку. После завершения боя cache очищается.</p><pre><code>В бою с &lt;имя цели&gt; (ур. &lt;уровень&gt;)</code></pre><p>Game data source сообщает факт <code>inCombat</code> и текст. Решение, показывать ли small combat asset, остаётся в coordinator.</p></section>
 
-<section id="snapshot"><h2>3. <code>ReadPlayerSnapshot()</code>, строки 551–586</h2>
-<pre><code>model::PlayerSnapshot snapshot;
-auto* player = RE::PlayerCharacter::GetSingleton();
-if (!player) return snapshot;</code></pre>
-<p>Snapshot создаётся до lookup и уже имеет defaults. Поэтому любой ранний return возвращает корректный объект, а не частично неинициализированную память.</p>
-<div class="table-wrap"><table class="line-notes"><thead><tr><th>Строки</th><th>Читаемое значение</th><th>Поведение при отсутствии</th></tr></thead><tbody>
-<tr><td>557</td><td><code>player-&gt;GetLevel()</code></td><td>До этого player проверен; int записывается напрямую.</td></tr>
-<tr><td>558–560</td><td><code>runtimeData_.deaths-&gt;value</code></td><td>Optional остаётся disengaged; в Discord будет <code>—</code>.</td></tr>
-<tr><td>561</td><td>Выбранный stone spell</td><td><code>не выбран</code>.</td></tr>
-<tr><td>562</td><td>Papyrus difficulty</td><td><code>не определена</code>.</td></tr>
-<tr><td>563</td><td>Worldspace/location/cell display text</td><td>Пустая string.</td></tr>
-<tr><td>564</td><td><code>IsInCombat()</code></td><td>false default.</td></tr>
-</tbody></table></div>
-<h3>Преобразование deaths</h3><p><code>TESGlobal::value</code> хранится как floating value. <code>static_cast&lt;int&gt;</code> явно отбрасывает fractional часть. Код предполагает, что STB использует global как целочисленный счётчик.</p>
-<h3>Combat target handle</h3><pre><code>if (const auto target =
-        player-&gt;GetActorRuntimeData().currentCombatTarget.get()) {
-    std::string targetName = text::FromGameString(target-&gt;GetName());
-    if (!targetName.empty()) {
-        lastCombatTarget_ = model::CombatTargetData{
-            std::move(targetName), target-&gt;GetLevel()
-        };
-    }
-}</code></pre>
-<ul><li>if-initializer ограничивает <code>target</code> веткой.</li><li><code>currentCombatTarget</code> — handle; <code>get()</code> пытается разрешить его в actor pointer.</li><li>Пустое имя не перезаписывает хороший предыдущий cache.</li><li>Имя перемещается, level копируется.</li></ul>
-<h3>Формирование combat text</h3><p>Если cache есть, <code>std::format</code> создаёт <code>В бою с NAME (ур. LEVEL)</code>. Иначе используется базовое <code>В бою</code>. Когда <code>inCombat=false</code>, <code>lastCombatTarget_.reset()</code> убирает старое значение, чтобы следующая битва не показывала прежнего врага.</p>
-<div class="callout"><strong>Почему snapshot, а не набор getters в coordinator:</strong> все значения относятся к одному polling moment, обработка fallbacks сосредоточена в игровом слое, а Discord-код не хранит pointers Skyrim.</div>
-</section>
+<section id="location"><h2>5. Построение <code>LocationContext</code></h2><p>Adapter копирует:</p><ul><li>Editor ID worldspace;</li><li>Editor ID текущей cell;</li><li>Editor IDs всей цепочки parent locations;</li><li>первое доступное локализованное имя location;</li><li>отображаемую комбинацию worldspace/location или fallback cell name.</li></ul><p>Иерархия сохраняется в порядке обхода. Core resolver затем может сопоставить правило не только с текущей location, но и с её родителем.</p></section>
 
-<section id="stone-name"><h2>4. <code>ParseStoneName()</code>, строки 591–615</h2>
-<ol><li>Null spell → compile-time fallback.</li><li><code>RE::BSString description</code> принимает текст через <code>GetDescription</code>.</li><li>Пустой description → fallback.</li><li><code>nlohmann::json::parse</code> разбирает embedded JSON.</li><li>Ищется key <code>name</code>; нужен string и непустое значение.</li><li>JSON exception пишет warning с Editor ID spell.</li><li>Любой неуспех заканчивается fallback.</li></ol>
-<pre><code>const auto name = root.find("name");
-if (name != root.end() &amp;&amp; name-&gt;is_string()) {
-    const auto parsedName = name-&gt;get&lt;std::string&gt;();
-    if (!parsedName.empty()) return parsedName;
-}</code></pre>
-<p><code>find</code> предпочтительнее <code>root["name"]</code>: он не создаёт отсутствующий key. Template <code>get&lt;std::string&gt;</code> выполняет typed extraction.</p>
-</section>
+<section id="papyrus"><h2>6. <code>PapyrusValueReader.h</code></h2><p>Header-only helper изолирует механику Papyrus VM:</p><ol class="steps"><li>получает VM policy;</li><li>получает handle формы или alias;</li><li>под lock находит attached scripts;</li><li>сначала читает property, затем variable;</li><li>преобразует поддерживаемый Papyrus type в C++ value;</li><li>возвращает <code>std::nullopt</code> при отсутствии любого звена.</li></ol><p>Шаблоны constrained допустимыми RE form/alias types. Координатор никогда не знает имени Papyrus script или property.</p><p><a href="https://github.com/STB-Team/DragonbornPresence-SE/blob/master/include/DragonbornPresence/adapters/SkyrimTrueBeliever/PapyrusValueReader.h">Открыть PapyrusValueReader.h</a></p></section>
 
-<section id="difficulty"><h2>5. Сложность: <code>DifficultyName</code> и <code>ReadSelectedDifficulty</code></h2>
-<h3><code>DifficultyName(int)</code></h3><p>Число явно приводится к scoped enum, затем switch отображает 0–4 в локализованные literals. <code>default</code> возвращает unknown для отрицательных и будущих значений.</p>
-<h3><code>ReadSelectedDifficulty() const</code></h3>
-<pre><code>const auto difficulty =
-    ScriptUtils::GetFirstAliasScriptPropertyOrVariable&lt;int&gt;(
-        runtimeData_.difficultyQuest,
-        constants::kDifficultyScriptName.data(),
-        constants::kDifficultyPropertyName.data());
-return difficulty ? std::string(DifficultyName(*difficulty))
-                  : std::string(constants::kUnknownDifficultyText);</code></pre>
-<ul><li>Template argument <code>&lt;int&gt;</code> выбирает Papyrus integer conversion.</li><li><code>.data()</code> получает pointer на null-terminated characters string literal view.</li><li>Optional проверяется как bool.</li><li><code>*difficulty</code> извлекает int только в true branch ternary.</li><li>Обе ветки создают owning string, поэтому return lifetime безопасен.</li><li><code>const</code> после сигнатуры обещает не менять observable fields provider.</li></ul>
-</section>
+<section id="encoding"><h2>7. Кодировки строк STB</h2><p><code>StbStringEncoding.cpp</code> преобразует legacy CP1251 через два WinAPI-прохода:</p><pre><code>CP1251 bytes → UTF-16 → UTF-8</code></pre><p><code>FromGameString</code> сначала принимает уже корректный UTF-8 без преобразования и только иначе вызывает <code>Cp1251ToUtf8</code>. Null, пустая строка или ошибка WinAPI дают пустую owned строку.</p><div class="callout"><strong>Граница:</strong> WinAPI-кодировка относится к STB adapter, а общая проверка и безопасное ограничение UTF-8 относятся к core.</div></section>
 
-<section id="stone"><h2>6. <code>ReadSelectedStone()</code>, строки 643–654</h2>
-<pre><code>const auto selectedStone = std::ranges::find_if(
-    runtimeData_.stones,
-    [player](const auto&amp; stone) {
-        return stone.descriptionSpell &amp;&amp;
-               player-&gt;HasSpell(stone.descriptionSpell);
-    });</code></pre>
-<p>Lambda захватывает player pointer по value. Логическое AND short-circuit не вызывает <code>HasSpell(null)</code>. Алгоритм останавливается на первом совпадении; порядок <code>kStoneDefinitions</code> задаёт precedence, если по ошибке активно несколько description spells.</p>
-<p>Iterator сравнивается с <code>end()</code>. При успехе возвращается копия cached name, иначе fallback.</p>
-</section>
-
-<section id="position"><h2>7. <code>BuildDisplayPosition()</code>, строки 657–680</h2>
-<p>Метод получает три независимых уровня:</p><pre><code>worldspace = player-&gt;GetWorldspace();
-location   = player-&gt;GetCurrentLocation();
-cell       = player-&gt;GetParentCell();</code></pre>
-<h3>Цепочка parent locations</h3><pre><code>for (auto* current = location; current &amp;&amp; locationName.empty();
-     current = current-&gt;parentLoc) {
-    locationName = text::FromGameString(current-&gt;GetName());
-}</code></pre>
-<p>Цикл прекращается при null или первом непустом display name. Это позволяет interior child location без имени унаследовать понятное имя родителя.</p>
-<h3>Приоритет результата</h3><ol><li>Есть worldspace и отличающаяся location → <code>worldspace: location</code>.</li><li>Есть только worldspace либо names равны → worldspace.</li><li>Нет worldspace, есть location → location.</li><li>Иначе cell.</li></ol>
-<p>Сравнение <code>locationName != worldspaceName</code> предотвращает строку вроде <code>Скайрим: Скайрим</code>.</p>
-</section>
-
-<section id="script-utils"><h2>8. <code>ScriptUtils.h</code>: доступ к Papyrus VM</h2>
-<h3>Class без экземпляров</h3><p>Все методы static. Объект <code>ScriptUtils</code> не создаётся; class группирует связанные шаблоны и скрывает два helper в <code>private</code>.</p>
-<h3><code>GetPropertyOrVariable&lt;TForm&gt;</code></h3>
-<div class="table-wrap"><table class="line-notes"><thead><tr><th>Строки</th><th>Разбор</th></tr></thead><tbody>
-<tr><td>11–14</td><td>Template constraint допускает TESForm-derived, ActiveEffect или BGSBaseAlias.</td></tr>
-<tr><td>15–20</td><td>Null form возвращает empty optional.</td></tr>
-<tr><td>22–24</td><td>Получаются VirtualMachine singleton и ObjectHandlePolicy; оба проверяются.</td></tr>
-<tr><td>26–33</td><td><code>if constexpr</code> выбирает способ определения VMTypeID и компилирует только подходящую ветку.</td></tr>
-<tr><td>35–36</td><td>Policy строит VM handle; EmptyHandle означает, что Papyrus object недоступен.</td></tr>
-<tr><td>38</td><td><code>BSSpinLockGuard</code> захватывает lock attachedScripts по RAII.</td></tr>
-<tr><td>39–40</td><td>Map ищется по handle; отсутствующий key → empty.</td></tr>
-<tr><td>42–51</td><td>Перебираются attached scripts, проверяется pointer, type info и точное имя.</td></tr>
-<tr><td>48–49</td><td>Сначала property, затем backing variable.</td></tr>
-<tr><td>50</td><td>Если нужный script найден, но value нет, поиск прекращается.</td></tr>
-<tr><td>52</td><td>Ни один script не совпал → empty.</td></tr>
-</tbody></table></div>
-<h3>Почему нужен lock</h3><p>Papyrus VM может менять таблицу scripts. Чтение container одновременно с записью было бы data race/invalid iterator. Guard освобождает spin lock при любом return и исключении.</p>
-<h3><code>GetVariableValue&lt;T&gt;</code></h3><p>Compile-time chain выбирает getter:</p><ul><li>bool → <code>GetBool</code>;</li><li>signed или enum → <code>GetSInt</code> + cast;</li><li>unsigned → <code>GetUInt</code>;</li><li>floating point → <code>GetFloat</code>;</li><li>string → <code>GetString</code>;</li><li>другой T → compile error через dependent <code>static_assert</code>.</li></ul>
-<h3><code>GetScriptPropertyOrVariable&lt;T, TForm&gt;</code>: публичная обёртка</h3><pre><code>return GetPropertyOrVariable(form, scriptName, propertyName)
-    .transform([](auto* value) { return GetVariableValue&lt;T&gt;(*value); });</code></pre>
-<p>C++23 <code>optional::transform</code> вызывает lambda только при наличии pointer. Empty остаётся empty. Так lookup и type conversion образуют одну цепочку без ручного if.</p>
-<h3>Первый alias quest</h3><p><code>std::ranges::find_if</code> ищет первый non-null pointer в <code>quest-&gt;aliases</code>. Если найден, alias передаётся общей функции; иначе возвращается empty. Текущий код намеренно не ищет «alias с конкретным ID» — он полагается на первый заполненный alias.</p>
-</section>
-
-<section id="templates"><h2>9. Конструкции языка: templates и concepts</h2>
-<div class="table-wrap"><table><thead><tr><th>Конструкция</th><th>Что делает</th></tr></thead><tbody>
-<tr><td><code>template &lt;class T&gt;</code></td><td>Описывает семейство функций; конкретный код создаётся для использованного типа.</td></tr>
-<tr><td><code>requires condition</code></td><td>Ограничивает допустимые template arguments и даёт раннюю compile diagnostic.</td></tr>
-<tr><td><code>std::is_base_of_v</code></td><td>Compile-time bool: наследуется ли TForm от TESForm.</td></tr>
-<tr><td><code>std::same_as</code></td><td>Concept точного совпадения типов.</td></tr>
-<tr><td><code>if constexpr</code></td><td>Не выбранные ветки не instantiируются; в них может быть код, невалидный для другого T.</td></tr>
-<tr><td><code>static_assert</code></td><td>Останавливает компиляцию с сообщением, а не runtime.</td></tr>
-<tr><td><code>RAII lock guard</code></td><td>Lock захвачен constructor и гарантированно освобождён destructor.</td></tr>
-<tr><td><code>override</code></td><td>Будет в sinks: компилятор проверяет точное переопределение virtual метода.</td></tr>
-</tbody></table></div>
-<div class="callout danger"><strong>Главный риск при изменении:</strong> Papyrus VM internals и Skyrim objects требуют правильного потока и lock. Не возвращайте <code>Variable*</code> наружу для долгого хранения: pointer связан с VM state и lock уже будет отпущен.</div>
-</section>
-
-<nav class="page-nav" aria-label="Переход между главами"><a href="code-foundation.html"><small>Назад</small>Модели и JSON</a><a href="code-discord.html"><small>Далее</small>Discord и Windows</a></nav><footer>Полный разбор DragonbornPresence 3.1.8 · глава 3 из 7</footer>
-</main></div></body></html>
+<nav class="page-nav" aria-label="Переходы"><a href="code-foundation.html"><small>Назад</small>Core и JSON</a><a href="code-discord.html"><small>Далее</small>Discord transport</a></nav>
+<footer>DragonbornPresence 3.1.8 · актуальная архитектура · глава 3 из 7</footer>
+</main></div></body>
+</html>

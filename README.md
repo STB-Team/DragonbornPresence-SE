@@ -78,7 +78,7 @@ SKSE\Plugins\DragonbornPresence.json
 Рабочий файл:
 
 ```text
-D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence\SKSE\Plugins\DragonbornPresence.json
+<корень мода MO2>\SKSE\Plugins\DragonbornPresence.json
 ```
 
 Основной блок:
@@ -101,6 +101,8 @@ D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence\SKSE\Plugins\DragonbornPresen
   }
 }
 ```
+
+`schema_version` проверяется до чтения остальных разделов. Поддерживается версия `1`: отсутствие поля принимается как legacy schema 1 с warning, а неверный тип или неподдерживаемая версия отклоняют весь документ и сохраняют безопасные defaults.
 
 ### Правила локаций
 
@@ -135,7 +137,7 @@ D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence\SKSE\Plugins\DragonbornPresen
 | `image` | обязательный Asset key |
 | `text` | подсказка; пустое значение заменяется `large_text` |
 
-В текущем JSON находятся 438 правил. Изменение JSON требует полного перезапуска Skyrim, но не пересборки DLL.
+В текущем JSON находятся 439 правил. Изменение JSON требует полного перезапуска Skyrim, но не пересборки DLL.
 
 ## Сборка Visual Studio 2026
 
@@ -164,16 +166,16 @@ Debug:
 cmake --build --preset debug
 ```
 
-После каждой сборки автоматически обновляются:
+Общий `CMakePresets.json` не содержит пути конкретного компьютера и всегда создаёт DLL, PDB и ZIP. Локальное развёртывание в MO2 настраивается в ignored `CMakeUserPresets.json` через preset `vs2026-local`; пример приведён в [главе о сборке](docs/code-build.html#local).
 
-```text
-D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence\SKSE\Plugins\DragonbornPresence.dll
-D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence\SKSE\Plugins\DragonbornPresence.pdb
-D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence\SKSE\Plugins\discord_game_sdk.dll
-D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence\SKSE\Plugins\DragonbornPresence.json
+Локальная сборка с deploy:
+
+```bash
+cmake --preset vs2026-local
+cmake --build --preset release-local
 ```
 
-Каталог развертывания уже задан пресетом `vs2026`; при сборке JSON из `config` обновляется вместе с DLL. Готовый ZIP мода с корневым каталогом `SKSE` устанавливается напрямую через MO2:
+Она обновляет обе DLL, PDB и исходный JSON в `<корень мода MO2>\SKSE\Plugins`. Готовый ZIP с корневым каталогом `SKSE` создаётся и общим, и локальным Release preset:
 
 ```text
 D:\Dev\STB-Discord-Integration\DragonbornPresence-SE\build\vs2026\DragonbornPresence.zip
@@ -195,9 +197,9 @@ CTest запускает три изолированные цели:
 |---|---|
 | `DragonbornPresenceCoreTests` | UTF-8, лимит Discord-строк, сложность и выбор первого правила локации |
 | `DragonbornPresenceApplicationTests` | запуск, loading/game transitions, polling, бой, ошибки и постоянная остановка координатора |
-| `DragonbornPresenceAdapterTests` | CP1251 → UTF-8 и чтение/валидация JSON-конфигурации |
+| `DragonbornPresenceAdapterTests` | CP1251 → UTF-8, JSON defaults, schema version и чтение/валидация конфигурации |
 
-Workflow `.github/workflows/ci.yml` выполняет эти команды на каждом push в `dev`, pull request и ручном запуске. Тестовые цели не линкуют Discord SDK и Skyrim runtime; зависящее от RE/SKSE поведение дополнительно проверяется полной Release-сборкой и запуском в игре.
+Workflow `.github/workflows/ci.yml` запускает два независимых job на каждом push в `dev`, pull request и ручном запуске: все три CTest-цели и полную Release-сборку SKSE-плагина со строгой проверкой ZIP. Runtime smoke test в игре остаётся обязательным для изменений RE/SKSE.
 
 ## Диагностика
 
@@ -257,7 +259,7 @@ git tag -a v3.1.8 -m "DragonbornPresence 3.1.8"
 git push origin v3.1.8
 ```
 
-Workflow `.github/workflows/release.yml` использует runner `windows-2025-vs2026`, собирает Visual Studio 2026 Release и прикрепляет `DragonbornPresence.zip` к GitHub Release.
+Workflow `.github/workflows/release.yml` требует соответствия тега версии из `CMakeLists.txt`, собирает и запускает тесты, создаёт Visual Studio 2026 Release, проверяет точный manifest ZIP и только затем публикует `DragonbornPresence.zip`.
 
 Для следующего релиза сначала обновляется версия в `CMakeLists.txt`, затем создаётся новый тег `vX.Y.Z`.
 
@@ -289,6 +291,7 @@ src/adapters/discord/                     — Discord Game SDK adapter
 src/adapters/config/                      — JSON adapter
 tests/                                    — автоматические core/application/adapter tests
 config/                                   — исходный JSON релизного архива
+scripts/                                  — локальные и CI-проверки Release-артефактов
 docs/                                     — веб-документация и описание Nexus
 .github/workflows/                        — CI и GitHub Release
 ```
@@ -306,6 +309,8 @@ SKSE message/event
 ## Ссылки
 
 - [Внутренняя веб-документация](https://stb-team.github.io/DragonbornPresence-SE/)
+- [Архитектурный учебник](https://stb-team.github.io/DragonbornPresence-SE/code-entry.html)
+- [Карта актуальных исходников](https://stb-team.github.io/DragonbornPresence-SE/source-walkthrough.html)
 - [История изменений](CHANGELOG.md)
 
 Лицензия: [GPL-3.0](LICENSE).

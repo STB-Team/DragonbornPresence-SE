@@ -15,7 +15,6 @@ namespace DragonbornPresence::core
         std::string difficulty;
         LocationContext location;
         std::string combatText;
-        std::string PlayerName;
         bool inCombat = false;
     };
 

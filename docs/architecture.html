@@ -77,10 +77,11 @@
             <tr><td><code>src/main.cpp</code></td><td>SKSE entry point, лог-файл и маршрутизация сообщений SKSE.</td></tr>
             <tr><td><code>tests</code></td><td>Core, application и adapter test suites.</td></tr>
             <tr><td><code>CMakeLists.txt</code><br><code>CMakePresets.json</code></td><td>Цели, зависимости, presets, упаковка и deploy в MO2.</td></tr>
+            <tr><td><code>scripts</code></td><td>Строгая локальная и CI-проверка Release ZIP.</td></tr>
           </tbody>
         </table>
       </div>
-      <p class="source-link">Текущий код: <a href="https://github.com/STB-Team/DragonbornPresence-SE/tree/dev/include/DragonbornPresence">include/DragonbornPresence</a> · <a href="https://github.com/STB-Team/DragonbornPresence-SE/tree/dev/src">src</a> · <a href="https://github.com/STB-Team/DragonbornPresence-SE/tree/dev/tests">tests</a></p>
+      <p class="source-link">Текущий код: <a href="https://github.com/STB-Team/DragonbornPresence-SE/tree/master/include/DragonbornPresence">include/DragonbornPresence</a> · <a href="https://github.com/STB-Team/DragonbornPresence-SE/tree/master/src">src</a> · <a href="https://github.com/STB-Team/DragonbornPresence-SE/tree/master/tests">tests</a></p>
     </section>
 
     <section id="layers">
@@ -237,20 +238,20 @@ ctest --preset tests</code></pre>
           <tbody>
             <tr><td><code>DragonbornPresenceCoreTests</code></td><td>UTF-8, безопасный byte limit, difficulty labels, ASCII match и first-match location rules.</td></tr>
             <tr><td><code>DragonbornPresenceApplicationTests</code></td><td>Dependency calls, start/stop, loading/game transitions, polling, combat coalescing, inactive transport и permanent failure.</td></tr>
-            <tr><td><code>DragonbornPresenceAdapterTests</code></td><td>CP1251 conversion, defaults, valid JSON, invalid field fallback, malformed/root-invalid config и ordered location rules.</td></tr>
+            <tr><td><code>DragonbornPresenceAdapterTests</code></td><td>CP1251 conversion, defaults, schema version, valid JSON, invalid field fallback, malformed/root-invalid config и ordered location rules.</td></tr>
           </tbody>
         </table>
       </div>
-      <p>Тестовые цели не собирают SKSE plugin и не линкуют Discord SDK или Skyrim runtime. <code>.github/workflows/ci.yml</code> запускает их на Windows runner для push в <code>dev</code>, pull request и manual dispatch. UI/RE/SKSE integration окончательно проверяется Release-сборкой и runtime smoke test в игре.</p>
+      <p><code>.github/workflows/ci.yml</code> запускает два независимых job: все три test targets и полную production Release-сборку со строгой проверкой ZIP. Тестовые цели не линкуют Discord SDK или Skyrim runtime; runtime smoke test в игре остаётся отдельным доказательством RE/SKSE integration.</p>
     </section>
 
     <section id="build">
       <h2>13. Сборка, deploy и релиз</h2>
       <pre><code>cmake --preset vs2026
 cmake --build --preset release</code></pre>
-      <p>Production target линкует CommonLibSSE-NG, Discord Game SDK, spdlog, nlohmann/json и delayimp. Release создаёт оптимизированную DLL с PDB, копирует runtime-файлы в заданный preset-каталог MO2 и упаковывает <code>build/vs2026/DragonbornPresence.zip</code>.</p>
-      <p><code>.github/workflows/release.yml</code> запускается для тегов <code>v*</code>, проверяет соответствие tag и CMake version, собирает Release ZIP и публикует GitHub Release. Оба workflow используют <code>actions/checkout@v5</code>.</p>
-      <div class="callout"><strong>Разделение проверок:</strong> CI быстро доказывает engine-independent контракты. Release build доказывает совместимость всех headers, symbols и link dependencies. Запуск через SKSE доказывает runtime integration.</div>
+      <p>Production target линкует CommonLibSSE-NG, Discord Game SDK, spdlog, nlohmann/json и delayimp. Release создаёт оптимизированную DLL с PDB и упаковывает <code>build/vs2026/DragonbornPresence.zip</code>. Общий preset не содержит локального MO2 path; deploy включается только через ignored <code>CMakeUserPresets.json</code>.</p>
+      <p><code>.github/workflows/release.yml</code> запускается для тегов <code>v*</code>, требует соответствия tag и CMake version, запускает тесты, собирает Release и проверяет точный manifest архива перед публикацией. <code>scripts/Validate-ReleaseArchive.ps1</code> также проверяет JSON, пустые/лишние файлы и выводит SHA-256.</p>
+      <div class="callout"><strong>Разделение проверок:</strong> unit tests доказывают внутренние контракты. Production CI build доказывает совместимость headers, symbols и link dependencies. Запуск через SKSE доказывает runtime integration.</div>
     </section>
 
     <section id="invariants">
@@ -261,7 +262,7 @@ cmake --build --preset release</code></pre>
         <li><strong>Не более одной pending main-thread task.</strong> Задержка не создаёт неограниченную очередь.</li>
         <li><strong>Исключения не пересекают callback или DLL boundary.</strong> Каждая внешняя точка имеет catch guard.</li>
         <li><strong>Runtime adapter уничтожается первым.</strong> Его thread не переживает coordinator и adapters.</li>
-        <li><strong>Первое правило локации побеждает.</strong> Порядок 438 JSON rules является поведением.</li>
+        <li><strong>Первое правило локации побеждает.</strong> Порядок 439 JSON rules является поведением.</li>
         <li><strong>Session timestamp стабилен весь запуск.</strong> Presence update его не пересоздаёт.</li>
         <li><strong>Нет скрытого восстановления Discord.</strong> Плагин не скачивает, не устанавливает и не запускает клиент или SDK.</li>
         <li><strong>Игровой namespace — <code>SkyrimTrueBeliever</code>.</strong> Второй универсальный <code>skyrim</code> adapter не создаётся.</li>
@@ -280,6 +281,8 @@ cmake --build --preset release</code></pre>
         <li><code>StbGameDataSource</code>, <code>PapyrusValueReader</code>, <code>StbStringEncoding</code> — STB data boundary.</li>
         <li><code>DiscordSdkLoader</code> и <code>DiscordPresenceClient</code> — transport boundary.</li>
         <li><code>tests/*.cpp</code> — исполняемые примеры application и core contracts.</li>
+        <li><a href="code-entry.html">Семь глав архитектурного учебника</a> — подробное объяснение каждого слоя и рецепты изменений.</li>
+        <li><a href="source-walkthrough.html">Карта исходников</a> — актуальные файлы и основные symbols без хрупких номеров строк.</li>
       </ol>
     </section>
 

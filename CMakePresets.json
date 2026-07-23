@@ -15,7 +15,7 @@
       "binaryDir": "${sourceDir}/build/vs2026",
       "cacheVariables": {
         "BUILD_TESTING": "OFF",
-        "DRAGONBORNPRESENCE_DEPLOY_DIR": "D:/Stb/[STB] Mod Organizer/mods/DragonbornPresence"
+        "DRAGONBORNPRESENCE_DEPLOY_DIR": ""
       }
     },
     {

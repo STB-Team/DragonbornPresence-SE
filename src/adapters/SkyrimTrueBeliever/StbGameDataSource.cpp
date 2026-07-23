@@ -143,7 +143,6 @@ namespace DragonbornPresence::adapters::SkyrimTrueBeliever
             return snapshot;
 
         snapshot.level = player->GetLevel();
-        snapshot.PlayerName = FromGameString(player->GetName());
 
         if (runtimeData_.deaths)
         {
@@ -178,7 +177,6 @@ namespace DragonbornPresence::adapters::SkyrimTrueBeliever
                 lastCombatTarget_
                     ? std::format(
                           "{} с {} (ур. {})",
-                          //snapshot.PlayerName,
                           kCombatText,
                           lastCombatTarget_->name,
                           lastCombatTarget_->level)

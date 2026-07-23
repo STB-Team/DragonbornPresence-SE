@@ -17,6 +17,19 @@ jobs:
       - name: Получение исходного кода
         uses: actions/checkout@v5
 
+      - name: Проверка соответствия тега версии проекта
+        shell: pwsh
+        run: ./scripts/Test-ReleaseVersion.ps1 -Tag "${{ github.ref_name }}"
+
+      - name: Настройка тестовой сборки
+        run: cmake --preset vs2026-tests
+
+      - name: Сборка тестов
+        run: cmake --build --preset tests
+
+      - name: Запуск тестов
+        run: ctest --preset tests
+
       - name: Настройка Visual Studio 2026
         run: cmake --preset vs2026
 
@@ -25,10 +38,7 @@ jobs:
 
       - name: Проверка Release-архива
         shell: pwsh
-        run: |
-          if (-not (Test-Path "build/vs2026/DragonbornPresence.zip")) {
-            throw "Release-архив не создан."
-          }
+        run: ./scripts/Validate-ReleaseArchive.ps1 -ArchivePath "build/vs2026/DragonbornPresence.zip"
 
       - name: Публикация GitHub Release
         shell: pwsh

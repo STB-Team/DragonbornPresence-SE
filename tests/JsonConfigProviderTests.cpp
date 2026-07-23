@@ -78,6 +78,7 @@ TEST_CASE("Valid JSON configuration maps every supported field")
     const ScopedConfigDirectory directory;
     directory.Write(R"json(
 {
+  "schema_version": 1,
   "discord": {
     "enabled": false,
     "application_id": "123456789012345678"
@@ -137,6 +138,7 @@ TEST_CASE("Invalid optional fields preserve defaults and malformed rules are dis
     const ScopedConfigDirectory directory;
     directory.Write(R"json(
 {
+  "schema_version": 1,
   "discord": {
     "enabled": "yes",
     "application_id": "-5"
@@ -189,4 +191,45 @@ TEST_CASE("Non-object JSON root returns complete defaults")
     config_adapter::JsonConfigProvider provider;
 
     CheckDefaults(provider.Load());
+}
+
+TEST_CASE("Configuration without schema_version uses legacy schema one")
+{
+    const ScopedConfigDirectory directory;
+    directory.Write(R"json(
+{
+  "discord": {
+    "enabled": false
+  }
+}
+)json");
+
+    config_adapter::JsonConfigProvider provider;
+    CHECK_FALSE(provider.Load().enabled);
+}
+
+TEST_CASE("Invalid and unsupported schema versions return complete defaults")
+{
+    const ScopedConfigDirectory directory;
+
+    SECTION("schema version has the wrong type")
+    {
+        directory.Write(R"json({"schema_version": "1", "discord": {"enabled": false}})json");
+        config_adapter::JsonConfigProvider provider;
+        CheckDefaults(provider.Load());
+    }
+
+    SECTION("schema version is older than the supported version")
+    {
+        directory.Write(R"json({"schema_version": 0, "discord": {"enabled": false}})json");
+        config_adapter::JsonConfigProvider provider;
+        CheckDefaults(provider.Load());
+    }
+
+    SECTION("schema version is newer than the supported version")
+    {
+        directory.Write(R"json({"schema_version": 2, "discord": {"enabled": false}})json");
+        config_adapter::JsonConfigProvider provider;
+        CheckDefaults(provider.Load());
+    }
 }
