@@ -11,9 +11,8 @@
 #include "DragonbornPresence/adapters/config/JsonConfigProvider.h"
 #include "DragonbornPresence/application/ports/IConfigProvider.h"
 #include "DragonbornPresence/application/ports/IGameDataSource.h"
+#include "DragonbornPresence/adapters/SkyrimTrueBeliever/StbGameDataSource.h"
 #include "discord_loader.h"
-#include "AdditionalFunctions.h"
-#include "ScriptUtils.h"
 #include "discord.h"
 
 #include <array>
@@ -22,15 +21,10 @@
 #include <cstdint>
 #include <format>
 #include <memory>
-#include <optional>
-#include <ranges>
 #include <string>
 #include <string_view>
 #include <thread>
 #include <utility>
-#include <vector>
-
-#include <nlohmann/json.hpp>
 
 namespace DragonbornPresence
 {
@@ -47,336 +41,12 @@ namespace DragonbornPresence
             constexpr std::uint32_t kPendingTaskWarningRepeatTicks = 10;
             constexpr std::uint32_t kActivityCallbackTimeoutTicks = 20;
             constexpr std::size_t kDiscordTextMaxBytes = 127;
-            constexpr std::uint32_t kDifficultyQuestFormId = 0x1417C4;
-            constexpr std::string_view kStbPluginName = "STB.esp";
-            constexpr std::string_view kDifficultyScriptName = "aamz_mcmdatastorage";
-            constexpr std::string_view kDifficultyPropertyName = "aaMZ_SelectedLevel_OfDifficulty";
-            constexpr std::string_view kDeathsGlobalEditorId = "aaMZgv_NowDeath";
             constexpr std::string_view kMainMenuName = "Main Menu";
             constexpr std::string_view kLoadingMenuName = "Loading Menu";
             constexpr std::string_view kLoadingText = "Загрузка";
             constexpr std::string_view kUnknownDeathsText = "—";
-            constexpr std::string_view kNoStoneText = "не выбран";
-            constexpr std::string_view kCombatText = "В бою";
 
         } // namespace constants
-
-        namespace model
-        {
-
-            /// Describes an STB standing stone and the localized fallback shown by Discord.
-            struct StoneDefinition
-            {
-                std::string_view descriptionSpellEditorId;
-                std::string_view fallbackName;
-            };
-
-            constexpr std::array kStoneDefinitions{
-                StoneDefinition{"aaMZs_DoomstoneWarriorDesc", "🪓-Воин"},
-                StoneDefinition{"aaMZs_DoomstoneSteedDesc", "🐴-Конь"},
-                StoneDefinition{"aaMZs_DoomstoneAtronachDesc", "🎭-Атронах"},
-                StoneDefinition{"aaMZs_DoomstoneApprenticeDesc", "📜-Ученик"},
-                StoneDefinition{"aaMZs_DoomstoneLordDesc", "👑-Лорд"},
-                StoneDefinition{"aaMZs_DoomstoneThiefDesc", "🧤-Вор"},
-                StoneDefinition{"aaMZs_DoomstoneMageDesc", "🧙‍-Маг"},
-                StoneDefinition{"aaMZs_DoomstoneRitualDesc", "👻-Ритуал"},
-                StoneDefinition{"aaMZs_DoomstoneSnakeDesc", "🐍-Змей"},
-                StoneDefinition{"aaMZs_DoomstoneLadyDesc", "👠-Леди"},
-                StoneDefinition{"aaMZs_DoomstoneLoverDesc", "💖-Любовник"},
-                StoneDefinition{"aaMZs_DoomstoneShadowDesc", "🌙-Тень"},
-                StoneDefinition{"aaMZs_DoomstoneTowerDesc", "🛡️-Башня"},
-                StoneDefinition{"aaMZs_DoomstoneBeastDesc", "🦧-Зверь"},
-                StoneDefinition{"aaMZs_DoomstoneWindDesc", "🌪️-Ветер"},
-                StoneDefinition{"aaMZs_DoomstoneWaterDesc", "🌊-Вода"},
-                StoneDefinition{"aaMZs_DoomstoneTreeDesc", "🌲-Дерево"},
-                StoneDefinition{"aaMZs_DoomstoneSunDesc", "☀️-Солнце"},
-                StoneDefinition{"aaMZs_DoomstoneEarthDesc", "⛰️-Земля"},
-            };
-
-            /// Stores a resolved standing-stone spell and its display name.
-            struct StoneRuntimeData
-            {
-                RE::SpellItem *descriptionSpell = nullptr;
-                std::string name;
-            };
-
-            /// Caches STB forms required to read player data without repeated lookups.
-            struct StbRuntimeData
-            {
-                RE::TESGlobal *deaths = nullptr;
-                RE::TESQuest *difficultyQuest = nullptr;
-                std::vector<StoneRuntimeData> stones;
-            };
-
-            /// Caches the last resolved combat target while Skyrim temporarily loses its handle.
-            struct CombatTargetData
-            {
-                std::string name;
-                std::uint16_t level = 0;
-            };
-
-        } // namespace model
-
-        namespace text
-        {
-
-            /// Converts a nullable Skyrim string to valid UTF-8 without altering valid input.
-            [[nodiscard]] std::string FromGameString(const char *value)
-            {
-                if (!value || *value == '\0')
-                    return {};
-                return core::IsValidUtf8(value) ? std::string(value) : Cp1251ToUtf8(value);
-            }
-
-        } // namespace text
-
-        namespace game
-        {
-            /// Skyrim adapter that implements the application game-data port.
-            ///
-            /// Skyrim owns every cached RE::* form pointer; this adapter only observes them
-            /// after game data initialization and never deletes them. Values that cross into
-            /// application/core are copied into PlayerSnapshot, so no engine pointer escapes
-            /// this adapter boundary.
-            class StbDataProvider final
-                : public ::DragonbornPresence::application::ports::IGameDataSource
-            {
-            public:
-                /// Resolves and caches the non-owning STB forms used by presence updates.
-                ///
-                /// Skyrim retains ownership of these forms for the game session. Missing forms
-                /// remain null and are converted to fallback values when a snapshot is created.
-                void Initialize() override
-                {
-                    auto *dataHandler = RE::TESDataHandler::GetSingleton();
-                    if (!dataHandler)
-                    {
-                        SKSE::log::error("STB integration: TESDataHandler is unavailable.");
-                        return;
-                    }
-
-                    runtimeData_.deaths = RE::TESForm::LookupByEditorID<RE::TESGlobal>(
-                        constants::kDeathsGlobalEditorId.data());
-                    runtimeData_.difficultyQuest = dataHandler->LookupForm<RE::TESQuest>(
-                        constants::kDifficultyQuestFormId,
-                        constants::kStbPluginName.data());
-
-                    runtimeData_.stones.clear();
-                    runtimeData_.stones.reserve(model::kStoneDefinitions.size());
-                    for (const auto &definition : model::kStoneDefinitions)
-                    {
-                        auto *descriptionSpell = RE::TESForm::LookupByEditorID<RE::SpellItem>(
-                            definition.descriptionSpellEditorId.data());
-                        runtimeData_.stones.push_back({
-                            descriptionSpell,
-                            ParseStoneName(descriptionSpell, definition.fallbackName),
-                        });
-                    }
-
-                    SKSE::log::info(
-                        "STB integration: deaths={} difficulty={} stones={}/{}.",
-                        runtimeData_.deaths != nullptr,
-                        runtimeData_.difficultyQuest != nullptr,
-                        std::ranges::count_if(runtimeData_.stones, [](const auto &stone)
-                                              { return stone.descriptionSpell != nullptr; }),
-                        runtimeData_.stones.size());
-                }
-
-                /// Copies all game values required for a single presence refresh.
-                ///
-                /// RE::PlayerCharacter and related forms are inspected only while this method
-                /// runs. The returned PlayerSnapshot owns its strings and location identifiers.
-                [[nodiscard]] core::PlayerSnapshot ReadPlayerSnapshot() override
-                {
-                    core::PlayerSnapshot snapshot;
-                    auto *player = RE::PlayerCharacter::GetSingleton();
-                    if (!player)
-                        return snapshot;
-
-                    snapshot.level = player->GetLevel();
-                    snapshot.PlayerName = text::FromGameString(player->GetName());
-                    if (runtimeData_.deaths)
-                    {
-                        snapshot.deaths = static_cast<int>(runtimeData_.deaths->value);
-                    }
-                    snapshot.stone = ReadSelectedStone(player);
-                    snapshot.difficulty = ReadSelectedDifficulty();
-                    snapshot.location = BuildLocationContext(player);
-                    snapshot.inCombat = player->IsInCombat();
-                    if (snapshot.inCombat)
-                    {
-                        if (const auto target = player->GetActorRuntimeData().currentCombatTarget.get())
-                        {
-                            std::string targetName = text::FromGameString(target->GetName());
-                            if (!targetName.empty())
-                            {
-                                lastCombatTarget_ = model::CombatTargetData{
-                                    std::move(targetName),
-                                    target->GetLevel(),
-                                };
-                            }
-                        }
-                        snapshot.combatText = lastCombatTarget_
-                                                  ? std::format(
-                                                        "{} {} с {} (ур. {})",
-                                                        snapshot.PlayerName,
-                                                        constants::kCombatText,
-                                                        lastCombatTarget_->name,
-                                                        lastCombatTarget_->level)
-                                                  : std::string(constants::kCombatText);
-                    }
-                    else
-                    {
-                        lastCombatTarget_.reset();
-                    }
-                    return snapshot;
-                }
-
-            private:
-                /// Extracts a localized stone name from the spell description JSON.
-                [[nodiscard]] static std::string ParseStoneName(
-                    RE::SpellItem *descriptionSpell,
-                    std::string_view fallbackName)
-                {
-                    if (!descriptionSpell)
-                        return std::string(fallbackName);
-
-                    RE::BSString description;
-                    descriptionSpell->GetDescription(description, descriptionSpell);
-                    if (description.empty())
-                        return std::string(fallbackName);
-
-                    try
-                    {
-                        const auto root = nlohmann::json::parse(description.c_str());
-                        const auto name = root.find("name");
-                        if (name != root.end() && name->is_string())
-                        {
-                            const auto parsedName = name->get<std::string>();
-                            if (!parsedName.empty())
-                                return parsedName;
-                        }
-                    }
-                    catch (const nlohmann::json::exception &error)
-                    {
-                        SKSE::log::warn(
-                            "STB stone '{}': invalid description JSON: {}",
-                            descriptionSpell->GetFormEditorID(),
-                            error.what());
-                    }
-                    return std::string(fallbackName);
-                }
-
-                /// Reads the selected STB difficulty from the data-storage quest.
-                [[nodiscard]] std::string ReadSelectedDifficulty() const
-                {
-                    const auto difficulty =
-                        ScriptUtils::GetFirstAliasScriptPropertyOrVariable<int>(
-                            runtimeData_.difficultyQuest,
-                            constants::kDifficultyScriptName.data(),
-                            constants::kDifficultyPropertyName.data());
-                    return std::string(core::DifficultyName(difficulty));
-                }
-
-                /// Finds the first configured stone spell currently affecting the player.
-                [[nodiscard]] std::string ReadSelectedStone(RE::PlayerCharacter *player) const
-                {
-                    if (!player)
-                        return std::string(constants::kNoStoneText);
-                    const auto selectedStone = std::ranges::find_if(
-                        runtimeData_.stones,
-                        [player](const auto &stone)
-                        {
-                            return stone.descriptionSpell && player->HasSpell(stone.descriptionSpell);
-                        });
-                    return selectedStone != runtimeData_.stones.end()
-                               ? selectedStone->name
-                               : std::string(constants::kNoStoneText);
-                }
-
-                [[nodiscard]] static std::string FormEditorId(
-                    const RE::TESForm *form)
-                {
-                    if (!form)
-                        return {};
-
-                    const char *editorId = form->GetFormEditorID();
-                    return editorId ? std::string(editorId) : std::string{};
-                }
-
-                [[nodiscard]] static core::LocationContext BuildLocationContext(
-                    RE::PlayerCharacter *player)
-                {
-                    core::LocationContext context;
-
-                    if (!player)
-                        return context;
-
-                    auto *worldspace = player->GetWorldspace();
-                    auto *location = player->GetCurrentLocation();
-                    auto *cell = player->GetParentCell();
-
-                    context.worldspaceEditorId = FormEditorId(worldspace);
-                    context.cellEditorId = FormEditorId(cell);
-
-                    std::string locationName;
-
-                    for (auto *current = location;
-                         current;
-                         current = current->parentLoc)
-                    {
-                        std::string editorId = FormEditorId(current);
-
-                        if (!editorId.empty())
-                        {
-                            context.locationEditorIds.push_back(
-                                std::move(editorId));
-                        }
-
-                        if (locationName.empty())
-                        {
-                            locationName =
-                                text::FromGameString(current->GetName());
-                        }
-                    }
-
-                    const std::string worldspaceName =
-                        worldspace
-                            ? text::FromGameString(worldspace->GetName())
-                            : "";
-
-                    const std::string cellName =
-                        cell
-                            ? text::FromGameString(cell->GetName())
-                            : "";
-
-                    if (!worldspaceName.empty())
-                    {
-                        context.displayName =
-                            !locationName.empty() &&
-                                    locationName != worldspaceName
-                                ? std::format(
-                                      "{}: {}",
-                                      worldspaceName,
-                                      locationName)
-                                : worldspaceName;
-                    }
-                    else
-                    {
-                        context.displayName =
-                            !locationName.empty()
-                                ? locationName
-                                : cellName;
-                    }
-
-                    return context;
-                }
-
-                model::StbRuntimeData runtimeData_;
-                std::optional<model::CombatTargetData> lastCombatTarget_;
-            };
-
-        } // namespace game
 
         namespace integration
         {
@@ -1336,7 +1006,7 @@ namespace DragonbornPresence
         /// non-owning references to them. Destruction occurs in reverse order, so the
         /// coordinator is destroyed before either adapter.
         adapters::config::JsonConfigProvider g_configProvider;
-        game::StbDataProvider g_gameDataSource;
+        adapters::SkyrimTrueBeliever::StbGameDataSource g_gameDataSource;
 
         runtime::PresenceCoordinator g_presenceCoordinator(
             g_configProvider,
