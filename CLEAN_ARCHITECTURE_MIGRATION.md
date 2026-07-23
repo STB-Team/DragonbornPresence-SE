@@ -109,12 +109,12 @@ src/
 Текущее состояние:
 
 - рабочая ветка — `dev`, публикация выполняется только в `origin/dev`;
-- блоки B1–B6 завершены;
+- блоки B1–B7 завершены;
 - `StbGameDataSource` вынесен в `adapters/SkyrimTrueBeliever`;
-- `PresenceCoordinator` зависит от `IPresenceClient`, а concrete Discord client выбирается в composition root;
+- `PresenceCoordinator` зависит от `IPresenceClient`, а `DiscordPresenceClient` вынесен в `adapters/discord`;
 - единственный исполняемый gate на время переноса — полная Release-сборка без ошибок.
 
-Текущий активный блок: **B7 — извлечь Discord Presence adapter**.
+Текущий активный блок: **B8 — переместить Discord SDK loader в инфраструктуру адаптера**.
 
 ## Маршрут миграции
 
@@ -198,7 +198,7 @@ Commit: `refactor: extract Skyrim True Believer game adapter`.
 
 Commit: `refactor: inject presence client port`.
 
-### B7. Извлечь Discord Presence adapter
+### B7. Извлечь Discord Presence adapter — завершён
 
 Создать:
 
@@ -225,7 +225,7 @@ Commit: `refactor: inject presence client port`.
 - поведение callback, deduplication и fail-closed сохранено;
 - Release-сборка успешна.
 
-Планируемый commit: `refactor: extract Discord presence adapter`.
+Commit: `refactor: extract Discord presence adapter`.
 
 ### B8. Переместить Discord SDK loader в инфраструктуру адаптера
 
