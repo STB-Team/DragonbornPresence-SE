@@ -114,6 +114,7 @@ set(DRAGONBORNPRESENCE_SOURCES
 set(DRAGONBORNPRESENCE_HEADERS
     include/DragonbornPresence.h
     include/AdditionalFunctions.h
+    include/DragonbornPresence/application/ports/IConfigProvider.h
     include/DragonbornPresence/adapters/config/JsonConfigProvider.h
     include/ScriptUtils.h
     include/discord_loader.h

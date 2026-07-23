@@ -9,6 +9,7 @@
 #include "DragonbornPresence/core/LocationContext.h"
 #include "DragonbornPresence/core/LocationAssetResolver.h"
 #include "DragonbornPresence/adapters/config/JsonConfigProvider.h"
+#include "DragonbornPresence/application/ports/IConfigProvider.h"
 #include "discord_loader.h"
 #include "AdditionalFunctions.h"
 #include "ScriptUtils.h"
@@ -858,7 +859,7 @@ namespace DragonbornPresence
 
     } // namespace integration
 
-    namespace application
+    namespace runtime
     {
 
         class PresenceCoordinator;
@@ -905,9 +906,15 @@ namespace DragonbornPresence
         class PresenceCoordinator final
         {
         public:
-            /// Constructs the coordinator and binds both event adapters to it.
-            PresenceCoordinator() noexcept
-                : menuEventSink_(*this), combatEventSink_(*this)
+            /// Constructs the coordinator with its external configuration dependency.
+            ///
+            /// The provider is stored as a non-owning reference. The composition root must
+            /// keep it alive for at least as long as this coordinator.
+            explicit PresenceCoordinator(
+                ::DragonbornPresence::application::ports::IConfigProvider &configProvider) noexcept
+                : configProvider_(configProvider),
+                  menuEventSink_(*this),
+                  combatEventSink_(*this)
             {
             }
 
@@ -941,7 +948,7 @@ namespace DragonbornPresence
             /// Replaces the active configuration with validated file contents or defaults.
             void LoadConfig()
             {
-                config_ = adapters::config::JsonConfigProvider::Load();
+                config_ = configProvider_.Load();
             }
 
             /// Initializes integrations, publishes loading state, and registers event sinks.
@@ -1238,7 +1245,10 @@ namespace DragonbornPresence
                 {
                 }
             }
-
+            /// Non-owning configuration dependency supplied by the composition root.
+            ///
+            /// A reference expresses that this dependency is required and cannot be null.
+            ::DragonbornPresence::application::ports::IConfigProvider &configProvider_;
             core::Config config_;
             game::StbDataProvider stbDataProvider_;
             integration::DiscordPresenceClient discordClient_;
@@ -1299,9 +1309,14 @@ namespace DragonbornPresence
             return RE::BSEventNotifyControl::kContinue;
         }
 
-    } // namespace application
+    } // namespace runtime
 
-    application::PresenceCoordinator g_presenceCoordinator;
+    /// Concrete infrastructure dependencies are selected only at the composition root.
+    ///
+    /// The provider is declared first because PresenceCoordinator stores a
+    /// non-owning reference to it and must never outlive it.
+    adapters::config::JsonConfigProvider g_configProvider;
+    runtime::PresenceCoordinator g_presenceCoordinator(g_configProvider);
 
 } // namespace
 
