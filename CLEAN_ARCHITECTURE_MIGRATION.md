@@ -109,13 +109,13 @@ src/
 Текущее состояние:
 
 - рабочая ветка — `dev`, публикация выполняется только в `origin/dev`;
-- блоки B1–B11 завершены;
-- `PresenceCoordinator` извлечён в отдельную цель `DragonbornPresenceApplication`;
-- application target зависит только от `DragonbornPresenceCore` и application ports;
-- Skyrim events, SKSE services и scheduler принадлежат временному `StbRuntimeAdapter` внутри composition unit;
+- блоки B1–B12 завершены;
+- `PresenceCoordinator` находится в отдельной цели `DragonbornPresenceApplication`;
+- Skyrim events, SKSE services и scheduler извлечены в `adapters/SkyrimTrueBeliever/StbRuntimeAdapter`;
+- `DragonbornPresence.cpp` содержит только composition root и публичный фасад;
 - единственный исполняемый gate на время переноса — полная Release-сборка без ошибок.
 
-Текущий активный блок: **B12 — извлечь runtime adapter Skyrim True Believer**.
+Текущий активный блок: **B13 — свести DragonbornPresence.cpp к composition root**.
 
 ## Маршрут миграции
 
@@ -312,7 +312,7 @@ Commit: `refactor: separate application and STB runtime responsibilities`.
 
 Commit: `refactor: extract presence application service`.
 
-### B12. Извлечь runtime adapter Skyrim True Believer
+### B12. Извлечь runtime adapter Skyrim True Believer — завершён
 
 Создать:
 
@@ -329,7 +329,7 @@ Commit: `refactor: extract presence application service`.
 - остановка корректно завершает `std::jthread` и не уничтожает Discord core в scheduler thread;
 - Release-сборка успешна.
 
-Планируемый commit: `refactor: extract Skyrim True Believer runtime adapter`.
+Commit: `refactor: extract Skyrim True Believer runtime adapter`.
 
 ### B13. Свести `DragonbornPresence.cpp` к composition root
 
