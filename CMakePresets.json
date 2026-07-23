@@ -14,7 +14,19 @@
       "architecture": "x64",
       "binaryDir": "${sourceDir}/build/vs2026",
       "cacheVariables": {
+        "BUILD_TESTING": "OFF",
         "DRAGONBORNPRESENCE_DEPLOY_DIR": "D:/Stb/[STB] Mod Organizer/mods/DragonbornPresence"
+      }
+    },
+    {
+      "name": "vs2026-tests",
+      "displayName": "Visual Studio 2026 x64 tests",
+      "description": "Отдельная конфигурация core, application и adapter unit tests.",
+      "inherits": "vs2026",
+      "binaryDir": "${sourceDir}/build/vs2026-tests",
+      "cacheVariables": {
+        "BUILD_TESTING": "ON",
+        "DRAGONBORNPRESENCE_DEPLOY_DIR": ""
       }
     }
   ],
@@ -36,6 +48,28 @@
       "targets": [
         "DragonbornPresence"
       ]
+    },
+    {
+      "name": "tests",
+      "displayName": "Unit tests",
+      "configurePreset": "vs2026-tests",
+      "configuration": "Release",
+      "targets": [
+        "DragonbornPresenceCoreTests",
+        "DragonbornPresenceApplicationTests",
+        "DragonbornPresenceAdapterTests"
+      ]
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "tests",
+      "displayName": "Unit tests",
+      "configurePreset": "vs2026-tests",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
     }
   ]
 }

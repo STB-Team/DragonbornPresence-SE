@@ -52,15 +52,15 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(nlohmann_json)
 
-if(BUILD_TESTING)                                                                                                                                                                                                                          
-       FetchContent_Declare(
-           Catch2
-           GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-           GIT_TAG v3.8.1
-           GIT_SHALLOW TRUE
-       )
-       FetchContent_MakeAvailable(Catch2)
-   endif()  
+if(BUILD_TESTING)
+    FetchContent_Declare(
+        Catch2
+        GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+        GIT_TAG v3.8.1
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(Catch2)
+endif()
 
 # CommonLibSSE-NG — find_package(fmt/spdlog) intercepted above, tests disabled
 set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -171,20 +171,63 @@ target_compile_options(
         /utf-8
 )
 
-if(BUILD_TESTING)                                                                                                                                                                                                                          
-       add_executable(DragonbornPresenceCoreTests
-           tests/TextUtilsTests.cpp
-       )
+if(BUILD_TESTING)
+    add_executable(DragonbornPresenceCoreTests
+        tests/TextUtilsTests.cpp
+        tests/DifficultyTests.cpp
+        tests/LocationAssetResolverTests.cpp
+    )
+    target_link_libraries(DragonbornPresenceCoreTests PRIVATE
+        DragonbornPresenceCore
+        Catch2::Catch2WithMain
+    )
+    target_compile_options(DragonbornPresenceCoreTests PRIVATE /utf-8)
+    add_test(
+        NAME DragonbornPresenceCoreTests
+        COMMAND DragonbornPresenceCoreTests
+    )
 
-       target_link_libraries(DragonbornPresenceCoreTests PRIVATE
-           DragonbornPresenceCore
-           Catch2::Catch2WithMain
-       )
-       add_test(                                                                                                                                                                                                                                  
-       NAME DragonbornPresenceCoreTests
-       COMMAND DragonbornPresenceCoreTests
-   )  
-   endif()   
+    add_executable(DragonbornPresenceApplicationTests
+        tests/PresenceCoordinatorTests.cpp
+    )
+    target_link_libraries(DragonbornPresenceApplicationTests PRIVATE
+        DragonbornPresenceApplication
+        Catch2::Catch2WithMain
+    )
+    target_compile_options(DragonbornPresenceApplicationTests PRIVATE /utf-8)
+    add_test(
+        NAME DragonbornPresenceApplicationTests
+        COMMAND DragonbornPresenceApplicationTests
+    )
+
+    add_executable(DragonbornPresenceAdapterTests
+        tests/JsonConfigProviderTests.cpp
+        tests/StbStringEncodingTests.cpp
+        src/adapters/config/JsonConfigProvider.cpp
+        src/adapters/SkyrimTrueBeliever/StbStringEncoding.cpp
+    )
+    target_include_directories(DragonbornPresenceAdapterTests PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/include"
+        "${rapidcsv_SOURCE_DIR}/src"
+    )
+    target_link_libraries(DragonbornPresenceAdapterTests PRIVATE
+        CommonLibSSE::CommonLibSSE
+        nlohmann_json::nlohmann_json
+        Catch2::Catch2WithMain
+    )
+    target_compile_options(DragonbornPresenceAdapterTests PRIVATE /utf-8)
+    add_test(
+        NAME DragonbornPresenceAdapterTests
+        COMMAND DragonbornPresenceAdapterTests
+    )
+    set_property(
+        TARGET
+            DragonbornPresenceCoreTests
+            DragonbornPresenceApplicationTests
+            DragonbornPresenceAdapterTests
+        PROPERTY VS_GLOBAL_VcpkgXUseBuiltInApplocalDeps true
+    )
+endif()
 
 add_commonlibsse_plugin(DragonbornPresence
     SOURCES

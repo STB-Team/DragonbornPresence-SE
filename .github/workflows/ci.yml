@@ -1,0 +1,29 @@
+name: Проверка кода
+
+on:
+  push:
+    branches:
+      - dev
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Core, application и adapter tests
+    runs-on: windows-2025-vs2026
+
+    steps:
+      - name: Получение исходного кода
+        uses: actions/checkout@v4
+
+      - name: Настройка тестовой сборки
+        run: cmake --preset vs2026-tests
+
+      - name: Сборка тестов
+        run: cmake --build --preset tests
+
+      - name: Запуск тестов
+        run: ctest --preset tests
