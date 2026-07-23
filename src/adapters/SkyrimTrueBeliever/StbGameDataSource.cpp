@@ -177,8 +177,8 @@ namespace DragonbornPresence::adapters::SkyrimTrueBeliever
             snapshot.combatText =
                 lastCombatTarget_
                     ? std::format(
-                          "{} {} с {} (ур. {})",
-                          snapshot.PlayerName,
+                          "{} с {} (ур. {})",
+                          //snapshot.PlayerName,
                           kCombatText,
                           lastCombatTarget_->name,
                           lastCombatTarget_->level)
