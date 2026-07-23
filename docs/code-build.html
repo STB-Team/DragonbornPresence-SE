@@ -8,7 +8,7 @@
 <section id="coverage"><h2>Покрытие</h2><p><span class="coverage-ok">Разобраны все блоки:</span> 209 строк CMakeLists, 41 строка presets, 42 строки release workflow, корневая схема и semantics 438 однотипных location records.</p><p><a href="https://github.com/STB-Team/DragonbornPresence-SE/blob/master/CMakeLists.txt">CMakeLists.txt</a> · <a href="https://github.com/STB-Team/DragonbornPresence-SE/blob/master/CMakePresets.json">CMakePresets.json</a> · <a href="https://github.com/STB-Team/DragonbornPresence-SE/blob/master/.github/workflows/release.yml">release.yml</a></p></section>
 
 <section id="project"><h2>1. Строки 1–11: требования проекта</h2><pre><code>cmake_minimum_required(VERSION 4.2)
-project(DragonbornPresence VERSION 3.1.5 LANGUAGES CXX)
+project(DragonbornPresence VERSION 3.1.8 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(FetchContent)
@@ -88,5 +88,5 @@ permissions:
 
 <section id="artifacts"><h2>11. Что получается на выходе</h2><div class="table-wrap"><table><thead><tr><th>Файл</th><th>Откуда</th><th>Runtime роль</th></tr></thead><tbody><tr><td><code>DragonbornPresence.dll</code></td><td>Основной target</td><td>SKSE plugin code.</td></tr><tr><td><code>DragonbornPresence.pdb</code></td><td>MSVC linker</td><td>Symbols для crash diagnosis.</td></tr><tr><td><code>discord_game_sdk.dll</code></td><td>SDK 3.2.1 archive</td><td>Нативный Discord runtime.</td></tr><tr><td><code>DragonbornPresence.json</code></td><td><code>config/</code></td><td>Runtime configuration/data.</td></tr><tr><td><code>DragonbornPresence.zip</code></td><td>POST_BUILD staging</td><td>MO2-installable archive с корнем SKSE.</td></tr></tbody></table></div></section>
 
-<nav class="page-nav" aria-label="Переход между главами"><a href="code-application.html"><small>Назад</small>Координатор</a><a href="code-recipes.html"><small>Далее</small>Практические изменения</a></nav><footer>Полный разбор DragonbornPresence 3.1.5 · глава 6 из 7</footer>
+<nav class="page-nav" aria-label="Переход между главами"><a href="code-application.html"><small>Назад</small>Координатор</a><a href="code-recipes.html"><small>Далее</small>Практические изменения</a></nav><footer>Полный разбор DragonbornPresence 3.1.8 · глава 6 из 7</footer>
 </main></div></body></html>

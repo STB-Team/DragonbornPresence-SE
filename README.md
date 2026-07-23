@@ -250,11 +250,11 @@ Discord operation 'UpdateActivity callback' failed: RateLimited (code 34). Expla
 предотвращает сбои, но позволяет определить точную функцию и строку при разборе
 ошибки.
 
-## Релиз 3.1.5
+## Релиз 3.1.8
 
 ```bash
-git tag -a v3.1.5 -m "DragonbornPresence 3.1.5"
-git push origin v3.1.5
+git tag -a v3.1.8 -m "DragonbornPresence 3.1.8"
+git push origin v3.1.8
 ```
 
 Workflow `.github/workflows/release.yml` использует runner `windows-2025-vs2026`, собирает Visual Studio 2026 Release и прикрепляет `DragonbornPresence.zip` к GitHub Release.
