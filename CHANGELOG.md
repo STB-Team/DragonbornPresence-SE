@@ -5,6 +5,11 @@
 - Исходники, заголовки, runtime-конфигурация и материалы публикации распределены по каталогам `src`, `include`, `config` и `docs`.
 - Удалены устаревший HTML-редирект, неиспользуемые FOMOD/locale-остатки и старые каталоги сборки; локальная генерация оставлена только через пресет Visual Studio 2026.
 - Пресет сборки развёртывает обе DLL и исходный `DragonbornPresence.json` в мод MO2 `DragonbornPresence`.
+- Монолит `DragonbornPresence.cpp` сокращён до composition root: core-модели, application coordinator, порты и инфраструктурные адаптеры вынесены в отдельные цели и файлы.
+- Все зависимости от RE/SKSE сосредоточены в `adapters/SkyrimTrueBeliever`; Discord SDK и delay-load logic находятся в `adapters/discord`, JSON — в `adapters/config`.
+- Legacy helpers строк и Papyrus перенесены в STB adapter без compatibility headers и старых namespace.
+- Добавлены автоматические core, application и adapter tests, CMake-пресет `vs2026-tests` и CI для ветки `dev` и pull requests.
+- README и веб-документация обновлены по фактическим границам слоёв, lifecycle, потокам, тестам и инвариантам.
 
 ## 3.1.4 — 2026-07-18
 

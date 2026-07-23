@@ -16,12 +16,13 @@
     </div>
     <nav>
       <a href="#contract">Контракт</a>
-      <a href="architecture.html">Учебник по всему коду</a>
+      <a href="architecture.html">Архитектура текущего кода</a>
       <a href="#sources">Данные STB</a>
       <a href="#environment">Окружение</a>
       <a href="#config">JSON</a>
       <a href="#locations">Локации</a>
       <a href="#build">Сборка</a>
+      <a href="#tests">Автоматические тесты</a>
       <a href="#diagnostics">Диагностика</a>
       <a href="#release">Релиз</a>
     </nav>
@@ -47,7 +48,7 @@
 
     <section id="code-guide" class="guide-banner">
       <h2>Изучаете разработку плагина?</h2>
-      <p>Отдельный <a href="architecture.html"><strong>учебник по всему исходному коду</strong></a> объясняет архитектуру, жизненный цикл SKSE, модели, JSON, формы STB, строки, Discord SDK, потоки, обработку ошибок, CMake и логирование. В конце приведены примеры безопасных изменений и список инвариантов.</p>
+      <p>Отдельная <a href="architecture.html"><strong>карта текущего исходного кода</strong></a> объясняет clean architecture, application-порты, адаптеры Skyrim True Believer и Discord, жизненный цикл SKSE, потоки, обработку ошибок, тесты, CMake и инварианты.</p>
     </section>
 
     <section id="contract">
@@ -103,11 +104,16 @@ SKSE\Plugins\DragonbornPresence.pdb
 SKSE\Plugins\discord_game_sdk.dll
 SKSE\Plugins\DragonbornPresence.json</code></pre>
       <h3>Структура репозитория</h3>
-      <pre><code>src/       — реализации и точка входа SKSE
-include/   — заголовки и precompiled header
-config/    — исходный DragonbornPresence.json
-docs/      — веб-документация и описание Nexus
-.github/   — workflow релиза</code></pre>
+      <pre><code>include/DragonbornPresence/core/         — чистые модели и правила
+include/DragonbornPresence/application/  — coordinator и порты
+src/application/                         — orchestration без RE/SKSE
+src/adapters/SkyrimTrueBeliever/         — формы STB, events и scheduler
+src/adapters/discord/                    — Discord Game SDK transport
+src/adapters/config/                     — JSON provider
+tests/                                   — core/application/adapter tests
+config/                                  — исходный DragonbornPresence.json
+docs/                                    — веб-документация
+.github/workflows/                       — CI и release</code></pre>
       <div class="grid">
         <div class="card"><strong>Игра</strong><p>Текущий Skyrim SE/AE runtime, SKSE64 и Address Library сборки STB.</p></div>
         <div class="card"><strong>STB</strong><p>Текущий <code>STB.esp</code> и его MCM data-storage quest.</p></div>
@@ -170,6 +176,15 @@ cmake --build --preset release</code></pre>
       <pre><code>ZIP:
 D:\Dev\STB-Discord-Integration\DragonbornPresence-SE\build\vs2026\DragonbornPresence.zip</code></pre>
       <p>Архив содержит корневой каталог <code>SKSE</code> и устанавливается напрямую через MO2 без FOMOD.</p>
+    </section>
+
+    <section id="tests">
+      <h2>Автоматические тесты и CI</h2>
+      <pre><code>cmake --preset vs2026-tests
+cmake --build --preset tests
+ctest --preset tests</code></pre>
+      <p>Три CTest-цели проверяют core-правила, state machine <code>PresenceCoordinator</code>, JSON-конфигурацию и CP1251/UTF-8 adapter. Workflow <code>.github/workflows/ci.yml</code> запускает их для каждого push в <code>dev</code>, pull request и ручного запуска.</p>
+      <div class="callout">Тесты не заменяют runtime smoke test: после изменения RE/SKSE adapter нужна Release-сборка и проверка через SKSE в текущей сборке STB.</div>
     </section>
 
     <section id="diagnostics">

@@ -113,9 +113,11 @@ src/
 - core, application ports/service и infrastructure adapters физически разделены;
 - `StbRuntimeAdapter` владеет Skyrim events, SKSE services и scheduler;
 - `DragonbornPresence.cpp` содержит только composition root и публичный фасад;
-- Release-сборка и упаковка ZIP успешны.
+- Release-сборка и упаковка ZIP успешны;
+- восстановлены core, application и adapter tests;
+- CI успешно выполняет три CTest-цели на Windows runner.
 
-Активных блоков архитектурного переноса не осталось. Runtime smoke test и возврат автоматических тестов выполняются только по отдельному решению пользователя.
+Активных блоков архитектурного переноса не осталось. Runtime-поведение подтверждено пользователем в игре; автоматические проверки и документация завершены.
 
 ## Маршрут миграции
 
@@ -351,23 +353,26 @@ Commit: `refactor: extract Skyrim True Believer runtime adapter`.
 
 Commit: `refactor: reduce plugin module to composition root`.
 
-## Проверка каждого блока
+## Финальная проверка миграции
 
-Пока продолжается архитектурный перенос, единственный исполняемый gate перед commit — полная Release-сборка:
+После завершения архитектурных блоков действуют два автоматических gate:
 
 ```text
 cmake --build --preset release
+
+cmake --preset vs2026-tests
+cmake --build --preset tests
+ctest --preset tests
 ```
 
-Автоматические тесты, `ctest` и runtime smoke tests во время переноса не запускаются. Они будут возвращены только после завершения всех архитектурных блоков по отдельному решению пользователя. Успех промежуточного блока означает, что проект полностью собирается без ошибок; это не является утверждением о runtime-поведении.
+Release-сборка проверяет production headers, link dependencies, DLL и ZIP. Три CTest-цели отдельно проверяют core contracts, state machine координатора, JSON provider и string encoding. Workflow `.github/workflows/ci.yml` выполняет test preset для push в `dev` и pull requests.
 
-Дополнительно ассистент обязан:
+Финальные commits автоматизации:
 
-- прочитать полный diff текущего блока;
-- проверить все usages изменённых публичных символов;
-- найти старые namespace, include-пути и дубли перенесённой реализации;
-- убедиться, что CMake перечисляет реальные пути и правильные target dependencies;
-- не считать узкую компиляцию одного файла доказательством успешного plugin build.
+- `f762452 test: add automated coverage and CI`;
+- `c205408 ci: speed up adapter test build`.
+
+Runtime smoke test остаётся обязательным после изменений в `StbRuntimeAdapter`, `StbGameDataSource`, Discord SDK boundary или порядке lifetime, потому что эти части требуют настоящих SKSE/RE services.
 
 ## Git-протокол блока
 

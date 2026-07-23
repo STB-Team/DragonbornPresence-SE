@@ -179,6 +179,26 @@ D:\Stb\[STB] Mod Organizer\mods\DragonbornPresence\SKSE\Plugins\DragonbornPresen
 D:\Dev\STB-Discord-Integration\DragonbornPresence-SE\build\vs2026\DragonbornPresence.zip
 ```
 
+## Автоматические проверки
+
+Тестовая сборка не создаёт SKSE-плагин и не требует запущенной игры:
+
+```bash
+cmake --preset vs2026-tests
+cmake --build --preset tests
+ctest --preset tests
+```
+
+CTest запускает три изолированные цели:
+
+| Цель | Контракты |
+|---|---|
+| `DragonbornPresenceCoreTests` | UTF-8, лимит Discord-строк, сложность и выбор первого правила локации |
+| `DragonbornPresenceApplicationTests` | запуск, loading/game transitions, polling, бой, ошибки и постоянная остановка координатора |
+| `DragonbornPresenceAdapterTests` | CP1251 → UTF-8 и чтение/валидация JSON-конфигурации |
+
+Workflow `.github/workflows/ci.yml` выполняет эти команды на каждом push в `dev`, pull request и ручном запуске. Тестовые цели не линкуют Discord SDK и Skyrim runtime; зависящее от RE/SKSE поведение дополнительно проверяется полной Release-сборкой и запуском в игре.
+
 ## Диагностика
 
 Лог:
@@ -243,32 +263,45 @@ Workflow `.github/workflows/release.yml` использует runner `windows-20
 
 ## Архитектура
 
+Зависимости направлены внутрь: адаптеры знают application-порты и core-модели, но `core` и `application` не включают RE/SKSE или Discord SDK.
+
 | Слой | Ответственность |
 |---|---|
-| `model` | конфигурация, снимки состояния и payload |
-| `text` | UTF-8, CP1251 и ограничение Discord-полей |
-| `configuration::ConfigLoader` | чтение и валидация JSON |
-| `assets::LocationAssetResolver` | применение 438 правил локаций |
-| `game::StbDataProvider` | формы STB и снимок игрока |
-| `integration::DiscordPresenceClient` | Discord SDK, timestamp и подавление дубликатов |
-| `application::PresenceCoordinator` | загрузка, бой, события и polling раз в 500 мс |
+| `core` | конфигурация, снимки игрока, Presence payload, UTF-8, сложность и выбор ресурса локации |
+| `application::ports` | интерфейсы конфигурации, игровых данных, Presence-транспорта и логирования |
+| `application::PresenceCoordinator` | loading/game/combat transitions, polling и формирование Presence без типов Skyrim/Discord |
+| `adapters::config::JsonConfigProvider` | чтение и валидация `DragonbornPresence.json` |
+| `adapters::SkyrimTrueBeliever` | формы STB, Papyrus, строки CP1251, события Skyrim, scheduler и SKSE-логирование |
+| `adapters::discord` | проверка Discord Desktop, безопасная загрузка SDK, callbacks, timeout и подавление дубликатов |
+| `src/DragonbornPresence.cpp` | composition root: создаёт адаптеры и связывает их с координатором |
+| `src/main.cpp` | узкий SKSE entry point и маршрутизация lifecycle-сообщений |
 
 Структура репозитория:
 
 ```text
-src/       — реализации и точка входа SKSE
-include/   — заголовки и precompiled header
-config/    — исходный DragonbornPresence.json для релизного архива
-docs/      — веб-документация и описание Nexus
-.github/   — workflow сборки GitHub Release
+include/DragonbornPresence/core/          — engine-independent модели и правила
+include/DragonbornPresence/application/   — coordinator и порты
+include/DragonbornPresence/adapters/      — публичные контракты инфраструктуры
+src/core/                                 — чистая доменная логика
+src/application/                          — orchestration через порты
+src/adapters/SkyrimTrueBeliever/          — единственный Skyrim/STB runtime adapter
+src/adapters/discord/                     — Discord Game SDK adapter
+src/adapters/config/                      — JSON adapter
+tests/                                    — автоматические core/application/adapter tests
+config/                                   — исходный JSON релизного архива
+docs/                                     — веб-документация и описание Nexus
+.github/workflows/                        — CI и GitHub Release
 ```
 
-Ключевые файлы:
+Ключевой путь выполнения:
 
-- `src/main.cpp` — точка входа SKSE;
-- `include/ScriptUtils.h` — чтение сложности из alias-скрипта STB;
-- `src/AdditionalFunctions.cpp` — преобразование игровых строк;
-- `src/discord_loader.cpp` — проверка установленного и запущенного Discord и отложенная загрузка Discord SDK из `SKSE/Plugins`.
+```text
+SKSE message/event
+  → StbRuntimeAdapter
+  → PresenceCoordinator
+  → IGameDataSource / IPresenceClient / ILogger
+  → StbGameDataSource / DiscordPresenceClient / SkseLogger
+```
 
 ## Ссылки
 
