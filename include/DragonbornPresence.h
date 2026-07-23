@@ -1,11 +1,15 @@
 #pragma once
-#include <RE/Skyrim.h>
-#include <SKSE/SKSE.h>
 
-namespace DragonbornPresence {
+namespace DragonbornPresence
+{
 
-void LoadConfig() noexcept;
-void RegisterGameEventHandlers() noexcept;
-void OnGameLoaded() noexcept;
+    /// Loads plugin configuration.
+    void LoadConfig() noexcept;
 
-}
+    /// Initializes game event handlers and runtime processing.
+    void RegisterGameEventHandlers() noexcept;
+
+    /// Publishes the first complete game state.
+    void OnGameLoaded() noexcept;
+
+} // namespace DragonbornPresence

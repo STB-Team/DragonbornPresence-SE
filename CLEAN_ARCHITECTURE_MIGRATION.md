@@ -109,13 +109,13 @@ src/
 Текущее состояние:
 
 - рабочая ветка — `dev`, публикация выполняется только в `origin/dev`;
-- блоки B1–B12 завершены;
-- `PresenceCoordinator` находится в отдельной цели `DragonbornPresenceApplication`;
-- Skyrim events, SKSE services и scheduler извлечены в `adapters/SkyrimTrueBeliever/StbRuntimeAdapter`;
+- блоки B1–B13 завершены;
+- core, application ports/service и infrastructure adapters физически разделены;
+- `StbRuntimeAdapter` владеет Skyrim events, SKSE services и scheduler;
 - `DragonbornPresence.cpp` содержит только composition root и публичный фасад;
-- единственный исполняемый gate на время переноса — полная Release-сборка без ошибок.
+- Release-сборка и упаковка ZIP успешны.
 
-Текущий активный блок: **B13 — свести DragonbornPresence.cpp к composition root**.
+Активных блоков архитектурного переноса не осталось. Runtime smoke test и возврат автоматических тестов выполняются только по отдельному решению пользователя.
 
 ## Маршрут миграции
 
@@ -331,7 +331,7 @@ Commit: `refactor: extract presence application service`.
 
 Commit: `refactor: extract Skyrim True Believer runtime adapter`.
 
-### B13. Свести `DragonbornPresence.cpp` к composition root
+### B13. Свести `DragonbornPresence.cpp` к composition root — завершён
 
 Оставить в файле только:
 
@@ -349,7 +349,7 @@ Commit: `refactor: extract Skyrim True Believer runtime adapter`.
 - `main.cpp` использует прежний узкий фасад;
 - Release-сборка и упаковка ZIP успешны.
 
-Планируемый commit: `refactor: reduce plugin module to composition root`.
+Commit: `refactor: reduce plugin module to composition root`.
 
 ## Проверка каждого блока
 

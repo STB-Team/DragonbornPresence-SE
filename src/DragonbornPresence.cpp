@@ -1,10 +1,11 @@
 #include "DragonbornPresence.h"
-#include "DragonbornPresence/adapters/config/JsonConfigProvider.h"
-#include "DragonbornPresence/adapters/SkyrimTrueBeliever/StbGameDataSource.h"
-#include "DragonbornPresence/adapters/discord/DiscordPresenceClient.h"
+
 #include "DragonbornPresence/adapters/SkyrimTrueBeliever/SkseLogger.h"
-#include "DragonbornPresence/application/PresenceCoordinator.h"
+#include "DragonbornPresence/adapters/SkyrimTrueBeliever/StbGameDataSource.h"
 #include "DragonbornPresence/adapters/SkyrimTrueBeliever/StbRuntimeAdapter.h"
+#include "DragonbornPresence/adapters/config/JsonConfigProvider.h"
+#include "DragonbornPresence/adapters/discord/DiscordPresenceClient.h"
+#include "DragonbornPresence/application/PresenceCoordinator.h"
 
 #include <exception>
 
