@@ -125,6 +125,7 @@ set(DRAGONBORNPRESENCE_HEADERS
     include/DragonbornPresence/adapters/discord/DiscordSdkLoader.h
     include/DragonbornPresence/application/ports/ILogger.h
     include/DragonbornPresence/adapters/SkyrimTrueBeliever/SkseLogger.h
+    include/DragonbornPresence/application/PresenceCoordinator.h
     include/DragonbornPresence/adapters/SkyrimTrueBeliever/StbGameDataSource.h
     include/ScriptUtils.h
     include/pch.h
@@ -144,6 +145,29 @@ target_include_directories(DragonbornPresenceCore PUBLIC
 )
 
 target_compile_options(DragonbornPresenceCore PRIVATE /utf-8)
+
+add_library(DragonbornPresenceApplication STATIC
+    src/application/PresenceCoordinator.cpp
+    include/DragonbornPresence/application/PresenceCoordinator.h
+)
+
+target_include_directories(
+    DragonbornPresenceApplication
+    PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}/include"
+)
+
+target_link_libraries(
+    DragonbornPresenceApplication
+    PUBLIC
+        DragonbornPresenceCore
+)
+
+target_compile_options(
+    DragonbornPresenceApplication
+    PRIVATE
+        /utf-8
+)
 
 if(BUILD_TESTING)                                                                                                                                                                                                                          
        add_executable(DragonbornPresenceCoreTests
@@ -188,11 +212,12 @@ target_precompile_headers(DragonbornPresence PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/include/pch.h"
 )
 
-target_link_libraries(DragonbornPresence PRIVATE 
-DragonbornPresenceCore 
-discord_cpp 
-delayimp 
-nlohmann_json::nlohmann_json
+target_link_libraries(DragonbornPresence PRIVATE
+    DragonbornPresenceApplication
+    DragonbornPresenceCore
+    discord_cpp
+    delayimp
+    nlohmann_json::nlohmann_json
 )
 target_link_options(DragonbornPresence PRIVATE /DELAYLOAD:discord_game_sdk.dll)
 target_compile_options(DragonbornPresence PRIVATE /utf-8)
