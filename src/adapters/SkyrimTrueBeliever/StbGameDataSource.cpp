@@ -41,7 +41,7 @@ namespace DragonbornPresence::adapters::SkyrimTrueBeliever
         constexpr std::string_view kAedraCurseSpellEditorId =
             "aaMZs_AedraCurseDUPLICATE001";
 
-        constexpr std::string_view kNoStoneText = "не выбран";
+        constexpr std::string_view kNoStoneText = "Камень выбран";
         constexpr std::string_view kCombatText = "В бою";
         constexpr std::string_view kAedraCurseText = "Проклятие Аэдра";
         constexpr std::string_view kVampireText = "Вампир";

@@ -85,36 +85,84 @@
       },
       {
         "match": "STB Dev Room",
-        "image": "dev_room",
+        "image": "dev_room1",
         "text": "STB Dev Room"
       },
-      { "match": "Картвастен", "image": "town", "text": "Картвастен" },
-      { "match": "Драконий мост", "image": "town", "text": "Драконий мост" },
-      { "match": "Рорикстед", "image": "town", "text": "Рорикстед" },
-      { "match": "Ривервуд", "image": "town", "text": "Ривервуд" },
-      { "match": "Айварстед", "image": "town", "text": "Айварстед" },
-      { "match": "Камень шора", "image": "town", "text": "Камень шора" },
+      {
+        "match": "Картвастен",
+        "image": "town",
+        "text": "Картвастен"
+      },
+      {
+        "match": "Драконий мост",
+        "image": "town",
+        "text": "Драконий мост"
+      },
+      {
+        "match": "Рорикстед",
+        "image": "town",
+        "text": "Рорикстед"
+      },
+      {
+        "match": "Ривервуд",
+        "image": "town",
+        "text": "Ривервуд"
+      },
+      {
+        "match": "Айварстед",
+        "image": "town",
+        "text": "Айварстед"
+      },
+      {
+        "match": "Камень шора",
+        "image": "town",
+        "text": "Камень шора"
+      },
       {
         "match": "Деревня Скаалов",
         "image": "town",
         "text": "Деревня Скаалов"
       },
-      { "match": "Мор Казгур", "image": "orcstgonghold", "text": "Мор Казгур" },
-      { "match": "Душник-Йал", "image": "orcstgonghold", "text": "Душник-Йал" },
-      { "match": "Ларгашбур", "image": "orcstgonghold", "text": "Ларгашбур" },
-      { "match": "Нарзулбур", "image": "orcstgonghold", "text": "Нарзулбур" },
+      {
+        "match": "Мор Казгур",
+        "image": "orcstgonghold",
+        "text": "Мор Казгур"
+      },
+      {
+        "match": "Душник-Йал",
+        "image": "orcstgonghold",
+        "text": "Душник-Йал"
+      },
+      {
+        "match": "Ларгашбур",
+        "image": "orcstgonghold",
+        "text": "Ларгашбур"
+      },
+      {
+        "match": "Нарзулбур",
+        "image": "orcstgonghold",
+        "text": "Нарзулбур"
+      },
       {
         "match": "Причал ледяных вод",
         "image": "docks",
         "text": "Причал ледяных вод"
       },
-      { "match": "Старый Хролдан", "image": "shack", "text": "Старый Хролдан" },
+      {
+        "match": "Старый Хролдан",
+        "image": "shack",
+        "text": "Старый Хролдан"
+      },
       {
         "match": "Солитьюд - Лесопилка",
         "image": "shack",
         "text": "Солитьюд - Лесопилка"
       },
-      { "match": "Каменные холмы", "image": "shack", "text": "Каменные холмы" },
+      {
+        "match": "Каменные холмы",
+        "image": "shack",
+        "text": "Каменные холмы"
+      },
       {
         "match": "Военный лагерь Сынов Скайрима",
         "image": "bratburi",
@@ -125,21 +173,41 @@
         "image": "shack",
         "text": "Полулунная лесопилка"
       },
-      { "match": "Зал дозора", "image": "shack", "text": "Зал дозора" },
+      {
+        "match": "Зал дозора",
+        "image": "shack",
+        "text": "Зал дозора"
+      },
       {
         "match": "Таверна Ночные ворота",
         "image": "shack",
         "text": "Таверна Ночные ворота"
       },
-      { "match": "Деревня Анга", "image": "shack", "text": "Деревня Анга" },
-      { "match": "Роща Кин", "image": "shack", "text": "Роща Кин" },
+      {
+        "match": "Деревня Анга",
+        "image": "shack",
+        "text": "Деревня Анга"
+      },
+      {
+        "match": "Роща Кин",
+        "image": "shack",
+        "text": "Роща Кин"
+      },
       {
         "match": "лесопилка Пирожок",
         "image": "shack",
         "text": "Лесопилка Пирожок"
       },
-      { "match": "Черный брод", "image": "shack", "text": "Черный брод" },
-      { "match": "Деревня Лесная", "image": "shack", "text": "Деревня Лесная" },
+      {
+        "match": "Черный брод",
+        "image": "shack",
+        "text": "Черный брод"
+      },
+      {
+        "match": "Деревня Лесная",
+        "image": "shack",
+        "text": "Деревня Лесная"
+      },
       {
         "match": "Имперский военный лагерь",
         "image": "imperiya",
@@ -245,8 +313,16 @@
         "image": "skelet",
         "text": "Алтарь некроманта"
       },
-      { "match": "Лагерь Пуща", "image": "rikling", "text": "Лагерь Пуща" },
-      { "match": "Лагерь Чаща", "image": "bandit", "text": "Лагерь Чаща" },
+      {
+        "match": "Лагерь Пуща",
+        "image": "rikling",
+        "text": "Лагерь Пуща"
+      },
+      {
+        "match": "Лагерь Чаща",
+        "image": "bandit",
+        "text": "Лагерь Чаща"
+      },
       {
         "match": "Святилище Талоса",
         "image": "elf",
@@ -1162,8 +1238,16 @@
         "image": "velikan",
         "text": "Арочный перевал"
       },
-      { "match": "Башня Светотьмы", "image": "mag", "text": "Башня Светотьмы" },
-      { "match": "Ведьмино гнездо", "image": "mag", "text": "Ведьмино гнездо" },
+      {
+        "match": "Башня Светотьмы",
+        "image": "mag",
+        "text": "Башня Светотьмы"
+      },
+      {
+        "match": "Ведьмино гнездо",
+        "image": "mag",
+        "text": "Ведьмино гнездо"
+      },
       {
         "match": "Вершинная башня",
         "image": "pepel",
@@ -1179,7 +1263,11 @@
         "image": "serebruka",
         "text": "Висельная скала"
       },
-      { "match": "Грот Серая Вода", "image": "bes", "text": "Грот Серая Вода" },
+      {
+        "match": "Грот Серая Вода",
+        "image": "bes",
+        "text": "Грот Серая Вода"
+      },
       {
         "match": "Застава Сиринга",
         "image": "draugr",
@@ -1230,7 +1318,11 @@
         "image": "draugr",
         "text": "Могила чемпиона"
       },
-      { "match": "Морозная пещера", "image": "mag", "text": "Морозная пещера" },
+      {
+        "match": "Морозная пещера",
+        "image": "mag",
+        "text": "Морозная пещера"
+      },
       {
         "match": "Морозное ущелье",
         "image": "atronah",
@@ -1351,7 +1443,11 @@
         "image": "rikling",
         "text": "Ледяная пещера"
       },
-      { "match": "Логово Кру'ула", "image": "trol", "text": "Логово Кру'ула" },
+      {
+        "match": "Логово Кру'ула",
+        "image": "trol",
+        "text": "Логово Кру'ула"
+      },
       {
         "match": "Логово Моварта",
         "image": "vampir",
@@ -1382,7 +1478,11 @@
         "image": "sprigan",
         "text": "Мшистая пещера"
       },
-      { "match": "Одинокая скала", "image": "mag", "text": "Одинокая скала" },
+      {
+        "match": "Одинокая скала",
+        "image": "mag",
+        "text": "Одинокая скала"
+      },
       {
         "match": "Осенняя поляна",
         "image": "sprigan",
@@ -1433,7 +1533,11 @@
         "image": "velikan",
         "text": "Роща Великанов"
       },
-      { "match": "Руины Кьенстаг", "image": "bes", "text": "Руины Кьенстаг" },
+      {
+        "match": "Руины Кьенстаг",
+        "image": "bes",
+        "text": "Руины Кьенстаг"
+      },
       {
         "match": "Рыбачий Лагерь",
         "image": "bandit",
@@ -1464,161 +1568,641 @@
         "image": "bandit",
         "text": "Часовня Боэтии"
       },
-      { "match": "Алтарь Тронда", "image": "mag", "text": "Алтарь Тронда" },
-      { "match": "Башни Валтейм", "image": "bandit", "text": "Башни Валтейм" },
-      { "match": "Башня Илинмир", "image": "bandit", "text": "Башня Илинмир" },
-      { "match": "Ведьмин оплот", "image": "izgoi", "text": "Ведьмин оплот" },
-      { "match": "Ветровая Дуга", "image": "draugr", "text": "Ветровая Дуга" },
-      { "match": "Глубокая Тень", "image": "trol", "text": "Глубокая Тень" },
-      { "match": "Двуглавый пик", "image": "jrec", "text": "Двуглавый пик" },
-      { "match": "Дом Хродульфа", "image": "pepel", "text": "Дом Хродульфа" },
+      {
+        "match": "Алтарь Тронда",
+        "image": "mag",
+        "text": "Алтарь Тронда"
+      },
+      {
+        "match": "Башни Валтейм",
+        "image": "bandit",
+        "text": "Башни Валтейм"
+      },
+      {
+        "match": "Башня Илинмир",
+        "image": "bandit",
+        "text": "Башня Илинмир"
+      },
+      {
+        "match": "Ведьмин оплот",
+        "image": "izgoi",
+        "text": "Ведьмин оплот"
+      },
+      {
+        "match": "Ветровая Дуга",
+        "image": "draugr",
+        "text": "Ветровая Дуга"
+      },
+      {
+        "match": "Глубокая Тень",
+        "image": "trol",
+        "text": "Глубокая Тень"
+      },
+      {
+        "match": "Двуглавый пик",
+        "image": "jrec",
+        "text": "Двуглавый пик"
+      },
+      {
+        "match": "Дом Хродульфа",
+        "image": "pepel",
+        "text": "Дом Хродульфа"
+      },
       {
         "match": "Древний каирн",
         "image": "serebrruka-draugr",
         "text": "Древний каирн"
       },
-      { "match": "Желчная шахта", "image": "orc", "text": "Желчная шахта" },
-      { "match": "Зал Гейрмунда", "image": "draugr", "text": "Зал Гейрмунда" },
-      { "match": "Каирн Холдира", "image": "draugr", "text": "Каирн Холдира" },
-      { "match": "Камень Солнца", "image": "hermeus", "text": "Камень Солнца" },
-      { "match": "Каприз Иафета", "image": "bandit", "text": "Каприз Иафета" },
-      { "match": "Кровавый Трон", "image": "vampir", "text": "Кровавый Трон" },
-      { "match": "Крысиная нора", "image": "elf", "text": "Крысиная нора" },
-      { "match": "Курган Ингола", "image": "draugr", "text": "Курган Ингола" },
-      { "match": "Лагерь Ветров", "image": "bandit", "text": "Лагерь Ветров" },
-      { "match": "Оплот Друадах", "image": "izgoi", "text": "Оплот Друадах" },
-      { "match": "Отвесная нора", "image": "trol", "text": "Отвесная нора" },
-      { "match": "Погорелый дом", "image": "bandit", "text": "Погорелый дом" },
-      { "match": "Речная хижина", "image": "animal", "text": "Речная хижина" },
-      { "match": "Руины Бталфта", "image": "bandit", "text": "Руины Бталфта" },
-      { "match": "Теневая башня", "image": "sprigan", "text": "Теневая башня" },
-      { "match": "Форт Храгстад", "image": "bandit", "text": "Форт Храгстад" },
-      { "match": "Хижина Фрейлы", "image": "bandit", "text": "Хижина Фрейлы" },
-      { "match": "Черный проход", "image": "falmer", "text": "Черный проход" },
+      {
+        "match": "Желчная шахта",
+        "image": "orc",
+        "text": "Желчная шахта"
+      },
+      {
+        "match": "Зал Гейрмунда",
+        "image": "draugr",
+        "text": "Зал Гейрмунда"
+      },
+      {
+        "match": "Каирн Холдира",
+        "image": "draugr",
+        "text": "Каирн Холдира"
+      },
+      {
+        "match": "Камень Солнца",
+        "image": "hermeus",
+        "text": "Камень Солнца"
+      },
+      {
+        "match": "Каприз Иафета",
+        "image": "bandit",
+        "text": "Каприз Иафета"
+      },
+      {
+        "match": "Кровавый Трон",
+        "image": "vampir",
+        "text": "Кровавый Трон"
+      },
+      {
+        "match": "Крысиная нора",
+        "image": "elf",
+        "text": "Крысиная нора"
+      },
+      {
+        "match": "Курган Ингола",
+        "image": "draugr",
+        "text": "Курган Ингола"
+      },
+      {
+        "match": "Лагерь Ветров",
+        "image": "bandit",
+        "text": "Лагерь Ветров"
+      },
+      {
+        "match": "Оплот Друадах",
+        "image": "izgoi",
+        "text": "Оплот Друадах"
+      },
+      {
+        "match": "Отвесная нора",
+        "image": "trol",
+        "text": "Отвесная нора"
+      },
+      {
+        "match": "Погорелый дом",
+        "image": "bandit",
+        "text": "Погорелый дом"
+      },
+      {
+        "match": "Речная хижина",
+        "image": "animal",
+        "text": "Речная хижина"
+      },
+      {
+        "match": "Руины Бталфта",
+        "image": "bandit",
+        "text": "Руины Бталфта"
+      },
+      {
+        "match": "Теневая башня",
+        "image": "sprigan",
+        "text": "Теневая башня"
+      },
+      {
+        "match": "Форт Храгстад",
+        "image": "bandit",
+        "text": "Форт Храгстад"
+      },
+      {
+        "match": "Хижина Фрейлы",
+        "image": "bandit",
+        "text": "Хижина Фрейлы"
+      },
+      {
+        "match": "Черный проход",
+        "image": "falmer",
+        "text": "Черный проход"
+      },
       {
         "match": "Ветреный пик",
         "image": "bandit-draugr",
         "text": "Ветреный пик"
       },
-      { "match": "Воронья нора", "image": "mag", "text": "Воронья нора" },
-      { "match": "Душная шахта", "image": "bandit", "text": "Душная шахта" },
-      { "match": "Зимняя война", "image": "bandit", "text": "Зимняя война" },
-      { "match": "Инеевый маяк", "image": "falmer", "text": "Инеевый маяк" },
-      { "match": "Камень Ветра", "image": "hermeus", "text": "Камень Ветра" },
-      { "match": "Камень Зверя", "image": "hermeus", "text": "Камень Зверя" },
-      { "match": "Камень Земли", "image": "hermeus", "text": "Камень Земли" },
-      { "match": "Камень Лорда", "image": "bandit", "text": "Камень Лорда" },
-      { "match": "Камни Вейнон", "image": "bes", "text": "Камни Вейнон" },
-      { "match": "Лагерь Буран", "image": "bandit", "text": "Лагерь Буран" },
-      { "match": "Лагерь Исток", "image": "bandit", "text": "Лагерь Исток" },
-      { "match": "Лагерь Якорь", "image": "bandit", "text": "Лагерь Якорь" },
-      { "match": "Лесной оплот", "image": "izgoi", "text": "Лесной оплот" },
-      { "match": "Логово плута", "image": "bandit", "text": "Логово плута" },
-      { "match": "Логово Снега", "image": "animal", "text": "Логово Снега" },
-      { "match": "Озерный утес", "image": "draugr", "text": "Озерный утес" },
-      { "match": "Роща Бродира", "image": "bandit", "text": "Роща Бродира" },
-      { "match": "Руины Ркунда", "image": "atronah", "text": "Руины Ркунда" },
-      { "match": "Скала Гулдун", "image": "velikan", "text": "Скала Гулдун" },
-      { "match": "Скрытая роща", "image": "sprigan", "text": "Скрытая роща" },
-      { "match": "Слеза Сироты", "image": "bandit", "text": "Слеза Сироты" },
-      { "match": "Форт Греймур", "image": "bandit", "text": "Форт Греймур" },
-      { "match": "Форт Гринвол", "image": "bandit", "text": "Форт Гринвол" },
-      { "match": "Форт Дунстад", "image": "bandit", "text": "Форт Дунстад" },
-      { "match": "Форт Нойград", "image": "bandit", "text": "Форт Нойград" },
-      { "match": "Форт Сангард", "image": "izgoi", "text": "Форт Сангард" },
-      { "match": "Форт Сноухок", "image": "nekromant", "text": "Форт Сноухок" },
-      { "match": "Чистое озеро", "image": "sprigan", "text": "Чистое озеро" },
+      {
+        "match": "Воронья нора",
+        "image": "mag",
+        "text": "Воронья нора"
+      },
+      {
+        "match": "Душная шахта",
+        "image": "bandit",
+        "text": "Душная шахта"
+      },
+      {
+        "match": "Зимняя война",
+        "image": "bandit",
+        "text": "Зимняя война"
+      },
+      {
+        "match": "Инеевый маяк",
+        "image": "falmer",
+        "text": "Инеевый маяк"
+      },
+      {
+        "match": "Камень Ветра",
+        "image": "hermeus",
+        "text": "Камень Ветра"
+      },
+      {
+        "match": "Камень Зверя",
+        "image": "hermeus",
+        "text": "Камень Зверя"
+      },
+      {
+        "match": "Камень Земли",
+        "image": "hermeus",
+        "text": "Камень Земли"
+      },
+      {
+        "match": "Камень Лорда",
+        "image": "bandit",
+        "text": "Камень Лорда"
+      },
+      {
+        "match": "Камни Вейнон",
+        "image": "bes",
+        "text": "Камни Вейнон"
+      },
+      {
+        "match": "Лагерь Буран",
+        "image": "bandit",
+        "text": "Лагерь Буран"
+      },
+      {
+        "match": "Лагерь Исток",
+        "image": "bandit",
+        "text": "Лагерь Исток"
+      },
+      {
+        "match": "Лагерь Якорь",
+        "image": "bandit",
+        "text": "Лагерь Якорь"
+      },
+      {
+        "match": "Лесной оплот",
+        "image": "izgoi",
+        "text": "Лесной оплот"
+      },
+      {
+        "match": "Логово плута",
+        "image": "bandit",
+        "text": "Логово плута"
+      },
+      {
+        "match": "Логово Снега",
+        "image": "animal",
+        "text": "Логово Снега"
+      },
+      {
+        "match": "Озерный утес",
+        "image": "draugr",
+        "text": "Озерный утес"
+      },
+      {
+        "match": "Роща Бродира",
+        "image": "bandit",
+        "text": "Роща Бродира"
+      },
+      {
+        "match": "Руины Ркунда",
+        "image": "atronah",
+        "text": "Руины Ркунда"
+      },
+      {
+        "match": "Скала Гулдун",
+        "image": "velikan",
+        "text": "Скала Гулдун"
+      },
+      {
+        "match": "Скрытая роща",
+        "image": "sprigan",
+        "text": "Скрытая роща"
+      },
+      {
+        "match": "Слеза Сироты",
+        "image": "bandit",
+        "text": "Слеза Сироты"
+      },
+      {
+        "match": "Форт Греймур",
+        "image": "bandit",
+        "text": "Форт Греймур"
+      },
+      {
+        "match": "Форт Гринвол",
+        "image": "bandit",
+        "text": "Форт Гринвол"
+      },
+      {
+        "match": "Форт Дунстад",
+        "image": "bandit",
+        "text": "Форт Дунстад"
+      },
+      {
+        "match": "Форт Нойград",
+        "image": "bandit",
+        "text": "Форт Нойград"
+      },
+      {
+        "match": "Форт Сангард",
+        "image": "izgoi",
+        "text": "Форт Сангард"
+      },
+      {
+        "match": "Форт Сноухок",
+        "image": "nekromant",
+        "text": "Форт Сноухок"
+      },
+      {
+        "match": "Чистое озеро",
+        "image": "sprigan",
+        "text": "Чистое озеро"
+      },
       {
         "match": "Бенконгерик",
         "image": "rikling-hermeus",
         "text": "Бенконгерик"
       },
-      { "match": "Глотка Мира", "image": "drakon", "text": "Глотка Мира" },
-      { "match": "Дом Буранов", "image": "velikan", "text": "Дом Буранов" },
-      { "match": "Дом Дреласа", "image": "mag", "text": "Дом Дреласа" },
-      { "match": "Зал мертвых", "image": "skelet", "text": "Зал мертвых" },
-      { "match": "Захоронение", "image": "skelet", "text": "Захоронение" },
-      { "match": "Зуб Фалдара", "image": "bandit", "text": "Зуб Фалдара" },
-      { "match": "Камень Воды", "image": "hermeus", "text": "Камень Воды" },
-      { "match": "Камень Змея", "image": "atronah", "text": "Камень Змея" },
-      { "match": "Лабиринтиан", "image": "trol", "text": "Лабиринтиан" },
-      { "match": "Лагерь Клык", "image": "bandit", "text": "Лагерь Клык" },
-      { "match": "Пещера Хоба", "image": "nekromant", "text": "Пещера Хоба" },
-      { "match": "Пик Древних", "image": "atronah", "text": "Пик Древних" },
-      { "match": "Руины форта", "image": "trol", "text": "Руины форта" },
-      { "match": "Форт Кастав", "image": "mag", "text": "Форт Кастав" },
-      { "match": "Ход Древних", "image": "atronah", "text": "Ход Древних" },
+      {
+        "match": "Глотка Мира",
+        "image": "drakon",
+        "text": "Глотка Мира"
+      },
+      {
+        "match": "Дом Буранов",
+        "image": "velikan",
+        "text": "Дом Буранов"
+      },
+      {
+        "match": "Дом Дреласа",
+        "image": "mag",
+        "text": "Дом Дреласа"
+      },
+      {
+        "match": "Зал мертвых",
+        "image": "skelet",
+        "text": "Зал мертвых"
+      },
+      {
+        "match": "Захоронение",
+        "image": "skelet",
+        "text": "Захоронение"
+      },
+      {
+        "match": "Зуб Фалдара",
+        "image": "bandit",
+        "text": "Зуб Фалдара"
+      },
+      {
+        "match": "Камень Воды",
+        "image": "hermeus",
+        "text": "Камень Воды"
+      },
+      {
+        "match": "Камень Змея",
+        "image": "atronah",
+        "text": "Камень Змея"
+      },
+      {
+        "match": "Лабиринтиан",
+        "image": "trol",
+        "text": "Лабиринтиан"
+      },
+      {
+        "match": "Лагерь Клык",
+        "image": "bandit",
+        "text": "Лагерь Клык"
+      },
+      {
+        "match": "Пещера Хоба",
+        "image": "nekromant",
+        "text": "Пещера Хоба"
+      },
+      {
+        "match": "Пик Древних",
+        "image": "atronah",
+        "text": "Пик Древних"
+      },
+      {
+        "match": "Руины форта",
+        "image": "trol",
+        "text": "Руины форта"
+      },
+      {
+        "match": "Форт Кастав",
+        "image": "mag",
+        "text": "Форт Кастав"
+      },
+      {
+        "match": "Ход Древних",
+        "image": "atronah",
+        "text": "Ход Древних"
+      },
       {
         "match": "Храм Мирака",
         "image": "draugr-hermeus",
         "text": "Храм Мирака"
       },
-      { "match": "Ценный груз", "image": "mag-bandit", "text": "Ценный груз" },
-      { "match": "Вольскигге", "image": "bandit-jrec", "text": "Вольскигге" },
-      { "match": "Гора Антор", "image": "atronah", "text": "Гора Антор" },
-      { "match": "Жертвенник", "image": "nekromant", "text": "Жертвенник" },
-      { "match": "Корваньюнд", "image": "bandit", "text": "Корваньюнд" },
+      {
+        "match": "Ценный груз",
+        "image": "mag-bandit",
+        "text": "Ценный груз"
+      },
+      {
+        "match": "Вольскигге",
+        "image": "bandit-jrec",
+        "text": "Вольскигге"
+      },
+      {
+        "match": "Гора Антор",
+        "image": "atronah",
+        "text": "Гора Антор"
+      },
+      {
+        "match": "Жертвенник",
+        "image": "nekromant",
+        "text": "Жертвенник"
+      },
+      {
+        "match": "Корваньюнд",
+        "image": "bandit",
+        "text": "Корваньюнд"
+      },
       {
         "match": "Мзинчалефт",
         "image": "bandit-falmer-dvemer",
         "text": "Мзинчалефт"
       },
-      { "match": "Морвунскар", "image": "mag", "text": "Морвунскар" },
+      {
+        "match": "Морвунскар",
+        "image": "mag",
+        "text": "Морвунскар"
+      },
       {
         "match": "Ральдбтхар",
         "image": "bandit-falmer-dvemer",
         "text": "Ральдбтхар"
       },
-      { "match": "Хармугстал", "image": "mag", "text": "Хармугстал" },
-      { "match": "Аванчнзел", "image": "dvemer", "text": "Аванчнзел" },
-      { "match": "Ангарвунд", "image": "draugr", "text": "Ангарвунд" },
-      { "match": "Ансилвунд", "image": "draugr-mag", "text": "Ансилвунд" },
-      { "match": "Волундруд", "image": "draugr", "text": "Волундруд" },
-      { "match": "Кагрензел", "image": "falmer", "text": "Кагрензел" },
-      { "match": "Картривер", "image": "bandit", "text": "Картривер" },
-      { "match": "Картспайр", "image": "izgoi", "text": "Картспайр" },
-      { "match": "Перепутье", "image": "bandit", "text": "Перепутье" },
-      { "match": "Рагнвальд", "image": "jrec", "text": "Рагнвальд" },
-      { "match": "Развалины", "image": "vampir", "text": "Развалины" },
-      { "match": "Устенгрев", "image": "nekromant", "text": "Устенгрев" },
-      { "match": "Фолгунтур", "image": "draugr", "text": "Фолгунтур" },
-      { "match": "Форелхост", "image": "jrec", "text": "Форелхост" },
-      { "match": "Форт Амол", "image": "mag", "text": "Форт Амол" },
-      { "match": "Альфтанд", "image": "falmer-dvemer", "text": "Альфтанд" },
-      { "match": "Аркнтамз", "image": "falmer-dvemer", "text": "Аркнтамз" },
-      { "match": "Бтардамз", "image": "dvemer", "text": "Бтардамз" },
-      { "match": "Ингвильд", "image": "draugr", "text": "Ингвильд" },
-      { "match": "Иркнтанд", "image": "bandit", "text": "Иркнтанд" },
-      { "match": "Кагрумез", "image": "bandit-dvemer", "text": "Кагрумез" },
-      { "match": "Мерзлота", "image": "bandit", "text": "Мерзлота" },
-      { "match": "Оротхейм", "image": "bandit", "text": "Оротхейм" },
-      { "match": "Пепелище", "image": "atronah", "text": "Пепелище" },
-      { "match": "Сунвальд", "image": "draugr", "text": "Сунвальд" },
-      { "match": "Упокоище", "image": "draugr", "text": "Упокоище" },
-      { "match": "Фалбтарз", "image": "rikling-dvemer", "text": "Фалбтарз" },
-      { "match": "Фроссель", "image": "rikling", "text": "Фроссель" },
-      { "match": "Фростмир", "image": "bandit", "text": "Фростмир" },
-      { "match": "Холодная", "image": "atronah", "text": "Холодная" },
-      { "match": "Нилхейм", "image": "bandit", "text": "Нилхейм" },
-      { "match": "Нчардак", "image": "bandit", "text": "Нчардак" },
-      { "match": "Саартал", "image": "draugr", "text": "Саартал" },
-      { "match": "Валтум", "image": "jrec", "text": "Валтум" },
-      { "match": "Мзулфт", "image": "falmer-dvemer", "text": "Мзулфт" },
-      { "match": "Хелген", "image": "bandit", "text": "Хелген" },
-      { "match": "Ковен", "image": "mag", "text": "Ковен" },
+      {
+        "match": "Хармугстал",
+        "image": "mag",
+        "text": "Хармугстал"
+      },
+      {
+        "match": "Аванчнзел",
+        "image": "dvemer",
+        "text": "Аванчнзел"
+      },
+      {
+        "match": "Ангарвунд",
+        "image": "draugr",
+        "text": "Ангарвунд"
+      },
+      {
+        "match": "Ансилвунд",
+        "image": "draugr-mag",
+        "text": "Ансилвунд"
+      },
+      {
+        "match": "Волундруд",
+        "image": "draugr",
+        "text": "Волундруд"
+      },
+      {
+        "match": "Кагрензел",
+        "image": "falmer",
+        "text": "Кагрензел"
+      },
+      {
+        "match": "Картривер",
+        "image": "bandit",
+        "text": "Картривер"
+      },
+      {
+        "match": "Картспайр",
+        "image": "izgoi",
+        "text": "Картспайр"
+      },
+      {
+        "match": "Перепутье",
+        "image": "bandit",
+        "text": "Перепутье"
+      },
+      {
+        "match": "Рагнвальд",
+        "image": "jrec",
+        "text": "Рагнвальд"
+      },
+      {
+        "match": "Развалины",
+        "image": "vampir",
+        "text": "Развалины"
+      },
+      {
+        "match": "Устенгрев",
+        "image": "nekromant",
+        "text": "Устенгрев"
+      },
+      {
+        "match": "Фолгунтур",
+        "image": "draugr",
+        "text": "Фолгунтур"
+      },
+      {
+        "match": "Форелхост",
+        "image": "jrec",
+        "text": "Форелхост"
+      },
+      {
+        "match": "Форт Амол",
+        "image": "mag",
+        "text": "Форт Амол"
+      },
+      {
+        "match": "Альфтанд",
+        "image": "falmer-dvemer",
+        "text": "Альфтанд"
+      },
+      {
+        "match": "Аркнтамз",
+        "image": "falmer-dvemer",
+        "text": "Аркнтамз"
+      },
+      {
+        "match": "Бтардамз",
+        "image": "dvemer",
+        "text": "Бтардамз"
+      },
+      {
+        "match": "Ингвильд",
+        "image": "draugr",
+        "text": "Ингвильд"
+      },
+      {
+        "match": "Иркнтанд",
+        "image": "bandit",
+        "text": "Иркнтанд"
+      },
+      {
+        "match": "Кагрумез",
+        "image": "bandit-dvemer",
+        "text": "Кагрумез"
+      },
+      {
+        "match": "Мерзлота",
+        "image": "bandit",
+        "text": "Мерзлота"
+      },
+      {
+        "match": "Оротхейм",
+        "image": "bandit",
+        "text": "Оротхейм"
+      },
+      {
+        "match": "Пепелище",
+        "image": "atronah",
+        "text": "Пепелище"
+      },
+      {
+        "match": "Сунвальд",
+        "image": "draugr",
+        "text": "Сунвальд"
+      },
+      {
+        "match": "Упокоище",
+        "image": "draugr",
+        "text": "Упокоище"
+      },
+      {
+        "match": "Фалбтарз",
+        "image": "rikling-dvemer",
+        "text": "Фалбтарз"
+      },
+      {
+        "match": "Фроссель",
+        "image": "rikling",
+        "text": "Фроссель"
+      },
+      {
+        "match": "Фростмир",
+        "image": "bandit",
+        "text": "Фростмир"
+      },
+      {
+        "match": "Холодная",
+        "image": "atronah",
+        "text": "Холодная"
+      },
+      {
+        "match": "Нилхейм",
+        "image": "bandit",
+        "text": "Нилхейм"
+      },
+      {
+        "match": "Нчардак",
+        "image": "bandit",
+        "text": "Нчардак"
+      },
+      {
+        "match": "Саартал",
+        "image": "draugr",
+        "text": "Саартал"
+      },
+      {
+        "match": "Валтум",
+        "image": "jrec",
+        "text": "Валтум"
+      },
+      {
+        "match": "Мзулфт",
+        "image": "falmer-dvemer",
+        "text": "Мзулфт"
+      },
+      {
+        "match": "Хелген",
+        "image": "bandit",
+        "text": "Хелген"
+      },
+      {
+        "match": "Ковен",
+        "image": "mag",
+        "text": "Ковен"
+      },
       {
         "match": "Винтерхолд",
         "image": "winterholdcapital",
         "text": "Винтерхолд"
       },
-      { "match": "Виндхельм", "image": "windhelmcapital", "text": "Виндхельм" },
-      { "match": "Солитьюд", "image": "solitudecapital", "text": "Солитьюд" },
-      { "match": "Фолкрит", "image": "falkreathcapital", "text": "Фолкрит" },
-      { "match": "Маркарт", "image": "markarthcapital", "text": "Маркарт" },
-      { "match": "Данстар", "image": "dawnstar", "text": "Данстар" },
-      { "match": "Вайтран", "image": "whiteruncapital", "text": "Вайтран" },
-      { "match": "Рифтен", "image": "riftencapital", "text": "Рифтен" },
-      { "match": "Морфал", "image": "morthalcapital", "text": "Морфал" }
+      {
+        "match": "Виндхельм",
+        "image": "windhelmcapital",
+        "text": "Виндхельм"
+      },
+      {
+        "match": "Солитьюд",
+        "image": "solitudecapital",
+        "text": "Солитьюд"
+      },
+      {
+        "match": "Фолкрит",
+        "image": "falkreathcapital",
+        "text": "Фолкрит"
+      },
+      {
+        "match": "Маркарт",
+        "image": "markarthcapital",
+        "text": "Маркарт"
+      },
+      {
+        "match": "Данстар",
+        "image": "dawnstar",
+        "text": "Данстар"
+      },
+      {
+        "match": "Вайтран",
+        "image": "whiteruncapital",
+        "text": "Вайтран"
+      },
+      {
+        "match": "Рифтен",
+        "image": "riftencapital",
+        "text": "Рифтен"
+      },
+      {
+        "match": "Морфал",
+        "image": "morthalcapital",
+        "text": "Морфал"
+      }
     ]
   }
 }
