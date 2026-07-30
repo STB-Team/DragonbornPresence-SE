@@ -13,10 +13,6 @@ namespace DragonbornPresence::core
         std::optional<int> deaths;
         std::string stone;
         std::string difficulty;
-        std::string playerName;
-        std::string god;
-        std::string vampire;
-        std::string werewolf;
         LocationContext location;
         std::string combatText;
         bool inCombat = false;

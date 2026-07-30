@@ -22,8 +22,6 @@ namespace DragonbornPresence::adapters::discord
     namespace
     {
 
-        constexpr ::discord::ClientId kStbDiscordApplicationId =
-            1527543892151373937;
         constexpr std::uint32_t kActivityCallbackTimeoutTicks = 20;
         constexpr std::chrono::milliseconds
             kActivityCallbackTimeout{10000};
@@ -157,12 +155,15 @@ namespace DragonbornPresence::adapters::discord
         }
     } // namespace
 
-    bool DiscordPresenceClient::Initialize()
+    bool DiscordPresenceClient::Initialize(const core::Config &config)
     {
         transportHealthy_ = false;
-        pendingActivitySignature_.clear();
-        pendingActivityCallbackTicks_ = 0;
-        core_.reset();
+        if (!config.enabled)
+        {
+            SKSE::log::info(
+                "Discord presence is disabled by configuration; the SDK was not loaded.");
+            return false;
+        }
 
         std::string failureReason;
         if (!IsDiscordRunning(&failureReason))
@@ -187,7 +188,8 @@ namespace DragonbornPresence::adapters::discord
         try
         {
             result = ::discord::Core::Create(
-                kStbDiscordApplicationId,
+                static_cast<::discord::ClientId>(
+                    config.applicationId),
                 DiscordCreateFlags_NoRequireDiscord,
                 &createdCore);
         }
@@ -235,7 +237,7 @@ namespace DragonbornPresence::adapters::discord
 
         SKSE::log::info(
             "Discord Game SDK initialized for application {}; session_start={}.",
-            kStbDiscordApplicationId,
+            config.applicationId,
             sessionStartTimestamp_);
         return true;
     }
@@ -424,21 +426,7 @@ namespace DragonbornPresence::adapters::discord
 
     void DiscordPresenceClient::Shutdown(std::string_view reason) noexcept
     {
-        const bool hadWork = core_ || transportHealthy_;
-        transportHealthy_ = false;
-        pendingActivitySignature_.clear();
-        pendingActivityCallbackTicks_ = 0;
-        core_.reset();
-        if (!hadWork)
-            return;
-
-        try
-        {
-            SKSE::log::info("Discord transport stopped: {}.", reason);
-        }
-        catch (...)
-        {
-        }
+        Disable(reason);
     }
 
     void DiscordPresenceClient::LogResultFailure(

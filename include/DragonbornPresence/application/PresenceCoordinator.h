@@ -5,12 +5,10 @@
 #include "DragonbornPresence/application/ports/ILogger.h"
 #include "DragonbornPresence/application/ports/IPresenceClient.h"
 #include "DragonbornPresence/core/Config.h"
-#include "DragonbornPresence/core/PlayerSnapshot.h"
 #include "DragonbornPresence/core/RefreshReason.h"
 
 #include <atomic>
 #include <cstdint>
-#include <string>
 #include <string_view>
 
 namespace DragonbornPresence::application
@@ -43,10 +41,7 @@ namespace DragonbornPresence::application
         /// Replaces the active configuration with provider output.
         void LoadConfig();
 
-        /// Initializes game data and starts runtime processing.
-        ///
-        /// A disabled or unavailable Presence transport does not prevent Skyrim
-        /// event registration; an explicit configuration change may enable it later.
+        /// Initializes game data and the Presence transport.
         [[nodiscard]] bool Start();
 
         /// Stops future application work without controlling runtime threads.
@@ -66,25 +61,12 @@ namespace DragonbornPresence::application
             bool involvesPlayer,
             bool combatEnded);
 
-        /// Checks runtime configuration, processes transport callbacks, and
-        /// publishes the next Presence state.
+        /// Processes transport callbacks and publishes the next Presence state.
         ///
         /// The runtime adapter must invoke this method on Skyrim's main thread.
         [[nodiscard]] bool Tick();
 
     private:
-        /// Applies a changed runtime configuration and transport transition.
-        void ApplyReloadedConfig(core::Config config);
-
-        /// Starts one transport session without stopping runtime on failure.
-        [[nodiscard]] bool StartTransport();
-
-        /// Formats one user-configured Presence line from a player snapshot.
-        [[nodiscard]] static std::string RenderPresenceTemplate(
-            std::string_view presenceTemplate,
-            const core::PlayerSnapshot &snapshot,
-            std::string_view locationText = {});
-
         /// Sends the stable loading activity.
         void SendLoadingPresence();
 

@@ -3,6 +3,7 @@
 #include <Windows.h>
 
 #include "DragonbornPresence.h"
+#include "DragonbornPresence/adapters/discord/DiscordSdkLoader.h"
 
 #include <exception>
 #include <filesystem>
@@ -100,6 +101,16 @@ SKSEPluginLoad(const SKSE::LoadInterface* skse)
 
         SKSE::Init(skse);
         if (!InitializeLogging()) return false;
+
+        std::string discordFailure;
+        if (!DragonbornPresence::adapters::discord::IsDiscordRunning(&discordFailure))
+        {
+            SKSE::log::error(
+                "DragonbornPresence disabled before Discord SDK initialization: {}",
+                discordFailure.empty() ? "Discord Desktop is unavailable."
+                                       : discordFailure);
+            return false;
+        }
 
         const auto* plugin = SKSE::PluginDeclaration::GetSingleton();
         if (!plugin) {

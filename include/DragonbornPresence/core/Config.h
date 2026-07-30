@@ -4,25 +4,20 @@
 
 #include <cstdint>
 #include <string>
-#include <string_view>
 #include <vector>
 
 namespace DragonbornPresence::core
 {
 
-    inline constexpr std::int64_t kSupportedConfigSchemaVersion = 1;
+    using ApplicationId = std::int64_t;
 
-    inline constexpr std::string_view kDefaultDetailsTemplate = "{difficulty}";
-    inline constexpr std::string_view kDefaultStateTemplate =
-        "lvl-{lvl} {deaths} {stone}";
-    inline constexpr std::string_view kLegacyDefaultStateTemplate =
-        "lvl-{lvl} 💀-{deaths} {stone}";
-    inline constexpr std::string_view kDefaultLargeTextTemplate = "{player}";
-    inline constexpr std::string_view kDefaultCombatTextTemplate = "{combat}";
+    inline constexpr ApplicationId kDefaultApplicationId = 1527543892151373937;
+    inline constexpr std::int64_t kSupportedConfigSchemaVersion = 1;
 
     struct Config
     {
         bool enabled = true;
+        ApplicationId applicationId = kDefaultApplicationId;
 
         std::string largeImage = "stb_logo";
         std::string largeText = "Skyrim True Believer";
@@ -31,11 +26,6 @@ namespace DragonbornPresence::core
         std::string combatImage = "combat";
 
         std::vector<LocationImageRule> locationImageRules;
-
-        std::string detailsTemplate{kDefaultDetailsTemplate};
-        std::string stateTemplate{kDefaultStateTemplate};
-        std::string largeTextTemplate{kDefaultLargeTextTemplate};
-        std::string combatTextTemplate{kDefaultCombatTextTemplate};
     };
 
 } // namespace DragonbornPresence::core
