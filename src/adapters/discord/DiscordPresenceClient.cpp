@@ -247,15 +247,9 @@ namespace DragonbornPresence::adapters::discord
         if (!IsActive())
             return false;
 
-        std::string failureReason;
-        if (!IsDiscordRunning(&failureReason))
-        {
-            Disable(
-                failureReason.empty() ? "Discord Desktop stopped responding or exited"
-                                      : failureReason);
-            return false;
-        }
-
+        // Discord exiting is reported by Core::RunCallbacks as NotRunning.
+        // Do not call IsDiscordRunning here: its process snapshot costs up to
+        // ~10 ms, and this runs inside the SKSE task that the frame waits on.
         ::discord::Result result = ::discord::Result::InternalError;
         try
         {

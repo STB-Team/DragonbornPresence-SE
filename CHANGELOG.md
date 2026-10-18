@@ -2,6 +2,8 @@
 
 ## Не выпущено
 
+- Убрана проверка списка процессов Windows (`CreateToolhelp32Snapshot`) из каждого `RunCallbacks` раз в 500 мс. Она выполнялась внутри SKSE task, которую ждёт кадр, и стоила до ~10 мс, из-за чего кадры удлинялись до ~30 мс. О закрытии Discord SDK сообщает сам: `Core::RunCallbacks` возвращает `NotRunning`.
+
 ## 4.0.0 — 2026-07-23
 
 - Архитектурная миграция завершена: production-код разделён на независимые `core`, `application`, `adapters/config`, `adapters/discord` и `adapters/SkyrimTrueBeliever`.
