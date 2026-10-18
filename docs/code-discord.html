@@ -37,6 +37,6 @@ error/timeout       → Disable()</code></pre><p>Coordinator продолжае�
 <section id="failure"><h2>7. Fail closed</h2><p>После SDK result error, callback error, timeout или exception client:</p><ul><li>помечает transport unhealthy;</li><li>очищает pending state;</li><li>освобождает <code>discord::Core</code>;</li><li>пишет operation, имя result, числовой код и объяснение;</li><li>не пытается reconnect в текущем процессе.</li></ul><p>Исключение — <code>NotRunning</code> из <code>RunCallbacks</code> или activity callback: это обычное закрытие Discord, поэтому client освобождает core и снова ждёт процесс. Остальное — сознательная политика: продолжать вызывать SDK после неизвестного сбоя опаснее, чем отключить необязательный Presence.</p><p><a href="https://github.com/STB-Team/DragonbornPresence-SE/blob/master/src/adapters/discord/DiscordPresenceClient.cpp">Открыть DiscordPresenceClient.cpp</a></p></section>
 
 <nav class="page-nav" aria-label="Переходы"><a href="code-game.html"><small>Назад</small>Skyrim True Believer</a><a href="code-application.html"><small>Далее</small>Application и runtime</a></nav>
-<footer>DragonbornPresence 4.0.0 · актуальная архитектура · глава 4 из 7</footer>
+<footer>DragonbornPresence 4.0.3 · актуальная архитектура · глава 4 из 7</footer>
 </main></div></body>
 </html>

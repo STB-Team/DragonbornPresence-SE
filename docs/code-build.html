@@ -51,6 +51,6 @@ SKSE/Plugins/DragonbornPresence.json</code></pre><p>Скрипт отклоня�
 <section id="release"><h2>7. Tag-gated GitHub Release</h2><p>Workflow для тега <code>v*</code> выполняет полный gate:</p><ol class="steps"><li>извлекает версию из <code>project(DragonbornPresence VERSION ...)</code>;</li><li>требует точное соответствие имени тега <code>vX.Y.Z</code>;</li><li>собирает и запускает все тесты;</li><li>собирает production Release;</li><li>проверяет ZIP manifest и JSON;</li><li>только затем вызывает <code>gh release create</code>.</li></ol><p>Несовпадающая версия, failing test или неверный архив блокируют публикацию.</p><p><a href="https://github.com/STB-Team/DragonbornPresence-SE/blob/master/.github/workflows/ci.yml">Открыть CI</a> · <a href="https://github.com/STB-Team/DragonbornPresence-SE/blob/master/.github/workflows/release.yml">Открыть release workflow</a></p></section>
 
 <nav class="page-nav" aria-label="Переходы"><a href="code-application.html"><small>Назад</small>Application и runtime</a><a href="code-recipes.html"><small>Далее</small>Рецепты изменений</a></nav>
-<footer>DragonbornPresence 4.0.0 · актуальная архитектура · глава 6 из 7</footer>
+<footer>DragonbornPresence 4.0.3 · актуальная архитектура · глава 6 из 7</footer>
 </main></div></body>
 </html>
