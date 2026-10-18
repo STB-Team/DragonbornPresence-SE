@@ -117,7 +117,7 @@ docs/                                    — веб-документация
       <div class="grid">
         <div class="card"><strong>Игра</strong><p>Текущий Skyrim SE/AE runtime, SKSE64 и Address Library сборки STB.</p></div>
         <div class="card"><strong>STB</strong><p>Текущий <code>STB.esp</code> и его MCM data-storage quest.</p></div>
-        <div class="card"><strong>Discord</strong><p>Установленный и уже запущенный Discord Desktop, Application ID <code>1527543892151373937</code> и assets команды. Без активного процесса инициализация плагина прекращается до загрузки <code>discord_game_sdk.dll</code>; Discord автоматически не запускается.</p></div>
+        <div class="card"><strong>Discord</strong><p>Установленный Discord Desktop, Application ID <code>1527543892151373937</code> и assets команды. Discord можно запустить до или во время игры: плагин раз в 2 с проверяет процесс в фоне и подключается, когда он появится. Discord автоматически не запускается.</p></div>
         <div class="card"><strong>Обновление</strong><p>Один ограниченный callback и снимок игрового состояния раз в 500 мс на game thread.</p></div>
       </div>
     </section>
@@ -191,7 +191,7 @@ ctest --preset tests</code></pre>
     <section id="diagnostics">
       <h2>Диагностика</h2>
       <pre><code>%USERPROFILE%\Documents\My Games\Skyrim Special Edition\SKSE\DragonbornPresence.log</code></pre>
-      <p>Перед инициализацией проверяются обработчик <code>discord://</code>, исполняемый файл, соответствующий процесс и локальный Discord SDK. Плагин ничего не устанавливает и не запускает. Ошибка клиента, SDK, callback или C++-исключение переводит интеграцию в окончательно остановленное состояние; Skyrim продолжает работу.</p>
+      <p>Фоновый поток проверяет обработчик <code>discord://</code>, исполняемый файл и соответствующий процесс; локальный Discord SDK загружается только после того, как процесс найден. Плагин ничего не устанавливает и не запускает. Закрытие Discord во время игры возвращает плагин в ожидание. Другая ошибка SDK, callback или C++-исключение переводит интеграцию в окончательно остановленное состояние; Skyrim продолжает работу.</p>
       <h3>Таймер</h3>
       <pre><code>Discord Game SDK initialized for application ...; session_start=1784380000.
 Presence updated; session_start=1784380000.

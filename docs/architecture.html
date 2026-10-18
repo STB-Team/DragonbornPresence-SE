@@ -129,7 +129,7 @@ StbRuntimeAdapter(coordinator, logger)</code></pre>
       <h2>5. Жизненный цикл</h2>
       <ol class="steps">
         <li><strong><code>SKSEPluginLoad</code>.</strong> Проверяется входной указатель, вызывается <code>SKSE::Init</code>, создаётся file logger.</li>
-        <li><strong>Проверка Discord.</strong> <code>IsDiscordRunning</code> проверяет protocol handler, executable и процесс. Плагин не скачивает и не запускает Discord.</li>
+        <li><strong>Проверка Discord.</strong> Фоновый поток <code>DiscordPresenceClient</code> раз в 2 с вызывает <code>IsDiscordRunning</code> (protocol handler, executable и процесс). SDK создаётся на main thread только после того, как процесс найден. Плагин не скачивает и не запускает Discord.</li>
         <li><strong>Конфигурация.</strong> <code>LoadConfig</code> читает JSON либо оставляет безопасные defaults.</li>
         <li><strong>Messaging listener.</strong> <code>main.cpp</code> подписывается на сообщения SKSE.</li>
         <li><strong><code>kDataLoaded</code>.</strong> Runtime adapter проверяет UI, event source и TaskInterface; coordinator инициализирует Discord transport, кэширует формы STB и отправляет loading Presence.</li>
@@ -189,7 +189,7 @@ StbRuntimeAdapter(coordinator, logger)</code></pre>
       <ul>
         <li>Одинаковый payload не отправляется повторно.</li>
         <li>Пока предыдущий update callback не завершён, второй update не ставится.</li>
-        <li>Callback timeout, Discord result error или исчезновение клиента permanently disables transport.</li>
+        <li>Закрытие Discord (<code>NotRunning</code>) освобождает core и возвращает client в ожидание; callback timeout или любая другая Discord result error permanently disables transport.</li>
         <li>Все известные <code>discord::Result</code> декодируются в имя, числовой код и понятное объяснение.</li>
       </ul>
     </section>
@@ -220,7 +220,8 @@ atomic pending false?
             <tr><td>Menu/combat sinks</td><td>Ловят исключение до возврата в Skyrim и останавливают интеграцию.</td></tr>
             <tr><td>Main-thread task</td><td>Ловит исключение, останавливает scheduler и coordinator.</td></tr>
             <tr><td>Scheduler thread</td><td>Останавливает producer, но не уничтожает Discord core на фоновом потоке.</td></tr>
-            <tr><td>Discord callback/result</td><td>Transport становится inactive; повторных SDK-вызовов нет.</td></tr>
+            <tr><td>Discord закрыт (<code>NotRunning</code>)</td><td>Core освобождается; client ждёт, пока фоновая проверка снова найдёт Discord.</td></tr>
+            <tr><td>Другой Discord callback/result</td><td>Transport становится inactive; повторных SDK-вызовов нет.</td></tr>
           </tbody>
         </table>
       </div>

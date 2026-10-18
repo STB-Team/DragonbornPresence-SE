@@ -170,7 +170,7 @@ DragonbornPresence.json
 - сохранить pending callback guard;
 - ограничить текстовые поля 127 байтами через `core::LimitUtf8Bytes`;
 - не хранить входные `string_view` после `UpdateActivity()`;
-- permanently disable transport после SDK error или timeout.
+- после `NotRunning` (Discord закрыт) освобождать core и снова ждать Discord; после любой другой SDK error или timeout — permanently disable transport.
 
 Если меняется только содержимое существующих `details`, `state`, `largeText` или `smallText`, Discord adapter обычно менять не нужно.
 
@@ -221,6 +221,8 @@ Coordinator не должен принимать `RE::SomeEvent`.
 
 - Skyrim forms и Discord core обрабатываются на Skyrim main thread;
 - scheduler thread только спит и вызывает `SKSE::TaskInterface::AddTask`;
+- availability thread `DiscordPresenceClient` только раз в 2 с вызывает `IsDiscordRunning` и выставляет atomic-флаг; SDK вызывается только на main thread;
+- process snapshot (`IsDiscordRunning`) никогда не выполняется внутри SKSE task: он стоит миллисекунды и задерживает кадр;
 - одновременно существует не более одной pending callback task;
 - event storm не создаёт неограниченную очередь;
 - `StbRuntimeAdapter` объявлен последним в composition root и уничтожается первым;
@@ -237,11 +239,11 @@ Coordinator не должен принимать `RE::SomeEvent`.
 - исключения не выходят из `SKSEPluginLoad`;
 - исключения не выходят из публичных функций `DragonbornPresence.h`;
 - исключения не выходят из event sinks и SKSE tasks;
-- неизвестное состояние Discord transport приводит к окончательной остановке интеграции в текущем процессе;
+- закрытие Discord (`NotRunning`) возвращает client в ожидание; любое другое неизвестное состояние Discord transport приводит к окончательной остановке интеграции в текущем процессе;
 - отсутствующие optional данные используют fallback;
 - отсутствие обязательного Skyrim/SKSE service предотвращает частичную регистрацию runtime.
 
-Не добавлять скрытые retries, reconnect, автоматический запуск Discord или fake fallback implementation.
+Не добавлять скрытые retries, reconnect после ошибок SDK, автоматический запуск Discord или fake fallback implementation. Единственное допустимое переподключение — после того как фоновая проверка снова нашла процесс Discord.
 
 ## Presence-инварианты
 

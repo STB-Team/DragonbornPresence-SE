@@ -7,13 +7,17 @@
 
 #include <array>
 #include <chrono>
+#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
 #include <format>
 #include <memory>
+#include <mutex>
+#include <stop_token>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <utility>
 
 namespace DragonbornPresence::adapters::discord
@@ -26,6 +30,11 @@ namespace DragonbornPresence::adapters::discord
         constexpr std::chrono::milliseconds
             kActivityCallbackTimeout{10000};
         constexpr std::size_t kDiscordTextMaxBytes = 127;
+
+        constexpr std::chrono::seconds kAvailabilityCheckInterval{2};
+
+        /// Core::Create failures in a row while Discord is running, about 20 s.
+        constexpr std::uint32_t kMaxFailedConnectAttempts = 10;
 
         struct DiscordResultDetails
         {
@@ -160,27 +169,76 @@ namespace DragonbornPresence::adapters::discord
         transportHealthy_ = false;
         if (!config.enabled)
         {
+            permanentlyDisabled_ = true;
             SKSE::log::info(
                 "Discord presence is disabled by configuration; the SDK was not loaded.");
             return false;
         }
 
-        std::string failureReason;
-        if (!IsDiscordRunning(&failureReason))
+        applicationId_ = config.applicationId;
+        failedConnectAttempts_ = 0;
+        permanentlyDisabled_ = false;
+        waitingForDiscord_ = true;
+        try
         {
-            LogFailure(
-                "Discord availability check",
-                failureReason.empty() ? "Discord Desktop is unavailable."
-                                      : failureReason);
+            StartAvailabilityWatcher();
+        }
+        catch (const std::exception &error)
+        {
+            permanentlyDisabled_ = true;
+            LogFailure("starting the Discord availability thread", error.what());
             return false;
         }
+
+        SKSE::log::info(
+            "Waiting for Discord Desktop: a background thread checks every {} s, "
+            "and Presence connects as soon as Discord is running.",
+            kAvailabilityCheckInterval.count());
+        return true;
+    }
+
+    void DiscordPresenceClient::StartAvailabilityWatcher()
+    {
+        if (availabilityThread_.joinable())
+            return;
+
+        availabilityThread_ = std::jthread(
+            [this](std::stop_token stopToken) noexcept
+            {
+                std::mutex mutex;
+                std::condition_variable_any wakeUp;
+                while (!stopToken.stop_requested())
+                {
+                    // The process snapshot costs milliseconds, so it runs here
+                    // and never on the Skyrim task that the frame waits for.
+                    if (waitingForDiscord_ && !discordDetected_ &&
+                        IsDiscordRunning(nullptr))
+                    {
+                        discordDetected_ = true;
+                    }
+
+                    std::unique_lock lock(mutex);
+                    wakeUp.wait_for(
+                        lock,
+                        stopToken,
+                        kAvailabilityCheckInterval,
+                        []
+                        { return false; });
+                }
+            });
+    }
+
+    void DiscordPresenceClient::Connect() noexcept
+    {
+        SKSE::log::info("Discord Desktop detected; connecting.");
+
+        std::string failureReason;
         if (!LoadDiscordSdk(&failureReason))
         {
-            LogFailure(
-                "Discord SDK load",
+            Disable(
                 failureReason.empty() ? "discord_game_sdk.dll could not be loaded."
                                       : failureReason);
-            return false;
+            return;
         }
 
         ::discord::Core *createdCore = nullptr;
@@ -188,8 +246,7 @@ namespace DragonbornPresence::adapters::discord
         try
         {
             result = ::discord::Core::Create(
-                static_cast<::discord::ClientId>(
-                    config.applicationId),
+                static_cast<::discord::ClientId>(applicationId_),
                 DiscordCreateFlags_NoRequireDiscord,
                 &createdCore);
         }
@@ -197,55 +254,92 @@ namespace DragonbornPresence::adapters::discord
         {
             delete createdCore;
             LogFailure("Discord Core::Create exception", error.what());
-            return false;
+            Disable("Discord Core::Create raised an exception");
+            return;
         }
         catch (...)
         {
             delete createdCore;
-            LogFailure(
-                "Discord Core::Create exception",
-                "an unknown C++ exception escaped from the SDK wrapper");
-            return false;
+            Disable("Discord Core::Create raised an unknown exception");
+            return;
         }
 
         std::unique_ptr<::discord::Core> candidate(createdCore);
         if (result != ::discord::Result::Ok || !candidate)
         {
-            LogResultFailure("Core::Create", result);
-            return false;
+            // Discord may still be starting and not accept connections yet.
+            const auto details = DescribeResult(result);
+            if (++failedConnectAttempts_ >= kMaxFailedConnectAttempts)
+            {
+                LogResultFailure("Core::Create", result);
+                Disable("Core::Create kept failing while Discord was running");
+                return;
+            }
+            try
+            {
+                SKSE::log::warn(
+                    "Discord Core::Create returned {} (code {}), attempt {} of {}; "
+                    "retrying after the next background check.",
+                    details.name,
+                    static_cast<int>(result),
+                    failedConnectAttempts_,
+                    kMaxFailedConnectAttempts);
+            }
+            catch (...)
+            {
+            }
+            return;
         }
 
         core_ = std::move(candidate);
         transportHealthy_ = true;
+        waitingForDiscord_ = false;
+        failedConnectAttempts_ = 0;
+        // Discord forgot the old activity; send the current one again.
+        lastActivitySignature_.clear();
         try
         {
             core_->SetLogHook(::discord::LogLevel::Warn, LogSdkMessage);
+            SKSE::log::info(
+                "Discord Game SDK connected for application {}; session_start={}.",
+                applicationId_,
+                sessionStartTimestamp_);
         }
         catch (const std::exception &error)
         {
-            Disable(std::format(
-                "installing the Discord SDK log hook raised an exception: {}",
-                error.what()));
-            return false;
+            LogFailure("installing the Discord SDK log hook", error.what());
+            Disable("installing the Discord SDK log hook raised an exception");
         }
         catch (...)
         {
             Disable(
                 "installing the Discord SDK log hook raised an unknown exception");
-            return false;
         }
+    }
 
-        SKSE::log::info(
-            "Discord Game SDK initialized for application {}; session_start={}.",
-            config.applicationId,
-            sessionStartTimestamp_);
-        return true;
+    void DiscordPresenceClient::DropConnection() noexcept
+    {
+        transportHealthy_ = false;
+        pendingActivitySignature_.clear();
+        pendingActivityCallbackTicks_ = 0;
+        lastActivitySignature_.clear();
+        activityDiscordExited_ = false;
+        core_.reset();
+        discordDetected_ = false;
+        waitingForDiscord_ = true;
     }
 
     bool DiscordPresenceClient::RunCallbacks()
     {
-        if (!IsActive())
+        if (permanentlyDisabled_)
             return false;
+
+        if (!core_)
+        {
+            if (discordDetected_.exchange(false))
+                Connect();
+            return !permanentlyDisabled_;
+        }
 
         // Discord exiting is reported by Core::RunCallbacks as NotRunning.
         // Do not call IsDiscordRunning here: its process snapshot costs up to
@@ -269,8 +363,22 @@ namespace DragonbornPresence::adapters::discord
 
         if (result != ::discord::Result::Ok)
         {
+            if (result == ::discord::Result::NotRunning)
+            {
+                SKSE::log::warn(
+                    "Discord was closed; Presence waits for it to start again.");
+                DropConnection();
+                return true;
+            }
             DisableForResult("RunCallbacks", result);
             return false;
+        }
+        if (!transportHealthy_ && activityDiscordExited_)
+        {
+            SKSE::log::warn(
+                "Discord was closed; Presence waits for it to start again.");
+            DropConnection();
+            return true;
         }
         if (!transportHealthy_)
         {
@@ -299,12 +407,13 @@ namespace DragonbornPresence::adapters::discord
 
     bool DiscordPresenceClient::IsActive() const noexcept
     {
-        return core_ && transportHealthy_;
+        // Waiting for Discord is not a failure: updates are dropped until it runs.
+        return !permanentlyDisabled_;
     }
 
     bool DiscordPresenceClient::UpdateActivity(const core::PresencePayload &payload)
     {
-        if (!IsActive() || !pendingActivitySignature_.empty())
+        if (!core_ || !transportHealthy_ || !pendingActivitySignature_.empty())
             return false;
 
         try
@@ -379,6 +488,11 @@ namespace DragonbornPresence::adapters::discord
                             SKSE::log::info(
                                 "Presence updated; session_start={}.",
                                 sessionStartTimestamp_);
+                        }
+                        else if (result == ::discord::Result::NotRunning)
+                        {
+                            transportHealthy_ = false;
+                            activityDiscordExited_ = true;
                         }
                         else
                         {
@@ -462,20 +576,20 @@ namespace DragonbornPresence::adapters::discord
 
     void DiscordPresenceClient::DisableForResult(std::string_view operation, ::discord::Result result) noexcept
     {
-        transportHealthy_ = false;
-        pendingActivitySignature_.clear();
-        pendingActivityCallbackTicks_ = 0;
         LogResultFailure(operation, result);
-        core_.reset();
+        Disable("the Discord SDK result above is not recoverable");
     }
 
     void DiscordPresenceClient::Disable(std::string_view reason) noexcept
     {
-        const bool hadWork = core_ || transportHealthy_;
+        const bool wasEnabled = !permanentlyDisabled_;
+        permanentlyDisabled_ = true;
+        waitingForDiscord_ = false;
+        availabilityThread_.request_stop();
         transportHealthy_ = false;
         pendingActivitySignature_.clear();
         pendingActivityCallbackTicks_ = 0;
-        if (hadWork)
+        if (wasEnabled)
             LogFailure("safe shutdown", reason);
         core_.reset();
     }
